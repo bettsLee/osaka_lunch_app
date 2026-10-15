@@ -1,0 +1,20 @@
+# Next.js
+.next/
+out/
+node_modules/
+
+# PWA (빌드 시 자동 생성)
+public/sw.js
+public/workbox-*.js
+public/swe-worker-*.js
+
+# 환경변수
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 타입스크립트 빌드 캐시
+tsconfig.tsbuildinfo
+next-env.d.ts
