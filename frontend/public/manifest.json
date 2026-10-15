@@ -1,0 +1,12 @@
+{
+  "name": "Osaka Lunch",
+  "short_name": "Osaka Lunch",
+  "description": "오사카 점심 식당을 저장하고 관리하는 앱",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "ko",
+  "icons": []
+}
