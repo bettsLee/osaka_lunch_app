@@ -32,7 +32,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: AI 구조화 (글이 바뀐 가게만)
-        run: python batch/structure_shops.py --max-minutes 45 --limit "$AI_LIMIT"
+        run: python batch/structure_shops.py --max-minutes 45 --workers 32 --limit "$AI_LIMIT"   # 20곳 시험: 8개 동시면 전체 약 3시간 → 32개로 1~2번에 끝냄
         env:
           AI_LIMIT: ${{ inputs.ai_limit || '0' }}   # 매일 예약 실행 때는 0 (전부)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
