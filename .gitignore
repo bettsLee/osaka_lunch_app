@@ -44,3 +44,8 @@ yarn-error.log*
 
 # ===== IntelliJ (root project) =====
 out/
+
+# ===== 평가 데이터 (핫페퍼 원문 포함, 저장소에 올리지 않기) =====
+eval_set.json
+ai_results_*.json
+__pycache__/
