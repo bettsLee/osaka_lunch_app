@@ -70,24 +70,35 @@ def shop_text(row):
     return "\n".join(f"{label}: {row.get(field) or ''}" for field, label in FIELDS)
 
 
+# JSON 응답을 요청하는 방식. 지금 문서의 방식(mimeType은 문자열이 아니라 APPLICATION_JSON 값)이 거절되면
+# 이전 방식(responseMimeType + responseJsonSchema)으로 한 번 바꾸고, 그 뒤로는 되는 쪽만 씀
+FORMATS = [
+    {"responseFormat": {"text": {"mimeType": "APPLICATION_JSON", "schema": SCHEMA}}},
+    {"responseMimeType": "application/json", "responseJsonSchema": SCHEMA},
+]
+_format = [0]
+
+
 def call_gemini(prompt, key, model):
-    body = {"contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseFormat": {"text": {"mimeType": "application/json", "schema": SCHEMA}}}}
-    req = urllib.request.Request(ENDPOINT.format(model=model), data=json.dumps(body).encode("utf-8"), method="POST",
-                                 headers={"x-goog-api-key": key, "Content-Type": "application/json"})
-    for attempt in range(4):  # 잠깐 몰리는 경우(429 · 5xx)만 쉬었다가 다시
+    for attempt in range(5):  # 잠깐 몰리는 경우(429 · 5xx)만 쉬었다가 다시
+        body = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": FORMATS[_format[0]]}
+        req = urllib.request.Request(ENDPOINT.format(model=model), data=json.dumps(body).encode("utf-8"),
+                                     method="POST", headers={"x-goog-api-key": key, "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
                 res = json.loads(r.read().decode("utf-8"))
             break
         except urllib.error.HTTPError as e:
-            msg = e.read().decode("utf-8")[:500]
-            if e.code in (429, 500, 502, 503) and attempt < 3:
+            msg = e.read().decode("utf-8")[:1500]
+            if e.code == 400 and "response_format" in msg and _format[0] + 1 < len(FORMATS):
+                _format[0] += 1
+                continue
+            if e.code in (429, 500, 502, 503) and attempt < 4:
                 time.sleep(5 * (attempt + 1))
                 continue
             raise RuntimeError(f"Gemini 오류 {e.code}: {msg}")
         except (urllib.error.URLError, TimeoutError) as e:
-            if attempt < 3:
+            if attempt < 4:
                 time.sleep(5)
                 continue
             raise RuntimeError(f"Gemini에 연결하지 못했어요: {e}")
