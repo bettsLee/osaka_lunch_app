@@ -1,0 +1,27 @@
+name: Collect Shops
+
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 매일 04:00 KST (UTC 19:00). main 브랜치에 있어야 돌아감
+  workflow_dispatch:       # Actions 탭에서 손으로 실행
+
+concurrency: collect-shops
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 핫페퍼 점심 가게 수집
+        run: python batch/collect.py
+        env:
+          HOTPEPPER_API_KEY: ${{ secrets.HOTPEPPER_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
