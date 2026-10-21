@@ -17,7 +17,6 @@ import { stillGoing, type Going, type PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
 import InstallHint from "./InstallHint";
-import GoingBanner from "./GoingBanner";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -36,7 +35,7 @@ type Tab = "lunch" | "zukan" | "settings";
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
 const INSTALL_HINT_KEY = "osaka-lunch-install-hint-closed"; // 홈 화면 추가 안내를 닫음
-const GOING_KEY = "osaka-lunch-going"; // 지금 가는 중인 가게 (홈의 가는 중 표시)
+const GOING_KEY = "osaka-lunch-going"; // 여기 갈래요로 정한 가게 (지도의 파란 핀 · 결과 카드의 길찾기 · 취소)
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
@@ -61,7 +60,7 @@ export default function HomeScreen() {
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
   const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
-  const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 홈에 가는 중 표시
+  const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 정한 가게 (지도의 파란 핀)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
@@ -396,6 +395,7 @@ export default function HomeScreen() {
             showLocate={mode === "home" && (!listOpen || sheetHidden)} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감 (시트를 접으면 다시 보임)
             pickedId={mode === "result" ? (picked?.id ?? null) : null}
             onPick={pickFromMap}
+            goingId={mode === "home" ? (goingNow?.shopId ?? null) : null} // 정한 가게는 파란 핀으로 (10/22 도그푸딩)
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-[#5F5E58]">
@@ -468,6 +468,12 @@ export default function HomeScreen() {
           canRespin={pool.length > 1}
           collapsed={cardHidden}
           onToggle={() => setCardHidden((v) => !v)}
+          goingAt={goingNow?.shopId === picked.id ? goingNow.chosenAt : null}
+          onCancelGoing={() => {
+            if (goingNow) cancelGoing(goingNow, "cancel");
+            rememberGoing(null);
+            backHome();
+          }}
         />
       )}
 
@@ -503,15 +509,6 @@ export default function HomeScreen() {
             >
               <span className="h-1 w-10 rounded-full bg-[#CFCCC2]" />
             </button>
-            {!sheetHidden && goingNow && (
-              <GoingBanner
-                going={goingNow}
-                onCancel={() => {
-                  cancelGoing(goingNow, "cancel");
-                  rememberGoing(null);
-                }}
-              />
-            )}
             {!sheetHidden && near && (
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">

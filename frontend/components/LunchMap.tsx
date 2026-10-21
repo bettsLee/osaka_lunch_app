@@ -17,11 +17,12 @@ type Props = {
   showLocate?: boolean; // '내 위치로' 버튼
   visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 채운 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤
   onPick?: (shopId: string) => void; // 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩). 없으면 이름 말풍선 (도감)
+  goingId?: string | null; // 여기 갈래요로 정한 가게: 파란 핀으로 크게, 다른 핀 위로
 };
 
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
-export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds, onPick }: Props) {
+export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds, onPick, goingId = null }: Props) {
   const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -131,16 +132,18 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     });
   }, [shops, t, visitedIds, pickable]);
 
-  // 룰렛 깜빡임 · 결과 강조
+  // 룰렛 깜빡임 · 결과 강조 · 정한 가게
   useEffect(() => {
     box.current?.classList.toggle("is-choosing", flashId !== null || pickedId !== null);
     markers.current.forEach(({ marker, z }, id) => {
       const el = marker.getElement()?.querySelector(".price-pin");
       el?.classList.toggle("is-flash", id === flashId && pickedId === null);
       el?.classList.toggle("is-picked", id === pickedId);
-      marker.setZIndexOffset(id === pickedId || (id === flashId && pickedId === null) ? TOP_Z : z);
+      const going = id === goingId && pickedId === null && flashId === null;
+      el?.classList.toggle("is-going", going);
+      marker.setZIndexOffset(id === pickedId || (id === flashId && pickedId === null) || going ? TOP_Z : z);
     });
-  }, [flashId, pickedId, shops]);
+  }, [flashId, pickedId, shops, goingId]);
 
   return (
     // isolate: 지도 안의 z-index(출처 표시 1000 등)가 밖으로 새어 주문 문장 · 질문 시트 위에 뜨지 않게

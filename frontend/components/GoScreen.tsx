@@ -1,6 +1,6 @@
 "use client";
 
-// S4 여기 갈래요 후: 길찾기(누르면 홈의 가는 중으로) + '다녀온 뒤에 알려 주세요'. 알림 권한은 여기서 물음 (10/21 결정: 이유가 보이는 순간)
+// S4 여기 갈래요 후: 길찾기(누르면 홈으로, 정한 가게는 지도의 파란 핀) + '다녀온 뒤에 알려 주세요'. 알림 권한은 여기서 물음 (10/21 결정: 이유가 보이는 순간)
 // 알림을 못 쓰거나 거절하면 1시간 뒤 앱을 열 때 질문 카드로 물어봄
 import { useEffect, useRef, useState } from "react";
 import { directionsUrl, priceRange, type NearbyShop } from "@/lib/lunch";
@@ -51,7 +51,7 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
         rel="noreferrer"
         onClick={() => {
           track("directions_click", { from: "go" });
-          // 구글 지도는 새 창으로 열리고, 앱은 홈의 가는 중으로 (10/22 도그푸딩)
+          // 구글 지도는 새 창으로 열리고, 앱은 홈으로 (10/22 도그푸딩)
           // 바로 화면을 바꾸면 링크가 사라져서 브라우저가 새 창을 열지 않음 → 링크가 열린 다음에
           setTimeout(onHome, 0);
         }}
