@@ -8,9 +8,12 @@ async function pushText(data) {
   try {
     const saved = await caches.match("/push-text.json");
     const t = saved ? await saved.json() : null;
-    if (t && t.title && t.body && data.shop) {
-      const body = t.body.replace("{shop}", () => data.shop).replace("{limit}", () => data.limit || ""); // 가게 이름의 $ 같은 글자를 그대로
-      return { title: t.title, body };
+    // kind price: 도착했어요에서 영업 중이라고 답해서 가격만 물음 (예전에 저장한 문구에 없으면 서버 문구)
+    const title = data.kind === "price" ? t && t.titlePrice : t && t.title;
+    const template = data.kind === "price" ? t && t.bodyPrice : t && t.body;
+    if (title && template && data.shop) {
+      const body = template.replace("{shop}", () => data.shop).replace("{limit}", () => data.limit || ""); // 가게 이름의 $ 같은 글자를 그대로
+      return { title, body };
     }
   } catch {
     // 저장해 둔 문구를 못 읽으면 서버 문구

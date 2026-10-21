@@ -166,4 +166,58 @@ class VisitControllerTest {
                 .andExpect(jsonPath("$[1].id").value(older.getId().toString()));
         mvc.perform(get("/api/visits/zukan")).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 도착하면_도감에_바로_들어가고_질문_카드는_가격만() throws Exception {
+        Visit v = saved(ALICE, Duration.ofMinutes(70));
+        String url = "/api/visits/" + v.getId() + "/arrive";
+        mvc.perform(as(BOB, put(url)).content("{\"by\":\"auto\"}")).andExpect(status().isNotFound()); // 남의 기록
+        mvc.perform(as(ALICE, put(url)).content("{\"by\":\"gps\"}")).andExpect(status().isBadRequest());
+        mvc.perform(as(ALICE, put(url)).content("{\"by\":\"auto\"}")).andExpect(status().isNoContent());
+
+        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.arrived").value(true))
+                .andExpect(jsonPath("$.openOk").isEmpty());
+
+        // 그 자리에서 영업 여부를 답함: 처음 도착 방법은 그대로
+        mvc.perform(as(ALICE, put(url)).content("{\"by\":\"manual\",\"openOk\":true}")).andExpect(status().isNoContent());
+        Visit arrived = visits.findById(v.getId()).orElseThrow();
+        assertThat(arrived.getArrivedBy()).isEqualTo("auto");
+        assertThat(arrived.getArrivedAt()).isNotNull();
+        assertThat(arrived.getVisited()).isTrue();
+        assertThat(arrived.getOpenOk()).isTrue();
+        assertThat(arrived.getAnsweredAt()).isNull(); // 가격은 아직이라 질문 카드 · 알림이 남음
+
+        mvc.perform(as(ALICE, put("/api/visits/" + v.getId() + "/cancel"))).andExpect(status().isConflict()); // 도착한 건 취소 못 함
+    }
+
+    @Test
+    void 취소한_기록은_도착할_수_없고_도착해서_문을_닫았으면_더_묻지_않음() throws Exception {
+        Visit cancelled = saved(ALICE, Duration.ofMinutes(20));
+        cancelled.cancel(Instant.now());
+        visits.save(cancelled);
+        mvc.perform(as(ALICE, put("/api/visits/" + cancelled.getId() + "/arrive")).content("{\"by\":\"manual\"}"))
+                .andExpect(status().isConflict());
+
+        // 도착했는데 영업을 안 함: 가격은 알 수 없어서 바로 답한 것으로
+        Visit closed = saved(ALICE, Duration.ofMinutes(20));
+        mvc.perform(as(ALICE, put("/api/visits/" + closed.getId() + "/arrive")).content("{\"by\":\"manual\",\"openOk\":false}"))
+                .andExpect(status().isNoContent());
+        Visit answered = visits.findById(closed.getId()).orElseThrow();
+        assertThat(answered.getVisited()).isTrue();
+        assertThat(answered.getOpenOk()).isFalse();
+        assertThat(answered.getPriceOk()).isNull();
+        assertThat(answered.getAnsweredAt()).isNotNull();
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, put("/api/visits/" + closed.getId() + "/arrive")).content("{\"by\":\"auto\"}"))
+                .andExpect(status().isConflict()); // 이미 답함
+
+        // '다녀왔어요?' 카드에서도 닫혀 있었으면 가격 없이 보낼 수 있음
+        Visit asked = saved(ALICE, Duration.ofMinutes(100));
+        mvc.perform(as(ALICE, put("/api/visits/" + asked.getId() + "/feedback")).content("{\"visited\":true,\"openOk\":false}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, put("/api/visits/" + asked.getId() + "/feedback")).content("{\"visited\":true,\"openOk\":true}"))
+                .andExpect(status().isBadRequest()); // 영업했으면 가격 답은 필요
+    }
 }

@@ -55,10 +55,17 @@ public class VisitController {
     public record FeedbackRequest(@NotNull Boolean visited, Boolean openOk, Boolean priceOk) {
     }
 
-    /** priceLimit: 그때 고른 가격 상한. '다녀왔어요?'에서 "n엔 이하였나요?"로 물을 때 씀 */
-    public record VisitResponse(UUID id, String shopId, String shopName, Integer priceLimit, Instant chosenAt) {
+    /** 도착했어요. by: auto(앱을 열 때 가게 근처) · manual(버튼). openOk: 그 자리에서 영업 여부를 답했으면 */
+    public record ArriveRequest(@NotNull @Pattern(regexp = "auto|manual") String by, Boolean openOk) {
+    }
+
+    /** priceLimit: 그때 고른 가격 상한. '다녀왔어요?'에서 "n엔 이하였나요?"로 물을 때 씀
+     *  arrived · openOk: 도착했어요로 이미 다녀온 기록이면 질문 카드는 남은 것(가격)만 물음 */
+    public record VisitResponse(UUID id, String shopId, String shopName, Integer priceLimit, Instant chosenAt,
+                                boolean arrived, Boolean openOk) {
         static VisitResponse of(Visit v) {
-            return new VisitResponse(v.getId(), v.getShopId(), v.getShopName(), v.getPriceLimit(), v.getChosenAt());
+            return new VisitResponse(v.getId(), v.getShopId(), v.getShopName(), v.getPriceLimit(), v.getChosenAt(),
+                    v.getArrivedAt() != null, v.getOpenOk());
         }
     }
 
@@ -105,10 +112,27 @@ public class VisitController {
         Visit v = visits.findById(id)
                 .filter(found -> found.getUserId().equals(userId(jwt))) // 남의 기록은 없는 것처럼
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (req.visited() && (req.openOk() == null || req.priceOk() == null)) {
+        // 영업을 안 했으면 가격은 알 수 없어서 비워도 됨 (10/22: 도착했는데 문을 닫은 경우)
+        if (req.visited() && (req.openOk() == null || (req.openOk() && req.priceOk() == null))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "다녀왔으면 영업 · 가격 답이 필요해요");
         }
         v.answer(req.visited(), req.openOk(), req.priceOk(), Instant.now());
+        visits.save(v);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 도착했어요 (10/22 결정: 버튼 + 앱을 열 때 가게 근처면 자동). 다녀온 것으로 보고 도감에 바로 넣음.
+     *  취소했거나 이미 답한 기록은 409, 다시 보내도 괜찮음(영업 답만 더함) */
+    @PutMapping("/{id}/arrive")
+    public ResponseEntity<Void> arrive(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                       @Valid @RequestBody ArriveRequest req) {
+        Visit v = visits.findById(id)
+                .filter(found -> found.getUserId().equals(userId(jwt))) // 남의 기록은 없는 것처럼
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (v.getCancelledAt() != null || v.getAnsweredAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "취소했거나 이미 답한 기록이에요");
+        }
+        v.arrive(req.by(), req.openOk(), Instant.now());
         visits.save(v);
         return ResponseEntity.noContent().build();
     }
@@ -119,8 +143,8 @@ public class VisitController {
         Visit v = visits.findById(id)
                 .filter(found -> found.getUserId().equals(userId(jwt))) // 남의 기록은 없는 것처럼
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (v.getAnsweredAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 답한 기록이에요");
+        if (v.getAnsweredAt() != null || v.getArrivedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 답했거나 도착한 기록이에요");
         }
         v.cancel(Instant.now());
         visits.save(v);
