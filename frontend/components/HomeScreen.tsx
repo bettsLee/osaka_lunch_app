@@ -10,7 +10,7 @@ import {
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
 import { fetchPendingVisit, flushVisits, saveVisit, syncPush, wakeServer } from "@/lib/api";
-import { startAnalytics, track } from "@/lib/analytics";
+import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
@@ -45,6 +45,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
+  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list">("roulette"); // 룰렛 vs 목록 지표
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
@@ -66,7 +67,10 @@ export default function HomeScreen() {
     setData({ status: "loading" });
     fetchLunchShops()
       .then((shops) => setData({ status: "ok", shops }))
-      .catch(() => setData({ status: "error" }));
+      .catch((e: unknown) => {
+        trackError("shops", e);
+        setData({ status: "error" });
+      });
   }, []);
 
   const clearTimers = () => {
@@ -78,6 +82,7 @@ export default function HomeScreen() {
     locate();
     load();
     startAnalytics();
+    watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
     const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 공유 카드로 열었는지
     track("app_open", { lang: pickLang(navigator.languages ?? []), ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포
@@ -144,8 +149,10 @@ export default function HomeScreen() {
     const showResult = () => {
       setFlashId(null);
       setPicked(winner);
+      setPickedFrom("roulette");
       setMode("result");
       track("result_view", {
+        source: "roulette",
         distance_km: Math.round(winner.km * 100) / 100,
         walk_min: winner.walk,
         badge: priceBadge(winner),
@@ -161,6 +168,17 @@ export default function HomeScreen() {
     }
     timers.current.push(setTimeout(showResult, at + SPIN_END_PAUSE_MS));
     skipTo.current = showResult;
+  };
+  // 목록에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
+  const pickFromList = (shop: NearbyShop, position: number) => {
+    clearTimers();
+    setFlashId(null);
+    setPicked(shop);
+    setPickedFrom("list");
+    setMode("result");
+    const distanceKm = Math.round(shop.km * 100) / 100;
+    track("list_item_click", { position, distance_km: distanceKm, price_limit: limit, list_open: listOpen });
+    track("result_view", { source: "list", distance_km: distanceKm, walk_min: shop.walk, badge: priceBadge(shop), price_limit: limit });
   };
   const skip = () => {
     clearTimers();
@@ -190,12 +208,12 @@ export default function HomeScreen() {
       id: crypto.randomUUID(),
       shopId: picked.id,
       shopName: picked.name,
-      source: "roulette",
+      source: pickedFrom,
       distanceKm,
       priceLimit: limit,
       chosenAt: new Date().toISOString(),
     });
-    track("go_here_click", { source: "roulette", distance_km: distanceKm, price_limit: limit });
+    track("go_here_click", { source: pickedFrom, distance_km: distanceKm, price_limit: limit });
     setMode("go");
   };
 
@@ -383,8 +401,9 @@ export default function HomeScreen() {
             </button>
             {rows.length > 0 && (
               <ul className={listOpen ? "max-h-[40dvh] overflow-y-auto" : ""}>
-                {rows.map((s) => (
-                  <li key={s.id} className="flex items-center gap-3 border-t border-[#ECEAE3] py-2.5">
+                {rows.map((s, i) => (
+                  <li key={s.id} className="border-t border-[#ECEAE3]">
+                    <button type="button" onClick={() => pickFromList(s, i)} className="flex w-full items-center gap-3 py-2.5 text-left">
                     {s.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- 핫페퍼 사진을 그대로 씀 (이미지 최적화 비용 없음)
                       <img src={s.photoUrl} alt="" loading="lazy" className="h-12 w-12 flex-none rounded-lg bg-[#ECEAE3] object-cover" />
@@ -399,6 +418,7 @@ export default function HomeScreen() {
                       </p>
                     </div>
                     <p className="text-base font-semibold">{priceLabel(s, t)}</p>
+                    </button>
                   </li>
                 ))}
               </ul>
