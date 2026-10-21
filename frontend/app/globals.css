@@ -53,3 +53,15 @@ body {
   color: #ffffff;
   font-size: 14px;
 }
+
+/* 도감 지도: 다녀온 곳은 채운 핀, 아직 안 간 곳은 점선 핀 */
+.price-pin.is-visited {
+  background: #2457c5;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.price-pin.is-unvisited {
+  border-style: dashed;
+  color: #5f5e58;
+  opacity: 0.85;
+}

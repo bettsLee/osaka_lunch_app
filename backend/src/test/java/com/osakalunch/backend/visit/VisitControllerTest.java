@@ -127,4 +127,27 @@ class VisitControllerTest {
         assertThat(answered.getOpenOk()).isNull();
         assertThat(answered.getPriceOk()).isNull();
     }
+
+    @Test
+    void 도감은_다녀왔다고_답한_내_기록만_최근_것부터() throws Exception {
+        Visit older = saved(ALICE, Duration.ofDays(2));
+        older.answer(true, true, true, Instant.now());
+        visits.save(older);
+        Visit newer = saved(ALICE, Duration.ofHours(3));
+        newer.answer(true, false, true, Instant.now());
+        visits.save(newer);
+        Visit notGone = saved(ALICE, Duration.ofHours(4));
+        notGone.answer(false, null, null, Instant.now());
+        visits.save(notGone);
+        saved(ALICE, Duration.ofHours(2)); // 아직 답 안 함
+        Visit bobs = saved(BOB, Duration.ofHours(3));
+        bobs.answer(true, true, true, Instant.now());
+        visits.save(bobs);
+
+        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(newer.getId().toString()))
+                .andExpect(jsonPath("$[1].id").value(older.getId().toString()));
+        mvc.perform(get("/api/visits/zukan")).andExpect(status().isUnauthorized());
+    }
 }

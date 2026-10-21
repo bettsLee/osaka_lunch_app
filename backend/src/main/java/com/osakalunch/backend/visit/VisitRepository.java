@@ -13,6 +13,9 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
     Optional<Visit> findFirstByUserIdAndAnsweredAtIsNullAndChosenAtBetweenOrderByChosenAtDesc(
             UUID userId, Instant from, Instant to);
 
+    /** 도감: '네, 다녀왔어요'라고 답한 기록, 최근 것부터 */
+    List<Visit> findTop200ByUserIdAndVisitedTrueOrderByChosenAtDesc(UUID userId);
+
     /** 알림 보낼 기록: 답도 알림도 아직이고 chosenAt이 from ~ to 사이 */
     List<Visit> findByAnsweredAtIsNullAndNotifiedAtIsNullAndChosenAtBetween(Instant from, Instant to);
 }

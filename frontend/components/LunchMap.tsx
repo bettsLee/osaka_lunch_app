@@ -15,11 +15,12 @@ type Props = {
   flashId?: string | null;
   pickedId?: string | null;
   showLocate?: boolean; // '내 위치로' 버튼
+  visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 채운 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤
 };
 
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
-export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true }: Props) {
+export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds }: Props) {
   const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -73,16 +74,20 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   const picked = shops.find((s) => s.id === pickedId) ?? null;
   const pickedLat = picked?.lat;
   const pickedLng = picked?.lng;
+  const visitedSpots = visitedIds ? shops.filter((s) => visitedIds.has(s.id)).map((s) => `${s.lat},${s.lng}`).join(";") : "";
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     m.invalidateSize();
-    if (pickedLat !== undefined && pickedLng !== undefined) {
+    if (visitedSpots) {
+      const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
+      m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
+    } else if (pickedLat !== undefined && pickedLng !== undefined) {
       m.fitBounds(L.latLngBounds([here.lat, here.lng], [pickedLat, pickedLng]), { padding: [48, 48], maxZoom: 17 });
     } else {
       m.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000));
     }
-  }, [here, radiusKm, pickedLat, pickedLng]);
+  }, [here, radiusKm, pickedLat, pickedLng, visitedSpots]);
 
   // 보여줄 가게가 바뀌면 가격 핀을 다시 그림
   useEffect(() => {
@@ -92,7 +97,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     markers.current.clear();
     shops.forEach((s, i) => {
       const pin = document.createElement("span");
-      pin.className = "price-pin";
+      pin.className = visitedIds ? `price-pin ${visitedIds.has(s.id) ? "is-visited" : "is-unvisited"}` : "price-pin";
       pin.textContent = priceLabel(s, t);
       const popup = document.createElement("div");
       popup.textContent = `${s.name} · ${t("common.walk", { n: s.walk })}`; // 가게 이름은 바깥 데이터라 글자로만 넣음
@@ -106,7 +111,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
         .addTo(group);
       markers.current.set(s.id, { marker, z });
     });
-  }, [shops, t]);
+  }, [shops, t, visitedIds]);
 
   // 룰렛 깜빡임 · 결과 강조
   useEffect(() => {
