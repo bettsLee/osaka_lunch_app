@@ -16,17 +16,21 @@ type Props = {
   pickedId?: string | null;
   showLocate?: boolean; // '내 위치로' 버튼
   visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 채운 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤
+  onPick?: (shopId: string) => void; // 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩). 없으면 이름 말풍선 (도감)
 };
 
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
-export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds }: Props) {
+export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds, onPick }: Props) {
   const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const pins = useRef<L.LayerGroup | null>(null);
   const me = useRef<L.LayerGroup | null>(null);
   const markers = useRef(new Map<string, { marker: L.Marker; z: number }>());
+  const pick = useRef(onPick); // 핀을 다시 그리지 않고 늘 최신 함수를 부르게
+  pick.current = onPick;
+  const pickable = onPick !== undefined;
   const fit = useRef<() => void>(() => {}); // 지금 기준으로 보이는 범위 맞추기 (숨겨졌다 다시 보일 때도 씀)
 
   // 지도는 한 번만 만듦. 지도 칸 크기가 바뀌면(결과 화면 등) 다시 잼
@@ -110,19 +114,22 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
       const pin = document.createElement("span");
       pin.className = visitedIds ? `price-pin ${visitedIds.has(s.id) ? "is-visited" : "is-unvisited"}` : "price-pin";
       pin.textContent = priceLabel(s, t);
-      const popup = document.createElement("div");
-      popup.textContent = `${s.name} · ${t("common.walk", { n: s.walk })}`; // 가게 이름은 바깥 데이터라 글자로만 넣음
       const z = (shops.length - i) * 10; // 겹치면 목록 앞쪽(싼 곳 · 가까운 곳)이 위로
       const marker = L.marker([s.lat, s.lng], {
         icon: L.divIcon({ className: "price-pin-icon", html: pin, iconSize: [0, 0] }),
         keyboard: false,
         zIndexOffset: z,
-      })
-        .bindPopup(popup)
-        .addTo(group);
+      }).addTo(group);
+      if (pickable) {
+        marker.on("click", () => pick.current?.(s.id));
+      } else {
+        const popup = document.createElement("div");
+        popup.textContent = `${s.name} · ${t("common.walk", { n: s.walk })}`; // 가게 이름은 바깥 데이터라 글자로만 넣음
+        marker.bindPopup(popup);
+      }
       markers.current.set(s.id, { marker, z });
     });
-  }, [shops, t, visitedIds]);
+  }, [shops, t, visitedIds, pickable]);
 
   // 룰렛 깜빡임 · 결과 강조
   useEffect(() => {
