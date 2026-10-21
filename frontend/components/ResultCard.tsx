@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
+import { fetchShopCatch } from "@/lib/api";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 import OrderSheet from "./OrderSheet";
@@ -20,10 +21,21 @@ type Props = {
 };
 
 export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin }: Props) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [catchTr, setCatchTr] = useState<{ id: string; text: string } | null>(null); // 가게 소개 AI 번역 (일본어 화면은 원문만)
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
+  useEffect(() => {
+    if (!shop.catchText || lang === "ja") return;
+    let live = true;
+    fetchShopCatch(shop.id, lang)
+      .then((text) => live && text && setCatchTr({ id: shop.id, text }))
+      .catch(() => {}); // 번역이 없으면 원문만 (서버가 잠들어 있으면 다음에)
+    return () => {
+      live = false;
+    };
+  }, [shop.id, shop.catchText, lang]);
 
   const time = lunchTimeText(shop, day, minutes, t);
   const range = priceRange(shop, t);
@@ -52,6 +64,11 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
         </p>
         {shop.catchText && <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>}
+        {catchTr?.id === shop.id && (
+          <p className="text-[13px] leading-snug text-[#1F1F1C]">
+            {catchTr.text} <span className="whitespace-nowrap text-[11px] text-[#5F5E58]">· {t("i18n.ai")}</span>
+          </p>
+        )}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
           {time.soon ? `${t("result.closingSoon")} · ` : ""}
           {time.text}
