@@ -136,7 +136,8 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   }, [flashId, pickedId, shops]);
 
   return (
-    <div className="absolute inset-0">
+    // isolate: 지도 안의 z-index(출처 표시 1000 등)가 밖으로 새어 주문 문장 · 질문 시트 위에 뜨지 않게
+    <div className="absolute inset-0 isolate">
       <div ref={box} className="h-full w-full bg-[#ECEAE3]" />
       {showLocate && pickedId === null && flashId === null && (
         <button
