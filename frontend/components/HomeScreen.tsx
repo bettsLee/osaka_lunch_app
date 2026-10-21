@@ -53,13 +53,14 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
-  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list">("roulette"); // 룰렛 vs 목록 지표
+  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
   const [priceOpen, setPriceOpen] = useState(false);
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
+  const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 홈에 가는 중 표시
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
@@ -196,6 +197,7 @@ export default function HomeScreen() {
     setPicked(null);
     const showResult = () => {
       setFlashId(null);
+      setCardHidden(false);
       setPicked(winner);
       setPickedFrom("roulette");
       setMode("result");
@@ -217,16 +219,29 @@ export default function HomeScreen() {
     timers.current.push(setTimeout(showResult, at + SPIN_END_PAUSE_MS));
     skipTo.current = showResult;
   };
-  // 목록에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
-  const pickFromList = (shop: NearbyShop, position: number) => {
+  // 목록 · 지도 핀에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
+  const pickDirect = (shop: NearbyShop, from: "list" | "map") => {
     clearTimers();
     setFlashId(null);
+    setCardHidden(false);
     setPicked(shop);
-    setPickedFrom("list");
+    setPickedFrom(from);
     setMode("result");
     const distanceKm = Math.round(shop.km * 100) / 100;
+    track("result_view", { source: from, distance_km: distanceKm, walk_min: shop.walk, badge: priceBadge(shop), price_limit: limit });
+    return distanceKm;
+  };
+  const pickFromList = (shop: NearbyShop, position: number) => {
+    const distanceKm = pickDirect(shop, "list");
     track("list_item_click", { position, distance_km: distanceKm, price_limit: limit, list_open: listOpen });
-    track("result_view", { source: "list", distance_km: distanceKm, walk_min: shop.walk, badge: priceBadge(shop), price_limit: limit });
+  };
+  // 지도 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩: 이름 말풍선 대신). 룰렛이 도는 중에는 무시
+  const pickFromMap = (shopId: string) => {
+    if (mode !== "home" && mode !== "result") return;
+    const shop = visible.find((s) => s.id === shopId);
+    if (!shop) return;
+    const distanceKm = pickDirect(shop, "map");
+    track("map_pin_click", { distance_km: distanceKm, price_limit: limit, map_big: sheetHidden });
   };
   const skip = () => {
     clearTimers();
@@ -276,7 +291,7 @@ export default function HomeScreen() {
       id,
       shopId: picked.id,
       shopName: picked.name,
-      source: pickedFrom,
+      source: pickedFrom === "map" ? "list" : pickedFrom, // 서버에는 직접 고름(list)으로. 지도 핀인지는 이벤트로 봄
       distanceKm,
       priceLimit: limit,
       chosenAt,
@@ -369,7 +384,7 @@ export default function HomeScreen() {
       )}
 
       <section
-        className={`relative bg-[#ECEAE3] ${mode === "result" ? "h-[170px] flex-none" : mode === "go" ? "hidden" : "flex-1"}`}
+        className={`relative bg-[#ECEAE3] ${mode === "result" ? (cardHidden ? "flex-1" : "h-[170px] flex-none") : mode === "go" ? "hidden" : "flex-1"}`}
         aria-label={t("home.map")}
       >
         {loc.status === "ok" && near ? (
@@ -378,8 +393,9 @@ export default function HomeScreen() {
             radiusKm={near.radiusKm}
             shops={visible}
             flashId={mode === "spin" ? flashId : null}
-            showLocate={mode === "home" && !listOpen} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감
+            showLocate={mode === "home" && (!listOpen || sheetHidden)} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감 (시트를 접으면 다시 보임)
             pickedId={mode === "result" ? (picked?.id ?? null) : null}
+            onPick={pickFromMap}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-[#5F5E58]">
@@ -442,7 +458,17 @@ export default function HomeScreen() {
       )}
 
       {mode === "result" && picked && (
-        <ResultCard shop={picked} day={day} minutes={minutes} limit={limit} onGo={go} onRespin={spin} canRespin={pool.length > 1} />
+        <ResultCard
+          shop={picked}
+          day={day}
+          minutes={minutes}
+          limit={limit}
+          onGo={go}
+          onRespin={spin}
+          canRespin={pool.length > 1}
+          collapsed={cardHidden}
+          onToggle={() => setCardHidden((v) => !v)}
+        />
       )}
 
       {mode === "go" && picked && <GoScreen shop={picked} onHome={backHome} />}

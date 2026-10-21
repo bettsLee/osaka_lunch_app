@@ -45,7 +45,7 @@
   "result.aiNoteTypical": "Typical lunch {typical} · AI read the restaurant's listing and judged lunch to be ¥{limit} or less",
   "result.menuLink": "See menu and photos on Hot Pepper",
   "result.go": "I'll go here",
-  "result.respin": "Spin again",
+  "result.respin": "Pick a random place",
   "result.orderOpen": "Phrases for ordering",
   "result.directions": "Directions in Google Maps",
   "result.priceSource": "See the original price text",
@@ -244,5 +244,7 @@
   "diet.halalAsk": "Do you have any dishes without pork or alcohol?",
   "order.mine": "My dietary needs",
   "order.dietHint": "If you have allergies or eat vegetarian or halal, choose them in Settings → Allergies & diet. Phrases will appear here.",
-  "privacy.diet": "Allergies & diet: your choices stay on this phone and are never sent to our server or usage records."
+  "privacy.diet": "Allergies & diet: your choices stay on this phone and are never sent to our server or usage records.",
+  "result.catchLabel": "About this restaurant (may be about dinner or parties, not lunch)",
+  "result.catchTranslating": "Translating with AI…"
 }
