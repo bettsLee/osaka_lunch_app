@@ -1,6 +1,7 @@
 "use client";
 
 // S5 다녀왔어요?: 다녀왔는지 → 그 시간에 영업했는지 → 점심 가격이 그때 고른 상한 이하였는지 (와이어프레임 검토: 질문 2개로 충분)
+// 도착했어요로 이미 다녀온 기록이면 '점심 어땠어요?'로 남은 것만 (도착할 때 영업 중이라고 답했으면 가격만)
 import { useEffect, useRef, useState } from "react";
 import { track, trackError } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
@@ -11,7 +12,9 @@ type Props = { visit: PendingVisit; onClose: () => void; onOpenZukan: () => void
 
 export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
   const { t } = useT();
-  const [a, setA] = useState<Answers>(EMPTY_ANSWERS);
+  const arrived = visit.arrived === true;
+  const start: Answers = arrived ? { ...EMPTY_ANSWERS, visited: true, openOk: visit.openOk ?? null } : EMPTY_ANSWERS;
+  const [a, setA] = useState<Answers>(start);
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
   const [added, setAdded] = useState(false); // '네, 다녀왔어요' → 도감에 한 곳 추가
   const title = useRef<HTMLHeadingElement>(null);
@@ -24,8 +27,8 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
       const body = feedbackBody(a);
       await sendFeedback(visit.id, body);
       track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, price_limit: limit });
-      if (body.visited) track("zukan_add");
-      setAdded(body.visited);
+      if (body.visited && !arrived) track("zukan_add"); // 도착했어요로 온 기록은 그때 이미 도감에 들어감
+      setAdded(body.visited && !arrived);
       setState("done");
     } catch (e) {
       trackError("feedback", e);
@@ -78,21 +81,33 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
         ) : (
           <>
             <h1 ref={title} id="feedback-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
-              {t("feedback.title")}
+              {t(arrived ? "feedback.titleArrived" : "feedback.title")}
             </h1>
-            <Choice
-              value={a.visited}
-              yes={t("feedback.visitedYes")}
-              no={t("feedback.visitedNo")}
-              onChange={(visited) => setA({ ...EMPTY_ANSWERS, visited })}
-              big
-            />
+            {!arrived && (
+              <Choice
+                value={a.visited}
+                yes={t("feedback.visitedYes")}
+                no={t("feedback.visitedNo")}
+                onChange={(visited) => setA({ ...EMPTY_ANSWERS, visited })}
+                big
+              />
+            )}
             {a.visited && (
-              <div className="flex flex-col gap-3 border-t border-[#ECEAE3] pt-4">
-                <p className="text-base font-semibold">{t("feedback.openQ")}</p>
-                <Choice value={a.openOk} yes={t("feedback.yesRight")} no={t("feedback.openNo")} onChange={(openOk) => setA({ ...a, openOk })} />
-                <p className="pt-1 text-base font-semibold">{t("feedback.priceQ", { limit: limit.toLocaleString("ja-JP") })}</p>
-                <Choice value={a.priceOk} yes={t("feedback.yesRight")} no={t("feedback.priceNo")} onChange={(priceOk) => setA({ ...a, priceOk })} />
+              <div className={`flex flex-col gap-3 ${arrived ? "" : "border-t border-[#ECEAE3] pt-4"}`}>
+                {!(arrived && start.openOk !== null) && (
+                  <>
+                    <p className="text-base font-semibold">{t("feedback.openQ")}</p>
+                    <Choice value={a.openOk} yes={t("feedback.yesRight")} no={t("feedback.openNo")} onChange={(openOk) => setA({ ...a, openOk })} />
+                  </>
+                )}
+                {a.openOk !== false && ( // 닫혀 있었으면 가격은 알 수 없어서 묻지 않음
+                  <>
+                    <p className="pt-1 text-base font-semibold">
+                      {t(arrived && start.openOk !== null ? "feedback.priceOnlyQ" : "feedback.priceQ", { limit: limit.toLocaleString("ja-JP") })}
+                    </p>
+                    <Choice value={a.priceOk} yes={t("feedback.yesRight")} no={t("feedback.priceNo")} onChange={(priceOk) => setA({ ...a, priceOk })} />
+                  </>
+                )}
               </div>
             )}
             {state === "error" && <p className="text-sm font-semibold text-[#9A4A00]">{t("feedback.error")}</p>}

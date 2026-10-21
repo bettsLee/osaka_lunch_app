@@ -2,7 +2,7 @@
 // Render 무료 서버는 쉬면 잠들어서: 앱을 열 때 미리 깨우고, '여기 갈래요'는 기다리지 않게 뒤에서 저장(실패하면 보관 후 다시)
 import { GoTrueClient } from "@supabase/auth-js";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
-import { cancelSettled, enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
+import { arriveSettled, cancelSettled, enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
@@ -11,6 +11,7 @@ const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const OUTBOX_KEY = "osaka-lunch-visit-outbox";
 const CANCEL_KEY = "osaka-lunch-visit-cancels"; // 보내야 할 취소 (여기 갈래요 id)
+const ARRIVE_KEY = "osaka-lunch-visit-arrivals"; // 보내야 할 도착했어요
 
 let auth: GoTrueClient | null = null;
 
@@ -82,9 +83,27 @@ function writeCancels(ids: string[]): void {
   }
 }
 
+type Arrival = { id: string; by: "auto" | "manual"; openOk: boolean | null };
+
+function readArrivals(): Arrival[] {
+  try {
+    return JSON.parse(localStorage.getItem(ARRIVE_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeArrivals(list: Arrival[]): void {
+  try {
+    localStorage.setItem(ARRIVE_KEY, JSON.stringify(list));
+  } catch {
+    // 저장소를 못 쓰면 이번 한 번만 보냄
+  }
+}
+
 let flushing: Promise<void> | null = null;
 
-// 보관해 둔 '여기 갈래요'를 차례로 보내고, 다 보냈으면 취소도 보냄 (저장되기 전에 취소하면 404가 나서 순서가 중요)
+// 보관해 둔 '여기 갈래요'를 차례로 보내고, 다 보냈으면 도착 · 취소도 보냄 (저장되기 전에 보내면 404가 나서 순서가 중요)
 // 저장됐거나 다시 보내도 소용없는 것만 뺌
 export function flushVisits(): Promise<void> {
   flushing ??= (async () => {
@@ -95,6 +114,16 @@ export function flushVisits(): Promise<void> {
         writeOutbox(readOutbox().filter((v) => v.id !== draft.id));
       } catch {
         return; // 연결이 안 되면 다음에 다시
+      }
+    }
+    for (const a of readArrivals()) {
+      try {
+        const res = await call(`/api/visits/${a.id}/arrive`, { method: "PUT", body: JSON.stringify({ by: a.by, openOk: a.openOk }) });
+        if (!arriveSettled(res.status)) return;
+        // 보내는 사이 영업 답이 더해졌으면 그건 남김
+        writeArrivals(readArrivals().filter((x) => !(x.id === a.id && x.openOk === a.openOk)));
+      } catch {
+        return;
       }
     }
     for (const id of readCancels()) {
@@ -121,6 +150,14 @@ export function saveVisit(draft: VisitDraft): void {
 // 여기 갈래요 취소 (10/22 결정: 따로 기록): 먼저 보관하고 뒤에서 보냄
 export function cancelVisit(id: string): void {
   writeCancels([...readCancels().filter((c) => c !== id), id]);
+  void (flushing ? flushing.then(flushVisits) : flushVisits());
+}
+
+// 도착했어요 (10/22 결정: 버튼 + 앱을 열 때 가게 근처면 자동): 먼저 보관하고 뒤에서 보냄
+// 그 자리에서 영업 여부를 답하면 같은 가게에 한 번 더 (서버는 처음 도착 시각 · 방법을 그대로 둠)
+export function arriveVisit(id: string, by: "auto" | "manual", openOk: boolean | null = null): void {
+  const before = readArrivals().find((a) => a.id === id);
+  writeArrivals([...readArrivals().filter((a) => a.id !== id), { id, by: before?.by ?? by, openOk: openOk ?? before?.openOk ?? null }]);
   void (flushing ? flushing.then(flushVisits) : flushVisits());
 }
 

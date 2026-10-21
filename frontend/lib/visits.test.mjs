@@ -1,7 +1,7 @@
 // 여기 갈래요 · 다녀왔어요? 규칙 테스트. 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cancelSettled, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
+import { arriveSettled, arrivedNear, cancelSettled, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
 import ko from "../public/i18n/ko.json" with { type: "json" };
 import { translator } from "./i18n.ts";
 
@@ -59,4 +59,21 @@ test("취소 요청은 취소됨 · 저장된 적 없음 · 이미 답함이면 
   assert.equal(cancelSettled(409), true);
   assert.equal(cancelSettled(503), false);
   assert.equal(cancelSettled(401), false);
+});
+
+test("영업을 안 했으면 가격 답 없이 보낼 수 있고, 가격은 비워서 보냄", () => {
+  assert.equal(canSubmit({ visited: true, openOk: false, priceOk: null }), true);
+  assert.deepEqual(feedbackBody({ visited: true, openOk: false, priceOk: true }), { visited: true, openOk: false, priceOk: null });
+});
+
+test("도착 자동 판단: 80m 안이고 GPS 오차가 100m 이하일 때만", () => {
+  assert.equal(arrivedNear(60, 30), true);
+  assert.equal(arrivedNear(80, 100), true);
+  assert.equal(arrivedNear(120, 20), false); // 아직 멀어요
+  assert.equal(arrivedNear(40, 250), false); // 오차가 커서 믿을 수 없음
+});
+
+test("도착 요청은 서버 문제(5xx)일 때만 다시 보냄", () => {
+  for (const code of [204, 400, 404, 409]) assert.equal(arriveSettled(code), true);
+  for (const code of [401, 500, 502, 503]) assert.equal(arriveSettled(code), false);
 });

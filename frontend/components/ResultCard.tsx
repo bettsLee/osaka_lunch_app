@@ -21,12 +21,13 @@ type Props = {
   canRespin: boolean;
   collapsed: boolean; // 손잡이로 카드를 접고 지도를 크게 (10/22 도그푸딩: 홈 시트와 같게)
   onToggle: () => void;
-  goingAt?: string | null; // 이미 여기 갈래요로 정한 가게면 정한 시각: 여기 갈래요 · 랜덤 대신 길찾기 · 취소 (10/22 도그푸딩: 가는 중 배너 대신)
+  goingAt?: string | null; // 이미 여기 갈래요로 정한 가게면 정한 시각: 여기 갈래요 · 랜덤 대신 길찾기 · 도착했어요 · 취소 (10/22 도그푸딩: 가는 중 배너 대신)
   onCancelGoing?: () => void;
+  onArrive?: () => void; // 도착했어요 버튼 (GPS가 빌딩 사이에서 튀어 자동으로 못 알아챘을 때)
 };
 
 export default function ResultCard(props: Props) {
-  const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, goingAt = null, onCancelGoing } = props;
+  const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, goingAt = null, onCancelGoing, onArrive } = props;
   const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
   const [asking, setAsking] = useState(false); // 취소를 한 번 더 물어보는 중
@@ -165,7 +166,7 @@ export default function ResultCard(props: Props) {
       )}
 
       {goingAt ? (
-        // 이미 정한 가게: 정한 시각 + 길찾기 · 취소 (취소는 한 번 더 물어봄)
+        // 이미 정한 가게: 정한 시각 + 길찾기 · 도착했어요 · 취소 (취소는 한 번 더 물어봄)
         <div className="mt-1 flex flex-col gap-2 rounded-[14px] border border-[#2457C5] bg-[#E8EEFA] p-3 text-[#1A3F91]" aria-live="polite">
           <p className="text-[15px] font-semibold">{t("result.goingChosen", { time: clockTime(goingAt) })}</p>
           {asking ? (
@@ -181,25 +182,37 @@ export default function ResultCard(props: Props) {
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={directionsUrl(shop)}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => track("directions_click", { from: "going" })}
-                className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-[#2457C5] text-[15px] font-semibold text-white"
-              >
-                {t("going.directions")}
-                <svg {...svg} width={16} height={16}>
-                  <path d="M14 4h6v6" />
-                  <path d="M20 4l-9 9" />
-                  <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-                </svg>
-              </a>
-              <button type="button" onClick={() => setAsking(true)} className="h-12 rounded-xl border border-[#9DB3E3] bg-white text-[15px]">
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={directionsUrl(shop)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => track("directions_click", { from: "going" })}
+                  className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-[#2457C5] text-[15px] font-semibold text-white"
+                >
+                  {t("going.directions")}
+                  <svg {...svg} width={16} height={16}>
+                    <path d="M14 4h6v6" />
+                    <path d="M20 4l-9 9" />
+                    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                  </svg>
+                </a>
+                <button
+                  type="button"
+                  onClick={onArrive}
+                  className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-[#1A3F91] text-[15px] font-semibold text-white"
+                >
+                  <svg {...svg} width={16} height={16} strokeWidth={2.5}>
+                    <path d="M5 12l5 5 9-10" />
+                  </svg>
+                  {t("result.arrive")}
+                </button>
+              </div>
+              <button type="button" onClick={() => setAsking(true)} className="-mb-1 min-h-11 self-center px-3 text-sm text-[#1A3F91] underline">
                 {t("going.cancel")}
               </button>
-            </div>
+            </>
           )}
         </div>
       ) : (

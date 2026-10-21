@@ -24,6 +24,8 @@ export type EventName =
   | "map_pin_click" // 지도 핀을 눌러 결과 카드를 봄
   | "opinion_submit" // 설정에서 의견을 보냄 (내용은 보내지 않고 글자 수만)
   | "visit_cancel" // 여기 갈래요 취소 (cancel: 직접 취소 · changed: 다른 가게로 다시 정함)
+  | "visit_arrive" // 도착했어요 (auto: 앱을 열 때 가게 근처 · manual: 버튼). 도감에 바로 들어감
+  | "arrive_answer" // 도착했어요에서 '지금 영업하고 있나요?'에 답함
   | "app_error"; // 화면에서 난 오류 (원인 확인용)
 
 type Props = Record<string, string | number | boolean | null>;
