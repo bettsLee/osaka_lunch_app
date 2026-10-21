@@ -206,8 +206,6 @@
   "install.step3": "홈 화면에 생긴 앱으로 열어요.",
   "home.sheetHide": "지도 크게 보기",
   "home.sheetShow": "아래 화면 펼치기",
-  "going.title": "{shop}에 가는 중",
-  "going.meta": "{time}에 정함 · 걸어서 {n}분",
   "going.directions": "길찾기",
   "going.cancel": "취소",
   "going.confirm": "여기 가는 걸 취소할까요?",
@@ -246,5 +244,6 @@
   "order.dietHint": "알레르기나 채식 · 할랄이 있으면 설정 → 알레르기 · 식사 제한에서 고르세요. 여기에 문장이 생겨요.",
   "privacy.diet": "알레르기 · 식사 제한: 고른 내용은 이 휴대폰에만 저장되고, 서버나 사용 기록으로 보내지 않아요.",
   "result.catchLabel": "가게 소개 (점심 말고 저녁 · 연회 얘기일 수도 있어요)",
-  "result.catchTranslating": "AI로 번역하는 중…"
+  "result.catchTranslating": "AI로 번역하는 중…",
+  "result.goingChosen": "{time}에 정한 가게예요"
 }

@@ -54,6 +54,16 @@ body {
   font-size: 14px;
 }
 
+/* 정한 가게: 홈에서도 채운 핀으로 크게 (10/22 도그푸딩: 정한 뒤가 안 정한 때와 똑같아 보였음) */
+.price-pin.is-going {
+  padding: 4px 12px;
+  border-color: #2457c5;
+  background: #2457c5;
+  color: #ffffff;
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(36, 87, 197, 0.35);
+}
+
 /* 도감 지도: 다녀온 곳은 채운 핀, 아직 안 간 곳은 점선 핀 */
 .price-pin.is-visited {
   background: #2457c5;

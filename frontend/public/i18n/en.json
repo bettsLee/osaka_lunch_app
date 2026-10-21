@@ -206,8 +206,6 @@
   "install.step3": "Open the app from your Home Screen.",
   "home.sheetHide": "Show a bigger map",
   "home.sheetShow": "Show the panel",
-  "going.title": "Heading to {shop}",
-  "going.meta": "Chosen at {time} · {n} min walk",
   "going.directions": "Directions",
   "going.cancel": "Cancel",
   "going.confirm": "Cancel going here?",
@@ -246,5 +244,6 @@
   "order.dietHint": "If you have allergies or eat vegetarian or halal, choose them in Settings → Allergies & diet. Phrases will appear here.",
   "privacy.diet": "Allergies & diet: your choices stay on this phone and are never sent to our server or usage records.",
   "result.catchLabel": "About this restaurant (may be about dinner or parties, not lunch)",
-  "result.catchTranslating": "Translating with AI…"
+  "result.catchTranslating": "Translating with AI…",
+  "result.goingChosen": "You picked this place at {time}"
 }

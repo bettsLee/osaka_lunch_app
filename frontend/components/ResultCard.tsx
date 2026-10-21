@@ -3,9 +3,10 @@
 // S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
 // 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
-import { genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
+import { directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
 import { fetchShopCatch } from "@/lib/api";
+import { clockTime } from "@/lib/visits";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 import OrderSheet from "./OrderSheet";
@@ -20,11 +21,15 @@ type Props = {
   canRespin: boolean;
   collapsed: boolean; // 손잡이로 카드를 접고 지도를 크게 (10/22 도그푸딩: 홈 시트와 같게)
   onToggle: () => void;
+  goingAt?: string | null; // 이미 여기 갈래요로 정한 가게면 정한 시각: 여기 갈래요 · 랜덤 대신 길찾기 · 취소 (10/22 도그푸딩: 가는 중 배너 대신)
+  onCancelGoing?: () => void;
 };
 
-export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle }: Props) {
+export default function ResultCard(props: Props) {
+  const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, goingAt = null, onCancelGoing } = props;
   const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [asking, setAsking] = useState(false); // 취소를 한 번 더 물어보는 중
   // 가게 소개 AI 번역 (일본어 화면은 원문만). text가 null이면 번역하는 중
   const [catchTr, setCatchTr] = useState<{ id: string; text: string | null } | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -159,19 +164,59 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
         </a>
       )}
 
-      <div className="mt-1 flex flex-col gap-2">
-        <button type="button" onClick={onGo} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
-          {t("result.go")}
-        </button>
-        <button
-          type="button"
-          onClick={onRespin}
-          disabled={!canRespin}
-          className="h-12 rounded-[14px] border border-[#CFCCC2] text-base disabled:opacity-50"
-        >
-          {t("result.respin")}
-        </button>
-      </div>
+      {goingAt ? (
+        // 이미 정한 가게: 정한 시각 + 길찾기 · 취소 (취소는 한 번 더 물어봄)
+        <div className="mt-1 flex flex-col gap-2 rounded-[14px] border border-[#2457C5] bg-[#E8EEFA] p-3 text-[#1A3F91]" aria-live="polite">
+          <p className="text-[15px] font-semibold">{t("result.goingChosen", { time: clockTime(goingAt) })}</p>
+          {asking ? (
+            <>
+              <p className="text-sm">{t("going.confirm")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={onCancelGoing} className="h-12 rounded-xl bg-[#1A3F91] text-[15px] font-semibold text-white">
+                  {t("going.confirmYes")}
+                </button>
+                <button type="button" onClick={() => setAsking(false)} className="h-12 rounded-xl border border-[#9DB3E3] bg-white text-[15px]">
+                  {t("going.confirmNo")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={directionsUrl(shop)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => track("directions_click", { from: "going" })}
+                className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-[#2457C5] text-[15px] font-semibold text-white"
+              >
+                {t("going.directions")}
+                <svg {...svg} width={16} height={16}>
+                  <path d="M14 4h6v6" />
+                  <path d="M20 4l-9 9" />
+                  <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                </svg>
+              </a>
+              <button type="button" onClick={() => setAsking(true)} className="h-12 rounded-xl border border-[#9DB3E3] bg-white text-[15px]">
+                {t("going.cancel")}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-1 flex flex-col gap-2">
+          <button type="button" onClick={onGo} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
+            {t("result.go")}
+          </button>
+          <button
+            type="button"
+            onClick={onRespin}
+            disabled={!canRespin}
+            className="h-12 rounded-[14px] border border-[#CFCCC2] text-base disabled:opacity-50"
+          >
+            {t("result.respin")}
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-x-4 text-sm">
         <button
