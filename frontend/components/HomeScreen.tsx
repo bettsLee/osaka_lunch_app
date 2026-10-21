@@ -52,6 +52,7 @@ export default function HomeScreen() {
   const [priceOpen, setPriceOpen] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
+  const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) return setLoc({ status: "error" });
@@ -79,6 +80,12 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    openedAt.current = performance.now();
+    // 홈 화면 앱은 뒤로 갔다가 다음 날 다시 쓰기도 해서, 다시 화면에 돌아온 때부터 다시 잼
+    const onVisible = () => {
+      if (document.visibilityState === "visible") openedAt.current = performance.now();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     locate();
     load();
     startAnalytics();
@@ -103,6 +110,7 @@ export default function HomeScreen() {
     return () => {
       clearInterval(t);
       clearTimers();
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [locate, load]);
 
@@ -213,7 +221,12 @@ export default function HomeScreen() {
       priceLimit: limit,
       chosenAt: new Date().toISOString(),
     });
-    track("go_here_click", { source: pickedFrom, distance_km: distanceKm, price_limit: limit });
+    track("go_here_click", {
+      source: pickedFrom,
+      distance_km: distanceKm,
+      price_limit: limit,
+      decide_sec: Math.round((performance.now() - openedAt.current) / 100) / 10, // 열고 → 여기 갈래요 (초, 소수 첫째 자리)
+    });
     setMode("go");
   };
 
