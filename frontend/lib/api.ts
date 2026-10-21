@@ -107,6 +107,15 @@ export async function sendFeedback(
   if (!res.ok) throw new Error(`답을 보내지 못했어요 (${res.status})`);
 }
 
+// 한국어 · 영어가 아닌 휴대폰 언어의 문구. 서버가 처음 한 번 AI로 번역해 저장해 둔 것 (로그인 필요 없음)
+export async function fetchTranslation(lang: string): Promise<Record<string, string> | null> {
+  if (!API_URL) return null;
+  const res = await fetch(`${API_URL}/api/i18n/${encodeURIComponent(lang)}`);
+  if (!res.ok) return null;
+  const body: { lang?: string; messages?: unknown } = await res.json();
+  return body.lang === lang && body.messages && typeof body.messages === "object" ? (body.messages as Record<string, string>) : null;
+}
+
 // '다녀왔어요?' 알림: 이 브라우저에서 지금 할 수 있는 것
 export function currentPushState(): PushState {
   return pushState({

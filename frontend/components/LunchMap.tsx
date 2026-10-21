@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { priceLabel, type NearbyShop, type Point } from "@/lib/lunch";
+import { useT } from "./I18n";
 
 type Props = {
   here: Point;
@@ -19,6 +20,7 @@ type Props = {
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
 export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true }: Props) {
+  const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const pins = useRef<L.LayerGroup | null>(null);
@@ -91,9 +93,9 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     shops.forEach((s, i) => {
       const pin = document.createElement("span");
       pin.className = "price-pin";
-      pin.textContent = priceLabel(s);
+      pin.textContent = priceLabel(s, t);
       const popup = document.createElement("div");
-      popup.textContent = `${s.name} · 걸어서 ${s.walk}분`; // 가게 이름은 바깥 데이터라 글자로만 넣음
+      popup.textContent = `${s.name} · ${t("common.walk", { n: s.walk })}`; // 가게 이름은 바깥 데이터라 글자로만 넣음
       const z = (shops.length - i) * 10; // 겹치면 목록 앞쪽(싼 곳 · 가까운 곳)이 위로
       const marker = L.marker([s.lat, s.lng], {
         icon: L.divIcon({ className: "price-pin-icon", html: pin, iconSize: [0, 0] }),
@@ -104,7 +106,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
         .addTo(group);
       markers.current.set(s.id, { marker, z });
     });
-  }, [shops]);
+  }, [shops, t]);
 
   // 룰렛 깜빡임 · 결과 강조
   useEffect(() => {
@@ -123,7 +125,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
       {showLocate && pickedId === null && flashId === null && (
         <button
           type="button"
-          aria-label="내 위치로 이동"
+          aria-label={t("map.locate")}
           onClick={() => map.current?.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000))}
           className="absolute bottom-6 right-4 z-[500] flex h-11 w-11 items-center justify-center rounded-full border border-[#CFCCC2] bg-white text-[#1F1F1C]"
         >

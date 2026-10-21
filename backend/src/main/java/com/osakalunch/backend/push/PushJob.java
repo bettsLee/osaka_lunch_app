@@ -97,9 +97,12 @@ public class PushJob {
     private byte[] payload(Visit v) {
         String limit = NumberFormat.getIntegerInstance(Locale.JAPAN).format(v.getPriceLimit());
         try {
+            // title · body는 한국어 기본 문구. 휴대폰 언어 문구는 서비스 워커가 shop · limit을 넣어 만듦
             return json.writeValueAsBytes(Map.of(
                     "title", "다녀왔어요?",
                     "body", v.getShopName() + " — 영업하고 있었는지, " + limit + "엔 이하였는지 알려 주세요",
+                    "shop", v.getShopName(),
+                    "limit", limit,
                     "url", "/?from=push",
                     "tag", "visit"));
         } catch (JsonProcessingException e) {

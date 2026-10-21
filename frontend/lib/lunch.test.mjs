@@ -6,6 +6,10 @@ import {
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
 } from "./lunch.ts";
+import ko from "../public/i18n/ko.json" with { type: "json" };
+import { translator } from "./i18n.ts";
+
+const t = translator(ko);
 
 const HERE = { lat: 34.68, lng: 135.5 };
 const KM_LAT = 1 / 111.195; // 위도 1km
@@ -55,9 +59,9 @@ test("오늘 점심 영업하지 않는 가게는 세지 않음", () => {
 
 test("보여줄 가격: 대표 메뉴 → 최고가 → 최저가~", () => {
   assert.deepEqual(displayPrice(shop(0, { typicalPrice: 880, priceMax: 990 })), { yen: 880, from: false });
-  assert.equal(priceLabel(shop(0, { priceMax: 1190 })), "1,190엔");
-  assert.equal(priceLabel(shop(0, { priceMax: null, priceMin: 500 })), "500엔~");
-  assert.equal(priceLabel(shop(0, { priceMax: null })), "가격 확인");
+  assert.equal(priceLabel(shop(0, { priceMax: 1190 }), t), "1,190엔");
+  assert.equal(priceLabel(shop(0, { priceMax: null, priceMin: 500 }), t), "500엔~");
+  assert.equal(priceLabel(shop(0, { priceMax: null }), t), "가격 확인");
 });
 
 test("지금 점심 영업 중인지", () => {
@@ -106,19 +110,19 @@ test("룰렛 연출은 결과에서 멈추고, 점점 느려지고, 같은 핀�
 
 test("결과 카드의 점심 시간 문구", () => {
   const s = shop(0.3, { lunchWindow: win("11:30", "14:30", "14:00") });
-  assert.deepEqual(lunchTimeText(s, "wed", 10 * 60), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 11:30부터", soon: false });
-  assert.deepEqual(lunchTimeText(s, "wed", 12 * 60 + 40), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 주문 마감까지 1시간 20분", soon: false });
-  assert.equal(lunchTimeText(s, "wed", 13 * 60 + 40).soon, true);
-  assert.equal(lunchTimeText(s, "wed", 14 * 60 + 5).text, "오늘 점심 11:30~14:30 (주문 14:00까지) · 오늘은 주문이 끝났어요");
-  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: win("11:00", "14:00") }), "wed", 13 * 60).text, "오늘 점심 11:00~14:00 · 마감까지 1시간");
-  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60).text, "오늘 점심 영업 (시간은 핫페퍼에서 확인)");
-  assert.equal(formatDuration(45), "45분");
+  assert.deepEqual(lunchTimeText(s, "wed", 10 * 60, t), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 11:30부터", soon: false });
+  assert.deepEqual(lunchTimeText(s, "wed", 12 * 60 + 40, t), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 주문 마감까지 1시간 20분", soon: false });
+  assert.equal(lunchTimeText(s, "wed", 13 * 60 + 40, t).soon, true);
+  assert.equal(lunchTimeText(s, "wed", 14 * 60 + 5, t).text, "오늘 점심 11:30~14:30 (주문 14:00까지) · 오늘은 주문이 끝났어요");
+  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: win("11:00", "14:00") }), "wed", 13 * 60, t).text, "오늘 점심 11:00~14:00 · 마감까지 1시간");
+  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60, t).text, "오늘 점심 영업 (시간은 핫페퍼에서 확인)");
+  assert.equal(formatDuration(45, t), "45분");
 });
 
 test("결과 카드 가격 · 배지 · 길찾기", () => {
-  assert.equal(priceRange(shop(0, { priceMin: 850, priceMax: 950 })), "850~950엔");
-  assert.equal(priceRange(shop(0, { priceMin: 500, priceMax: null })), "500엔~");
-  assert.equal(priceRange(shop(0, { priceMin: null, priceMax: null, typicalPrice: 1000 })), "1,000엔");
+  assert.equal(priceRange(shop(0, { priceMin: 850, priceMax: 950 }), t), "850~950엔");
+  assert.equal(priceRange(shop(0, { priceMin: 500, priceMax: null }), t), "500엔~");
+  assert.equal(priceRange(shop(0, { priceMin: null, priceMax: null, typicalPrice: 1000 }), t), "1,000엔");
   assert.equal(priceBadge(shop(0, { priceMax: 950 })), "confirmed");
   assert.equal(priceBadge(shop(0, { priceMin: 800, priceMax: 1500, typicalPrice: 900 })), "ai"); // 대표 메뉴 단서로 판단
   assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "ai");
@@ -147,14 +151,14 @@ test("가격 단계: 단계마다 반경을 다시 고르고, 2km 안 5곳 미�
 });
 
 test("장르는 우리 말로, 모르는 장르는 그대로", () => {
-  assert.equal(genreLabel("居酒屋"), "이자카야");
-  assert.equal(genreLabel("お好み焼き・もんじゃ"), "오코노미야키");
-  assert.equal(genreLabel("新ジャンル"), "新ジャンル");
+  assert.equal(genreLabel("居酒屋", t), "이자카야");
+  assert.equal(genreLabel("お好み焼き・もんじゃ", t), "오코노미야키");
+  assert.equal(genreLabel("新ジャンル", t), "新ジャンル");
 });
 
 test("동네 이름은 가장 가까운 가게의 지역", () => {
   const near = { ...shop(0.2, { areaCode: "Y315" }), km: 0.2, walk: 4 };
   const far = { ...shop(0.9), km: 0.9, walk: 15 };
-  assert.equal(areaName([far, near]), "난바");
-  assert.equal(areaName([]), null);
+  assert.equal(areaName([far, near], t), "난바");
+  assert.equal(areaName([], t), null);
 });
