@@ -1,0 +1,56 @@
+// 여기 갈래요(S4) · 다녀왔어요?(S5) 규칙. 화면 · 네트워크와 떨어진 순수 함수라 테스트하기 쉬움
+
+export type VisitDraft = {
+  id: string; // 화면이 만든 id. 저장을 다시 보내도 서버에는 한 번만 남음
+  shopId: string;
+  shopName: string;
+  source: "roulette" | "list";
+  distanceKm: number;
+  priceLimit: number;
+  chosenAt: string; // ISO 시각
+};
+
+export type PendingVisit = { id: string; shopId: string; shopName: string; chosenAt: string };
+
+export type Answers = { visited: boolean | null; openOk: boolean | null; priceOk: boolean | null };
+
+export const EMPTY_ANSWERS: Answers = { visited: null, openOk: null, priceOk: null };
+export const OUTBOX_MAX = 20; // 보관해 두는 '여기 갈래요' 최대 수
+export const OUTBOX_KEEP_MS = 3 * 24 * 60 * 60 * 1000; // 서버가 3일 넘은 기록은 받지 않음
+
+// 안 갔으면 바로 보낼 수 있고, 다녀왔으면 영업 · 가격 두 질문에 다 답해야 함
+export function canSubmit(a: Answers): boolean {
+  return a.visited === false || (a.visited === true && a.openOk !== null && a.priceOk !== null);
+}
+
+export function feedbackBody(a: Answers): { visited: boolean; openOk: boolean | null; priceOk: boolean | null } {
+  if (a.visited !== true) return { visited: false, openOk: null, priceOk: null };
+  return { visited: true, openOk: a.openOk, priceOk: a.priceOk };
+}
+
+// 저장 대기열에 넣기: 같은 id는 한 번만, 3일 지난 것은 버림, 최근 것 위주로 OUTBOX_MAX개까지
+export function enqueue(queue: VisitDraft[], draft: VisitDraft, now: Date): VisitDraft[] {
+  const fresh = queue.filter(
+    (v) => v.id !== draft.id && now.getTime() - new Date(v.chosenAt).getTime() < OUTBOX_KEEP_MS,
+  );
+  return [...fresh, draft].slice(-OUTBOX_MAX);
+}
+
+// 서버 응답을 보고 대기열에서 뺄지: 저장됨(200 · 201) 또는 다시 보내도 소용없음(400 · 409)이면 뺌
+export function settled(status: number): boolean {
+  return status === 200 || status === 201 || status === 400 || status === 409;
+}
+
+// S5 위쪽의 '오늘 12:10 · 여기 갈래요' (오사카 시간)
+export function chosenLabel(chosenAt: string, now: Date): string {
+  const fmt = (d: Date, opt: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", ...opt }).format(d);
+  const when = new Date(chosenAt);
+  const day = (d: Date) => fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" });
+  const time = fmt(when, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (day(when) === day(now)) return `오늘 ${time}`;
+  if (day(when) === day(yesterday)) return `어제 ${time}`;
+  const [, m, d] = day(when).split("-");
+  return `${Number(m)}/${Number(d)} ${time}`;
+}
