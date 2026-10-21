@@ -51,8 +51,9 @@ export default function SettingsScreen({ limit }: { limit: number }) {
       <header className="border-b border-[#E2E0D8] px-5 pb-3.5 pt-5">
         <h1 className="text-[22px] font-semibold">{t("settings.title")}</h1>
       </header>
+      {/* 카드는 줄어들지 않게 (flex-none): 화면이 낮으면 카드가 찌그러져 '의견 보내기'가 안 보이던 문제 (10/22) → 대신 이 칸이 스크롤 */}
       <section className="flex flex-1 flex-col gap-4 overflow-y-auto bg-[#F4F3EF] px-4 pb-6 pt-4">
-        <div className="overflow-hidden rounded-[14px] border border-[#E2E0D8] bg-white">
+        <div className="flex-none overflow-hidden rounded-[14px] border border-[#E2E0D8] bg-white">
           <LanguageRow />
           <PushRow />
         </div>
@@ -61,7 +62,7 @@ export default function SettingsScreen({ limit }: { limit: number }) {
           {t("settings.limit", { limit: limit.toLocaleString("ja-JP") })}
         </p>
 
-        <div className="overflow-hidden rounded-[14px] border border-[#E2E0D8] bg-white">
+        <div className="flex-none overflow-hidden rounded-[14px] border border-[#E2E0D8] bg-white">
           <LinkRow
             label={t("settings.diet")}
             value={hasDiet(diet) ? t("settings.dietOn") : t("settings.dietOff")}
