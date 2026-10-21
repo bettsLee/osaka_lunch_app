@@ -30,6 +30,12 @@ class TranslatorTest {
     }
 
     @Test
+    void 이하는_그_금액을_포함한다고_지시() {
+        // 10/21 베트남어 번역에서 '이하'를 '미만(dưới)'으로 옮긴 문구 8/11 → 지시문에 규칙 추가 (PROMPT_VERSION 2)
+        assertThat(Translator.PROMPT).contains("이하 means \"or less\"").contains("never as \"under\"");
+    }
+
+    @Test
     void 언어_이름은_영어로() {
         assertThat(Translator.languageName("vi")).isEqualTo("Vietnamese (vi)");
         assertThat(Translator.languageName("zh-Hant")).startsWith("Chinese");
