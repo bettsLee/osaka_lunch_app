@@ -50,6 +50,9 @@ public class Visit {
     @Column(name = "answered_at")
     private Instant answeredAt;
 
+    @Column(name = "notified_at")
+    private Instant notifiedAt; // '다녀왔어요?' 알림을 보낸 시각 (004)
+
     protected Visit() {
     }
 
@@ -73,6 +76,10 @@ public class Visit {
         this.answeredAt = at;
     }
 
+    public void markNotified(Instant at) {
+        this.notifiedAt = at;
+    }
+
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
     public String getShopId() { return shopId; }
@@ -83,4 +90,5 @@ public class Visit {
     public Boolean getOpenOk() { return openOk; }
     public Boolean getPriceOk() { return priceOk; }
     public Instant getAnsweredAt() { return answeredAt; }
+    public Instant getNotifiedAt() { return notifiedAt; }
 }
