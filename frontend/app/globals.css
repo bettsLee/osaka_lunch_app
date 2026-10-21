@@ -38,3 +38,18 @@ body {
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
+/* 룰렛 중 · 결과: 나머지 핀은 흐리게, 깜빡이는 핀은 테두리, 고른 핀은 채움 */
+.is-choosing .price-pin {
+  color: #5f5e58;
+}
+.is-choosing .price-pin.is-flash {
+  border: 2px solid #2457c5;
+  color: #1a3f91;
+}
+.is-choosing .price-pin.is-picked {
+  padding: 4px 12px;
+  border-color: #2457c5;
+  background: #2457c5;
+  color: #ffffff;
+  font-size: 14px;
+}

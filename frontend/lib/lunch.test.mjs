@@ -2,7 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  areaName, displayPrice, distanceKm, lunchOver, openNow, osakaNow, pickNearby, priceLabel, walkMinutes,
+  areaName, directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
+  pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, walkMinutes,
 } from "./lunch.ts";
 
 const HERE = { lat: 34.68, lng: 135.5 };
@@ -58,15 +59,76 @@ test("보여줄 가격: 대표 메뉴 → 최고가 → 최저가~", () => {
   assert.equal(priceLabel(shop(0, { priceMax: null })), "가격 확인");
 });
 
-test("지금 점심 영업 중인지 · 점심이 끝났는지", () => {
+test("지금 점심 영업 중인지", () => {
   const s = shop(0.3);
   assert.equal(openNow(s, "wed", 12 * 60), true);
   assert.equal(openNow(s, "wed", 14 * 60 + 30), false); // 끝나는 시각은 포함하지 않음
   assert.equal(openNow(s, "sat", 12 * 60), false);
   assert.equal(openNow(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60), false);
-  assert.equal(lunchOver([s], "wed", 14 * 60), false);
-  assert.equal(lunchOver([s], "wed", 15 * 60), true);
-  assert.equal(lunchOver([], "wed", 15 * 60), false);
+});
+
+// ---------------------------------------------------------------- 룰렛 · 결과 카드
+const win = (start, end, last_order = null) => ({ wed: { start, end, last_order } });
+
+test("룰렛 후보는 오늘 아직 주문할 수 있는 가게 (시간 모르면 넣음)", () => {
+  const a = shop(0.3, { id: "a", lunchWindow: win("11:30", "14:30", "14:00") });
+  const b = shop(0.3, { id: "b", lunchWindow: win("11:00", "15:00") });
+  const c = shop(0.3, { id: "c", lunchWindow: {} });
+  const ids = (m) => rouletteCandidates([a, b, c], "wed", m).map((s) => s.id);
+  assert.deepEqual(ids(9 * 60), ["a", "b", "c"]); // 점심 전에도 고를 수 있음
+  assert.deepEqual(ids(14 * 60 + 10), ["b", "c"]); // a는 라스트오더 지남
+  assert.deepEqual(ids(15 * 60), ["c"]);
+});
+
+test("다시 돌리면 직전 결과는 빼고 고름", () => {
+  const pool = [{ id: "a" }, { id: "b" }];
+  assert.equal(pickShop(pool, "a", () => 0).id, "b");
+  assert.equal(pickShop(pool, "a", () => 0.99).id, "b");
+  assert.equal(pickShop([{ id: "a" }], "a").id, "a"); // 한 곳뿐이면 그대로
+  assert.equal(pickShop([], null), null);
+});
+
+test("룰렛 연출은 결과에서 멈추고, 점점 느려지고, 같은 핀이 연달아 나오지 않음", () => {
+  const pool = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  let k = 0;
+  const steps = spinSteps(pool, "c", () => [0, 0, 0.5, 0.5, 0.9][k++ % 5]);
+  assert.equal(steps.length, SPIN_STEPS);
+  assert.equal(steps.at(-1).id, "c");
+  for (let i = 1; i < steps.length - 1; i++) {
+    assert.ok(steps[i].ms >= steps[i - 1].ms);
+    assert.notEqual(steps[i].id, steps[i - 1].id);
+  }
+  const total = steps.reduce((t, s) => t + s.ms, 0);
+  assert.ok(total > 1000 && total < 2000, `연출 ${total}ms`); // 1~2초
+  assert.equal(spinSteps([{ id: "a" }], "a").at(-1).id, "a");
+});
+
+test("결과 카드의 점심 시간 문구", () => {
+  const s = shop(0.3, { lunchWindow: win("11:30", "14:30", "14:00") });
+  assert.deepEqual(lunchTimeText(s, "wed", 10 * 60), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 11:30부터", soon: false });
+  assert.deepEqual(lunchTimeText(s, "wed", 12 * 60 + 40), { text: "오늘 점심 11:30~14:30 (주문 14:00까지) · 주문 마감까지 1시간 20분", soon: false });
+  assert.equal(lunchTimeText(s, "wed", 13 * 60 + 40).soon, true);
+  assert.equal(lunchTimeText(s, "wed", 14 * 60 + 5).text, "오늘 점심 11:30~14:30 (주문 14:00까지) · 오늘은 주문이 끝났어요");
+  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: win("11:00", "14:00") }), "wed", 13 * 60).text, "오늘 점심 11:00~14:00 · 마감까지 1시간");
+  assert.equal(lunchTimeText(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60).text, "오늘 점심 영업 (시간은 핫페퍼에서 확인)");
+  assert.equal(formatDuration(45), "45분");
+});
+
+test("결과 카드 가격 · 배지 · 길찾기", () => {
+  assert.equal(priceRange(shop(0, { priceMin: 850, priceMax: 950 })), "850~950엔");
+  assert.equal(priceRange(shop(0, { priceMin: 500, priceMax: null })), "500엔~");
+  assert.equal(priceRange(shop(0, { priceMin: null, priceMax: null, typicalPrice: 1000 })), "1,000엔");
+  assert.equal(priceBadge(shop(0, { priceMax: 950 })), "confirmed");
+  assert.equal(priceBadge(shop(0, { priceMin: 800, priceMax: 1500, typicalPrice: 900 })), "ai"); // 대표 메뉴 단서로 판단
+  assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "ai");
+  assert.equal(directionsUrl({ lat: 34.1, lng: 135.2 }),
+    "https://www.google.com/maps/dir/?api=1&destination=34.1,135.2&travelmode=walking");
+});
+
+test("장르는 우리 말로, 모르는 장르는 그대로", () => {
+  assert.equal(genreLabel("居酒屋"), "이자카야");
+  assert.equal(genreLabel("お好み焼き・もんじゃ"), "오코노미야키");
+  assert.equal(genreLabel("新ジャンル"), "新ジャンル");
 });
 
 test("동네 이름은 가장 가까운 가게의 지역", () => {
