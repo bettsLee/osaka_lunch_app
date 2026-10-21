@@ -4,15 +4,18 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  areaName, displayPrice, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceLabel, rouletteCandidates, spinSteps,
+  areaName, DEFAULT_LIMIT, displayPrice, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceBadge, priceLabel,
+  rouletteCandidates, spinSteps, tierInfo, underLimit,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
 import { fetchPendingVisit, flushVisits, saveVisit, wakeServer } from "@/lib/api";
+import { startAnalytics, track } from "@/lib/analytics";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
 import GoScreen from "./GoScreen";
 import { svg } from "./icons";
+import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
@@ -21,7 +24,8 @@ type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | {
 type Data = { status: "loading" } | { status: "error"; message: string } | { status: "ok"; shops: LunchShop[] };
 type Mode = "home" | "spin" | "result" | "go";
 
-const PRICE_LIMIT = 990; // 가격 단계(790 / 1,190) 시트를 붙이기 전까지 고정
+const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
+const yen = (n: number) => n.toLocaleString("ja-JP");
 
 const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
@@ -37,6 +41,8 @@ export default function HomeScreen() {
   const [picked, setPicked] = useState<NearbyShop | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
+  const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
+  const [priceOpen, setPriceOpen] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
 
@@ -65,6 +71,14 @@ export default function HomeScreen() {
   useEffect(() => {
     locate();
     load();
+    startAnalytics();
+    track("app_open");
+    try {
+      const saved = Number(localStorage.getItem(LIMIT_KEY));
+      if (saved) setChosenLimit(saved);
+    } catch {
+      // 저장소를 못 쓰면 기본 990엔
+    }
     wakeServer(); // 룰렛을 돌리는 동안 잠든 서버가 일어나게
     fetchPendingVisit() // 보관해 둔 '여기 갈래요'를 먼저 보내고, 물어볼 게 있으면 카드로
       .then(setAsk)
@@ -77,9 +91,18 @@ export default function HomeScreen() {
   }, [locate, load]);
 
   const { day, minutes } = osakaNow(now);
-  const near = useMemo(
-    () => (loc.status === "ok" && data.status === "ok" ? pickNearby(data.shops, loc.point, day) : null),
+  // 가격 단계: 단계마다 근처 가게 수 · 잠금. 고른 단계가 여기서 잠기면 기본 990엔으로
+  const tiers = useMemo(
+    () => (loc.status === "ok" && data.status === "ok" ? tierInfo(data.shops, loc.point, day) : null),
     [loc, data, day],
+  );
+  const limit = tiers?.find((t) => t.limit === chosenLimit && !t.locked) ? chosenLimit : DEFAULT_LIMIT;
+  const near = useMemo(
+    () =>
+      loc.status === "ok" && data.status === "ok"
+        ? pickNearby(data.shops.filter((s) => underLimit(s, limit)), loc.point, day)
+        : null,
+    [loc, data, day, limit],
   );
   const nowKey = nowOnly ? minutes : -1; // '지금 영업 중'일 때만 1분마다 다시 거름 (아니면 핀이 매분 다시 그려짐)
   const visible = useMemo(() => {
@@ -98,12 +121,25 @@ export default function HomeScreen() {
   const spin = () => {
     const winner = pickShop(pool, picked?.id ?? null);
     if (!winner) return;
+    track("roulette_spin", {
+      respin: mode === "result", // 다시 돌리기 횟수 지표
+      pool_size: pool.length,
+      radius_km: near?.radiusKm ?? null,
+      price_limit: limit,
+      now_only: nowOnly,
+    });
     clearTimers();
     setPicked(null);
     const showResult = () => {
       setFlashId(null);
       setPicked(winner);
       setMode("result");
+      track("result_view", {
+        distance_km: Math.round(winner.km * 100) / 100,
+        walk_min: winner.walk,
+        badge: priceBadge(winner),
+        price_limit: limit,
+      });
     };
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return showResult();
     setMode("spin");
@@ -119,6 +155,16 @@ export default function HomeScreen() {
     clearTimers();
     skipTo.current();
   };
+  const applyLimit = (next: number) => {
+    if (next !== limit) track("price_limit_change", { from: limit, to: next });
+    setChosenLimit(next);
+    try {
+      localStorage.setItem(LIMIT_KEY, String(next));
+    } catch {
+      // 기억 못 해도 이번에는 적용
+    }
+    setPriceOpen(false);
+  };
   const backHome = () => {
     clearTimers();
     setFlashId(null);
@@ -128,15 +174,17 @@ export default function HomeScreen() {
   // 여기 갈래요: 화면은 바로 넘기고 저장은 뒤에서 (서버가 잠들어 있어도 기다리지 않게)
   const go = () => {
     if (!picked) return;
+    const distanceKm = Math.round(picked.km * 100) / 100;
     saveVisit({
       id: crypto.randomUUID(),
       shopId: picked.id,
       shopName: picked.name,
       source: "roulette",
-      distanceKm: Math.round(picked.km * 100) / 100,
-      priceLimit: PRICE_LIMIT,
+      distanceKm,
+      priceLimit: limit,
       chosenAt: new Date().toISOString(),
     });
+    track("go_here_click", { source: "roulette", distance_km: distanceKm, price_limit: limit });
     setMode("go");
   };
 
@@ -153,9 +201,18 @@ export default function HomeScreen() {
           </h1>
           {mode === "home" && (
             <div className="flex gap-2">
-              <span className="flex h-9 items-center rounded-full border border-[#2457C5] bg-[#E8EEFA] px-3.5 text-sm font-semibold text-[#1A3F91]">
-                990엔 이하
-              </span>
+              <button
+                type="button"
+                disabled={!tiers}
+                onClick={() => setPriceOpen(true)}
+                aria-haspopup="dialog"
+                className="flex h-9 items-center gap-1 rounded-full border border-[#2457C5] bg-[#E8EEFA] px-3.5 text-sm font-semibold text-[#1A3F91]"
+              >
+                {yen(limit)}엔 이하
+                <svg {...svg} width={14} height={14} strokeWidth={2.5}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
               <Chip on={nowOnly} onClick={() => setNowOnly((v) => !v)}>지금 영업 중</Chip>
               <Chip on={byDistance} onClick={() => setByDistance((v) => !v)}>가까운순</Chip>
             </div>
@@ -173,6 +230,7 @@ export default function HomeScreen() {
             radiusKm={near.radiusKm}
             shops={visible}
             flashId={mode === "spin" ? flashId : null}
+            showLocate={mode === "home" && !listOpen} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감
             pickedId={mode === "result" ? (picked?.id ?? null) : null}
           />
         ) : (
@@ -231,12 +289,16 @@ export default function HomeScreen() {
       )}
 
       {mode === "result" && picked && (
-        <ResultCard shop={picked} day={day} minutes={minutes} onGo={go} onRespin={spin} canRespin={pool.length > 1} />
+        <ResultCard shop={picked} day={day} minutes={minutes} limit={limit} onGo={go} onRespin={spin} canRespin={pool.length > 1} />
       )}
 
       {mode === "go" && picked && <GoScreen shop={picked} onHome={backHome} />}
 
-      {mode === "home" && ask && (
+      {mode === "home" && priceOpen && tiers && (
+        <PriceSheet tiers={tiers} current={limit} onApply={applyLimit} onClose={() => setPriceOpen(false)} />
+      )}
+
+      {mode === "home" && ask && !priceOpen && (
         <FeedbackSheet
           visit={ask}
           onClose={() => {
@@ -254,14 +316,17 @@ export default function HomeScreen() {
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">
                   <p>
-                    {near.radiusKm}km 안 990엔 이하 {nowOnly ? "지금 영업 중 " : ""}
+                    {near.radiusKm}km 안 {yen(limit)}엔 이하 {nowOnly ? "지금 영업 중 " : ""}
                     {visible.length}곳
                   </p>
                   {visible.length > COLLAPSED_ROWS && (
                     <button
                       type="button"
                       aria-expanded={listOpen}
-                      onClick={() => setListOpen((v) => !v)}
+                      onClick={() => {
+                        if (!listOpen) track("list_open", { count: visible.length });
+                        setListOpen(!listOpen);
+                      }}
                       className="-my-2 h-11 px-1 font-semibold text-[#1A3F91]"
                     >
                       {listOpen ? "목록 접기" : "목록 모두 보기"}
@@ -270,7 +335,7 @@ export default function HomeScreen() {
                 </div>
                 {near.widened && near.shops.length > 0 && <p>가까운 가게가 적어서 {near.radiusKm}km까지 넓혔어요</p>}
                 {near.shops.length === 0 && (
-                  <p>2km 안에 오늘 점심 영업하는 990엔 이하 가게가 없어요. 지금은 오사카 시내 중심 6개 지역만 보여 줘요.</p>
+                  <p>2km 안에 오늘 점심 영업하는 {yen(limit)}엔 이하 가게가 없어요. 지금은 오사카 시내 중심 6개 지역만 보여 줘요.</p>
                 )}
                 {allOrdersOver && <p>오늘 점심 주문은 모두 끝났어요</p>}
               </div>

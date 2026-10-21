@@ -6,18 +6,27 @@ import {
   directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange,
   type Day, type NearbyShop,
 } from "@/lib/lunch";
+import { track } from "@/lib/analytics";
 import { svg } from "./icons";
 
-type Props = { shop: NearbyShop; day: Day; minutes: number; onGo: () => void; onRespin: () => void; canRespin: boolean };
+type Props = {
+  shop: NearbyShop;
+  day: Day;
+  minutes: number;
+  limit: number; // 지금 고른 가격 상한
+  onGo: () => void;
+  onRespin: () => void;
+  canRespin: boolean;
+};
 
-export default function ResultCard({ shop, day, minutes, onGo, onRespin, canRespin }: Props) {
+export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin }: Props) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
 
   const time = lunchTimeText(shop, day, minutes);
   const range = priceRange(shop);
   const typical = shop.typicalPrice !== null ? `${shop.typicalPrice.toLocaleString("ja-JP")}엔` : null;
-  const confirmed = priceBadge(shop) === "confirmed";
+  const confirmed = priceBadge(shop, limit) === "confirmed";
 
   return (
     <section className="relative z-[600] -mt-4 flex flex-1 flex-col gap-2.5 overflow-y-auto rounded-t-[20px] bg-white px-5 pb-4 pt-4">
@@ -61,7 +70,7 @@ export default function ResultCard({ shop, day, minutes, onGo, onRespin, canResp
       </div>
       {!confirmed && (
         <p className="-mt-1 text-[13px] text-[#5F5E58]">
-          {typical && range !== typical ? `대표 점심 메뉴 ${typical} · ` : ""}가게 글을 AI가 읽고 990엔 이하로 판단했어요
+          {typical && range !== typical ? `대표 점심 메뉴 ${typical} · ` : ""}가게 글을 AI가 읽고 {limit.toLocaleString("ja-JP")}엔 이하로 판단했어요
         </p>
       )}
 
@@ -71,6 +80,7 @@ export default function ResultCard({ shop, day, minutes, onGo, onRespin, canResp
           href={shop.hotpepperUrl}
           target="_blank"
           rel="noreferrer"
+          onClick={() => track("menu_link_click")} // 메뉴 보기 비율 (10/21 결정 C)
           className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#2457C5] text-[15px] font-semibold text-[#1A3F91]"
         >
           핫페퍼에서 메뉴 · 사진 보기
@@ -103,7 +113,13 @@ export default function ResultCard({ shop, day, minutes, onGo, onRespin, canResp
           </svg>
           주문 문장 보기
         </button>
-        <a href={directionsUrl(shop)} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-1.5 text-[#2457C5]">
+        <a
+          href={directionsUrl(shop)}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => track("directions_click", { from: "result" })}
+          className="flex min-h-11 items-center gap-1.5 text-[#2457C5]"
+        >
           구글 지도로 길찾기
           <svg {...svg} width={16} height={16}>
             <path d="M14 4h6v6" />
