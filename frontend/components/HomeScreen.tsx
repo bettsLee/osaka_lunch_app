@@ -12,8 +12,10 @@ import { fetchLunchShops } from "@/lib/shops";
 import { fetchPendingVisit, flushVisits, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
+import { isIOS } from "@/lib/push";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
+import FirstRun from "./FirstRun";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -29,6 +31,7 @@ type Mode = "home" | "spin" | "result" | "go";
 type Tab = "lunch" | "zukan";
 
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
+const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
 const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
@@ -36,6 +39,7 @@ const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기�
 
 export default function HomeScreen() {
   const { t, machine } = useT();
+  const [firstRun, setFirstRun] = useState<boolean | null>(null); // S0을 보여줄지 (null: 확인 중)
   const [loc, setLoc] = useState<Loc>({ status: "asking" });
   const [data, setData] = useState<Data>({ status: "loading" });
   const [now, setNow] = useState(() => new Date());
@@ -52,6 +56,7 @@ export default function HomeScreen() {
   const [priceOpen, setPriceOpen] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
+  const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) return setLoc({ status: "error" });
@@ -79,8 +84,29 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    locate();
-    load();
+    openedAt.current = performance.now();
+    // 홈 화면 앱은 뒤로 갔다가 다음 날 다시 쓰기도 해서, 다시 화면에 돌아온 때부터 다시 잼
+    const onVisible = () => {
+      if (document.visibilityState === "visible") openedAt.current = performance.now();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    // 처음이면 S0부터 (위치는 버튼을 누를 때 물음). 이미 시작했거나 위치를 허용해 둔 브라우저면 바로 홈
+    let started = false;
+    try {
+      started = localStorage.getItem(STARTED_KEY) === "1";
+    } catch {
+      // 저장소를 못 쓰면 권한 상태로만 판단
+    }
+    const granted = started
+      ? Promise.resolve(true)
+      : (navigator.permissions?.query({ name: "geolocation" }).then((s) => s.state === "granted") ?? Promise.resolve(false));
+    void granted
+      .catch(() => false)
+      .then((skip) => {
+        setFirstRun(!skip);
+        if (skip) locate();
+      });
+    load(); // 가게 목록은 S0을 보는 동안 미리 불러 둠
     startAnalytics();
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
@@ -103,6 +129,7 @@ export default function HomeScreen() {
     return () => {
       clearInterval(t);
       clearTimers();
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [locate, load]);
 
@@ -213,7 +240,12 @@ export default function HomeScreen() {
       priceLimit: limit,
       chosenAt: new Date().toISOString(),
     });
-    track("go_here_click", { source: pickedFrom, distance_km: distanceKm, price_limit: limit });
+    track("go_here_click", {
+      source: pickedFrom,
+      distance_km: distanceKm,
+      price_limit: limit,
+      decide_sec: Math.round((performance.now() - openedAt.current) / 100) / 10, // 열고 → 여기 갈래요 (초, 소수 첫째 자리)
+    });
     setMode("go");
   };
 
@@ -230,6 +262,20 @@ export default function HomeScreen() {
   );
   const mainClass = "mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]";
   const mainFont = { fontFamily: "-apple-system, 'Apple SD Gothic Neo', 'Hiragino Sans', 'Noto Sans KR', sans-serif" };
+
+  // S0 첫 실행 (확인 중에는 빈 화면: 홈이 잠깐 보였다 바뀌지 않게)
+  if (firstRun !== false) {
+    const start = () => {
+      try {
+        localStorage.setItem(STARTED_KEY, "1");
+      } catch {
+        // 기억 못 하면 다음에 S0을 한 번 더 봄
+      }
+      setFirstRun(false);
+      locate();
+    };
+    return <main className={mainClass} style={mainFont}>{firstRun && <FirstRun onStart={start} />}</main>;
+  }
 
   // S6 도감 탭 (점심 탭의 지도 · 목록 대신)
   if (mode === "home" && tab === "zukan") {
@@ -291,6 +337,13 @@ export default function HomeScreen() {
                 <p>
                   {loc.status === "denied" ? t("home.locationDenied") : t("home.locationError")}
                 </p>
+                {loc.status === "denied" && ( // 거부한 뒤에는 다시 눌러도 묻지 않아서, 설정에서 켜는 방법을 알려 줌
+                  <p className="text-left text-[13px] leading-relaxed">
+                    {isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)
+                      ? t("home.locationHowIOS")
+                      : t("home.locationHowOther")}
+                  </p>
+                )}
                 <button type="button" onClick={locate} className="h-11 rounded-xl border border-[#CFCCC2] bg-white px-4 text-[#1F1F1C]">
                   {t("home.retry")}
                 </button>
