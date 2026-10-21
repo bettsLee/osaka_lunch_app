@@ -53,7 +53,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
-  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list">("roulette"); // 룰렛 vs 목록 지표
+  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
@@ -217,16 +217,28 @@ export default function HomeScreen() {
     timers.current.push(setTimeout(showResult, at + SPIN_END_PAUSE_MS));
     skipTo.current = showResult;
   };
-  // 목록에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
-  const pickFromList = (shop: NearbyShop, position: number) => {
+  // 목록 · 지도 핀에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
+  const pickDirect = (shop: NearbyShop, from: "list" | "map") => {
     clearTimers();
     setFlashId(null);
     setPicked(shop);
-    setPickedFrom("list");
+    setPickedFrom(from);
     setMode("result");
     const distanceKm = Math.round(shop.km * 100) / 100;
+    track("result_view", { source: from, distance_km: distanceKm, walk_min: shop.walk, badge: priceBadge(shop), price_limit: limit });
+    return distanceKm;
+  };
+  const pickFromList = (shop: NearbyShop, position: number) => {
+    const distanceKm = pickDirect(shop, "list");
     track("list_item_click", { position, distance_km: distanceKm, price_limit: limit, list_open: listOpen });
-    track("result_view", { source: "list", distance_km: distanceKm, walk_min: shop.walk, badge: priceBadge(shop), price_limit: limit });
+  };
+  // 지도 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩: 이름 말풍선 대신). 룰렛이 도는 중에는 무시
+  const pickFromMap = (shopId: string) => {
+    if (mode !== "home" && mode !== "result") return;
+    const shop = visible.find((s) => s.id === shopId);
+    if (!shop) return;
+    const distanceKm = pickDirect(shop, "map");
+    track("map_pin_click", { distance_km: distanceKm, price_limit: limit, map_big: sheetHidden });
   };
   const skip = () => {
     clearTimers();
@@ -276,7 +288,7 @@ export default function HomeScreen() {
       id,
       shopId: picked.id,
       shopName: picked.name,
-      source: pickedFrom,
+      source: pickedFrom === "map" ? "list" : pickedFrom, // 서버에는 직접 고름(list)으로. 지도 핀인지는 이벤트로 봄
       distanceKm,
       priceLimit: limit,
       chosenAt,
@@ -378,8 +390,9 @@ export default function HomeScreen() {
             radiusKm={near.radiusKm}
             shops={visible}
             flashId={mode === "spin" ? flashId : null}
-            showLocate={mode === "home" && !listOpen} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감
+            showLocate={mode === "home" && (!listOpen || sheetHidden)} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감 (시트를 접으면 다시 보임)
             pickedId={mode === "result" ? (picked?.id ?? null) : null}
+            onPick={pickFromMap}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-[#5F5E58]">

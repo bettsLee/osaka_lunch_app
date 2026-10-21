@@ -1,6 +1,6 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 원문
+// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
 // 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
 import { genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
@@ -23,15 +23,17 @@ type Props = {
 export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin }: Props) {
   const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
-  const [catchTr, setCatchTr] = useState<{ id: string; text: string } | null>(null); // 가게 소개 AI 번역 (일본어 화면은 원문만)
+  // 가게 소개 AI 번역 (일본어 화면은 원문만). text가 null이면 번역하는 중
+  const [catchTr, setCatchTr] = useState<{ id: string; text: string | null } | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
   useEffect(() => {
     if (!shop.catchText || lang === "ja") return;
     let live = true;
+    setCatchTr({ id: shop.id, text: null }); // 처음 번역하는 가게는 몇 초 걸려서 '번역하는 중'을 보여 줌 (10/22 도그푸딩)
     fetchShopCatch(shop.id, lang)
-      .then((text) => live && text && setCatchTr({ id: shop.id, text }))
-      .catch(() => {}); // 번역이 없으면 원문만 (서버가 잠들어 있으면 다음에)
+      .then((text) => live && setCatchTr(text ? { id: shop.id, text } : null))
+      .catch(() => live && setCatchTr(null)); // 번역이 없으면 원문만 (서버가 잠들어 있으면 다음에)
     return () => {
       live = false;
     };
@@ -63,11 +65,26 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
           <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
         </p>
-        {shop.catchText && <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>}
-        {catchTr?.id === shop.id && (
-          <p className="text-[13px] leading-snug text-[#1F1F1C]">
-            {catchTr.text} <span className="whitespace-nowrap text-[11px] text-[#5F5E58]">· {t("i18n.ai")}</span>
-          </p>
+        {shop.catchText && (
+          <div className="flex flex-col gap-0.5">
+            {/* 가게 소개는 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22 결정) */}
+            <p className="text-[11px] text-[#5F5E58]">{t("result.catchLabel")}</p>
+            <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>
+            {catchTr?.id === shop.id &&
+              (catchTr.text === null ? (
+                <p className="flex items-center gap-1.5 text-[12px] text-[#5F5E58]" aria-live="polite">
+                  <span
+                    className="h-3 w-3 flex-none rounded-full border-2 border-[#CFCCC2] border-t-[#2457C5] motion-safe:animate-spin"
+                    aria-hidden="true"
+                  />
+                  {t("result.catchTranslating")}
+                </p>
+              ) : (
+                <p className="text-[13px] leading-snug text-[#1F1F1C]">
+                  {catchTr.text} <span className="whitespace-nowrap text-[11px] text-[#5F5E58]">· {t("i18n.ai")}</span>
+                </p>
+              ))}
+          </div>
         )}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
           {time.soon ? `${t("result.closingSoon")} · ` : ""}
