@@ -1,13 +1,15 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 길찾기 · 원문
-import { useEffect, useRef } from "react";
+// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 길찾기 · 원문
+import { useEffect, useRef, useState } from "react";
 import {
   directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange,
   type Day, type NearbyShop,
 } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
+import { useT } from "./I18n";
 import { svg } from "./icons";
+import OrderSheet from "./OrderSheet";
 
 type Props = {
   shop: NearbyShop;
@@ -20,12 +22,15 @@ type Props = {
 };
 
 export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin }: Props) {
+  const { t } = useT();
+  const [orderOpen, setOrderOpen] = useState(false);
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
 
-  const time = lunchTimeText(shop, day, minutes);
-  const range = priceRange(shop);
-  const typical = shop.typicalPrice !== null ? `${shop.typicalPrice.toLocaleString("ja-JP")}엔` : null;
+  const time = lunchTimeText(shop, day, minutes, t);
+  const range = priceRange(shop, t);
+  const typical = shop.typicalPrice !== null ? t("price.yen", { n: shop.typicalPrice.toLocaleString("ja-JP") }) : null;
+  const limitYen = limit.toLocaleString("ja-JP");
   const confirmed = priceBadge(shop, limit) === "confirmed";
 
   return (
@@ -45,12 +50,12 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           {shop.name}
         </h1>
         <p className="text-sm text-[#5F5E58]">
-          {shop.genre ? `${genreLabel(shop.genre)} · ` : ""}
-          <span className="font-semibold text-[#1A3F91]">걸어서 {shop.walk}분</span>
+          {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
+          <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
         </p>
         {shop.catchText && <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
-          {time.soon ? "곧 마감 · " : ""}
+          {time.soon ? `${t("result.closingSoon")} · ` : ""}
           {time.text}
         </p>
       </div>
@@ -62,15 +67,15 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
             <svg {...svg} width={14} height={14} strokeWidth={2.5}>
               <path d="M5 12l5 5 9-10" />
             </svg>
-            가격 확인됨
+            {t("result.priceConfirmed")}
           </span>
         ) : (
-          <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">AI 판단</span>
+          <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">{t("result.aiJudged")}</span>
         )}
       </div>
       {!confirmed && (
         <p className="-mt-1 text-[13px] text-[#5F5E58]">
-          {typical && range !== typical ? `대표 점심 메뉴 ${typical} · ` : ""}가게 글을 AI가 읽고 {limit.toLocaleString("ja-JP")}엔 이하로 판단했어요
+          {typical && range !== typical ? t("result.aiNoteTypical", { typical, limit: limitYen }) : t("result.aiNote", { limit: limitYen })}
         </p>
       )}
 
@@ -83,7 +88,7 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           onClick={() => track("menu_link_click")} // 메뉴 보기 비율 (10/21 결정 C)
           className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#2457C5] text-[15px] font-semibold text-[#1A3F91]"
         >
-          핫페퍼에서 메뉴 · 사진 보기
+          {t("result.menuLink")}
           <svg {...svg} width={16} height={16}>
             <path d="M14 4h6v6" />
             <path d="M20 4l-9 9" />
@@ -94,7 +99,7 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
 
       <div className="mt-1 flex flex-col gap-2">
         <button type="button" onClick={onGo} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
-          여기 갈래요
+          {t("result.go")}
         </button>
         <button
           type="button"
@@ -102,25 +107,32 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           disabled={!canRespin}
           className="h-12 rounded-[14px] border border-[#CFCCC2] text-base disabled:opacity-50"
         >
-          다시 돌리기
+          {t("result.respin")}
         </button>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <button type="button" disabled title="다음 단계에서 붙여요" className="flex min-h-11 items-center gap-1.5 text-[#1F1F1C] disabled:opacity-50">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 text-sm">
+        <button
+          type="button"
+          onClick={() => {
+            setOrderOpen(true);
+            track("order_open");
+          }}
+          className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[#1F1F1C]"
+        >
           <svg {...svg} width={18} height={18}>
             <path d="M4 5h16v11H9l-5 4z" />
           </svg>
-          주문 문장 보기
+          {t("result.orderOpen")}
         </button>
         <a
           href={directionsUrl(shop)}
           target="_blank"
           rel="noreferrer"
           onClick={() => track("directions_click", { from: "result" })}
-          className="flex min-h-11 items-center gap-1.5 text-[#2457C5]"
+          className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[#2457C5]"
         >
-          구글 지도로 길찾기
+          {t("result.directions")}
           <svg {...svg} width={16} height={16}>
             <path d="M14 4h6v6" />
             <path d="M20 4l-9 9" />
@@ -132,7 +144,7 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
       <div className="flex flex-col gap-1 text-xs text-[#5F5E58]">
         {shop.priceEvidence && (
           <details>
-            <summary className="min-h-8 cursor-pointer py-1">가격 원문 보기</summary>
+            <summary className="min-h-8 cursor-pointer py-1">{t("result.priceSource")}</summary>
             <p className="rounded-lg bg-[#F4F3EF] p-2 leading-relaxed">「{shop.priceEvidence}」</p>
           </details>
         )}
@@ -140,6 +152,7 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           Powered by ホットペッパー グルメ Webサービス
         </a>
       </div>
+      {orderOpen && <OrderSheet onClose={() => setOrderOpen(false)} />}
     </section>
   );
 }

@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/health").permitAll() // 화면이 앱을 열 때 서버를 깨우는 용도
                         .requestMatchers("/error").permitAll() // 400 · 404 같은 오류 응답이 401로 바뀌지 않게
                         .requestMatchers(HttpMethod.POST, "/internal/push/send-due").permitAll() // 로그인 대신 비밀 값으로 확인 (PushController)
+                        .requestMatchers(HttpMethod.GET, "/api/i18n/*").permitAll() // 앱 문구 번역 (누구에게나 같은 내용, 로그인 전에 필요)
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

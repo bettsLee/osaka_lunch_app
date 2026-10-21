@@ -7,11 +7,11 @@ import { directionsUrl, priceRange, type NearbyShop } from "@/lib/lunch";
 import { currentPushState, enablePush } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import type { PushState } from "@/lib/push";
+import { useT } from "./I18n";
 import { svg } from "./icons";
 
-const WHY = "다음 사람에게 더 정확한 가게를 보여 줄 수 있어요.";
-
 export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: () => void }) {
+  const { t } = useT();
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
   const [push, setPush] = useState<PushState | "working" | "error">(() => currentPushState());
@@ -38,10 +38,10 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
       </div>
       <div className="flex flex-col gap-1.5">
         <h1 ref={title} tabIndex={-1} className="text-2xl font-semibold outline-none">
-          좋아요, 맛있게 드세요
+          {t("go.title")}
         </h1>
         <p className="text-[15px] text-[#5F5E58]">
-          {shop.name} · 걸어서 {shop.walk}분 · {priceRange(shop)}
+          {shop.name} · {t("common.walk", { n: shop.walk })} · {priceRange(shop, t)}
         </p>
       </div>
       <a
@@ -51,7 +51,7 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
         onClick={() => track("directions_click", { from: "go" })}
         className="flex h-14 items-center justify-center gap-2 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white"
       >
-        구글 지도로 길찾기
+        {t("result.directions")}
         <svg {...svg} width={18} height={18}>
           <path d="M14 4h6v6" />
           <path d="M20 4l-9 9" />
@@ -64,18 +64,18 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
             <path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" />
             <path d="M10 20a2 2 0 0 0 4 0" />
           </svg>
-          다녀온 뒤에 알려 주세요
+          {t("go.askTitle")}
         </p>
         <p className="text-sm leading-relaxed text-[#5F5E58]" aria-live="polite">
           {push === "on"
-            ? `1시간 반 뒤에 알림으로 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`
+            ? `${t("go.pushOn")} ${t("go.why")}`
             : push === "ask" || push === "working"
-              ? `알림을 켜 두면 1시간 반 뒤에 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`
-              : `${push === "error" ? "알림을 켜지 못했어요. " : ""}1시간쯤 지나 앱을 다시 열면 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`}
+              ? `${t("go.pushAsk")} ${t("go.why")}`
+              : `${push === "error" ? `${t("go.pushError")} ` : ""}${t("go.appAsk")} ${t("go.why")}`}
         </p>
         {push === "install" && (
           <p className="text-sm leading-relaxed text-[#5F5E58]">
-            아이폰은 홈 화면에 추가하면 알림으로 물어볼 수 있어요. 공유 버튼 → &apos;홈 화면에 추가&apos;를 누르고, 홈 화면의 앱으로 열어 주세요.
+            {t("go.install")}
           </p>
         )}
         {(push === "ask" || push === "working") && (
@@ -85,14 +85,14 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
             disabled={push === "working"}
             className="mt-1 h-12 rounded-xl border border-[#2457C5] text-base font-semibold text-[#1A3F91] disabled:opacity-60"
           >
-            {push === "working" ? "알림 켜는 중…" : "알림 받기"}
+            {push === "working" ? t("go.pushWorking") : t("go.pushButton")}
           </button>
         )}
-        {push === "on" && <p className="text-sm font-semibold text-[#1A3F91]">알림이 켜져 있어요</p>}
+        {push === "on" && <p className="text-sm font-semibold text-[#1A3F91]">{t("go.pushOnLabel")}</p>}
       </div>
       <div className="flex-1" />
       <button type="button" onClick={onHome} className="min-h-11 text-sm text-[#2457C5]">
-        홈으로
+        {t("home.back")}
       </button>
     </section>
   );

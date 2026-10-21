@@ -11,9 +11,11 @@ import {
 import { fetchLunchShops } from "@/lib/shops";
 import { fetchPendingVisit, flushVisits, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track } from "@/lib/analytics";
+import { pickLang } from "@/lib/i18n";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
 import GoScreen from "./GoScreen";
+import { useT } from "./I18n";
 import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
@@ -21,7 +23,7 @@ import ResultCard from "./ResultCard";
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
 
 type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point };
-type Data = { status: "loading" } | { status: "error"; message: string } | { status: "ok"; shops: LunchShop[] };
+type Data = { status: "loading" } | { status: "error" } | { status: "ok"; shops: LunchShop[] };
 type Mode = "home" | "spin" | "result" | "go";
 
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
@@ -31,6 +33,7 @@ const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
 
 export default function HomeScreen() {
+  const { t, machine } = useT();
   const [loc, setLoc] = useState<Loc>({ status: "asking" });
   const [data, setData] = useState<Data>({ status: "loading" });
   const [now, setNow] = useState(() => new Date());
@@ -60,7 +63,7 @@ export default function HomeScreen() {
     setData({ status: "loading" });
     fetchLunchShops()
       .then((shops) => setData({ status: "ok", shops }))
-      .catch((e: Error) => setData({ status: "error", message: e.message }));
+      .catch(() => setData({ status: "error" }));
   }, []);
 
   const clearTimers = () => {
@@ -73,7 +76,7 @@ export default function HomeScreen() {
     load();
     startAnalytics();
     const fromPush = new URLSearchParams(window.location.search).get("from") === "push"; // 알림을 눌러 열었는지
-    track("app_open", fromPush ? { from: "push" } : undefined);
+    track("app_open", { lang: pickLang(navigator.languages ?? []), ...(fromPush ? { from: "push" } : {}) }); // 언어: 번역이 필요한 언어 분포
     if (fromPush) window.history.replaceState(null, "", window.location.pathname);
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
@@ -117,7 +120,7 @@ export default function HomeScreen() {
 
   const pool = rouletteCandidates(visible, day, minutes);
   const allOrdersOver = near !== null && near.shops.length > 0 && rouletteCandidates(near.shops, day, minutes).length === 0;
-  const area = near ? areaName(near.shops) : null;
+  const area = near ? areaName(near.shops, t) : null;
   const rows = listOpen ? visible : visible.slice(0, COLLAPSED_ROWS);
 
   // 룰렛: 결과를 먼저 정하고, 핀을 점점 느리게 깜빡이다 결과에서 멈춤. 움직임 줄이기 설정이면 바로 결과
@@ -200,7 +203,7 @@ export default function HomeScreen() {
         <header className="flex flex-col gap-3 px-5 pb-3 pt-5">
           <h1 className="flex items-center gap-1.5 text-[17px] font-semibold">
             <PinIcon />
-            {area ? `${area} 근처` : "지금 위치 근처"}
+            {area ? t("home.near", { area }) : t("home.nearHere")}
           </h1>
           {mode === "home" && (
             <div className="flex gap-2">
@@ -211,13 +214,13 @@ export default function HomeScreen() {
                 aria-haspopup="dialog"
                 className="flex h-9 items-center gap-1 rounded-full border border-[#2457C5] bg-[#E8EEFA] px-3.5 text-sm font-semibold text-[#1A3F91]"
               >
-                {yen(limit)}엔 이하
+                {t("home.limitChip", { limit: yen(limit) })}
                 <svg {...svg} width={14} height={14} strokeWidth={2.5}>
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </button>
-              <Chip on={nowOnly} onClick={() => setNowOnly((v) => !v)}>지금 영업 중</Chip>
-              <Chip on={byDistance} onClick={() => setByDistance((v) => !v)}>가까운순</Chip>
+              <Chip on={nowOnly} onClick={() => setNowOnly((v) => !v)}>{t("home.openNow")}</Chip>
+              <Chip on={byDistance} onClick={() => setByDistance((v) => !v)}>{t("home.byDistance")}</Chip>
             </div>
           )}
         </header>
@@ -225,7 +228,7 @@ export default function HomeScreen() {
 
       <section
         className={`relative bg-[#ECEAE3] ${mode === "result" ? "h-[170px] flex-none" : mode === "go" ? "hidden" : "flex-1"}`}
-        aria-label="지도"
+        aria-label={t("home.map")}
       >
         {loc.status === "ok" && near ? (
           <LunchMap
@@ -238,25 +241,23 @@ export default function HomeScreen() {
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-[#5F5E58]">
-            {loc.status === "asking" && <p>지금 위치를 확인하고 있어요</p>}
+            {loc.status === "asking" && <p>{t("home.locating")}</p>}
             {(loc.status === "denied" || loc.status === "error") && (
               <>
                 <p>
-                  {loc.status === "denied"
-                    ? "위치를 허용하면 근처 990엔 점심 가게를 보여 드려요. 브라우저 설정에서 이 사이트의 위치 권한을 켜 주세요."
-                    : "지금 위치를 알 수 없어요."}
+                  {loc.status === "denied" ? t("home.locationDenied") : t("home.locationError")}
                 </p>
                 <button type="button" onClick={locate} className="h-11 rounded-xl border border-[#CFCCC2] bg-white px-4 text-[#1F1F1C]">
-                  다시 시도
+                  {t("home.retry")}
                 </button>
               </>
             )}
-            {loc.status === "ok" && data.status === "loading" && <p>가게를 불러오는 중이에요</p>}
+            {loc.status === "ok" && data.status === "loading" && <p>{t("home.loading")}</p>}
             {loc.status === "ok" && data.status === "error" && (
               <>
-                <p>{data.message}</p>
+                <p>{t("home.loadError")}</p>
                 <button type="button" onClick={load} className="h-11 rounded-xl border border-[#CFCCC2] bg-white px-4 text-[#1F1F1C]">
-                  다시 시도
+                  {t("home.retry")}
                 </button>
               </>
             )}
@@ -265,7 +266,7 @@ export default function HomeScreen() {
         {mode === "result" && (
           <button
             type="button"
-            aria-label="홈으로"
+            aria-label={t("home.back")}
             onClick={backHome}
             className="absolute left-3 top-3 z-[700] flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1F1F1C] shadow"
           >
@@ -279,14 +280,14 @@ export default function HomeScreen() {
       {mode === "spin" && (
         <section className="relative z-[600] -mt-4 flex flex-col items-center gap-2.5 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-7 pt-4">
           <div className="h-1 w-10 rounded-full bg-[#CFCCC2]" aria-hidden="true" />
-          <p className="text-xl font-semibold" aria-live="polite">고르는 중…</p>
+          <p className="text-xl font-semibold" aria-live="polite">{t("home.spinning")}</p>
           <div className="flex gap-2" aria-hidden="true">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#2457C5]" />
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#9DB3E3] [animation-delay:150ms]" />
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#D6D4CC] [animation-delay:300ms]" />
           </div>
           <button type="button" onClick={skip} className="min-h-11 px-3 text-sm text-[#2457C5]">
-            바로 보기
+            {t("home.skip")}
           </button>
         </section>
       )}
@@ -319,8 +320,7 @@ export default function HomeScreen() {
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">
                   <p>
-                    {near.radiusKm}km 안 {yen(limit)}엔 이하 {nowOnly ? "지금 영업 중 " : ""}
-                    {visible.length}곳
+                    {t(nowOnly ? "home.countOpenNow" : "home.count", { radius: near.radiusKm, limit: yen(limit), n: visible.length })}
                   </p>
                   {visible.length > COLLAPSED_ROWS && (
                     <button
@@ -332,15 +332,15 @@ export default function HomeScreen() {
                       }}
                       className="-my-2 h-11 px-1 font-semibold text-[#1A3F91]"
                     >
-                      {listOpen ? "목록 접기" : "목록 모두 보기"}
+                      {listOpen ? t("home.listCollapse") : t("home.listExpand")}
                     </button>
                   )}
                 </div>
-                {near.widened && near.shops.length > 0 && <p>가까운 가게가 적어서 {near.radiusKm}km까지 넓혔어요</p>}
+                {near.widened && near.shops.length > 0 && <p>{t("home.widened", { radius: near.radiusKm })}</p>}
                 {near.shops.length === 0 && (
-                  <p>2km 안에 오늘 점심 영업하는 {yen(limit)}엔 이하 가게가 없어요. 지금은 오사카 시내 중심 6개 지역만 보여 줘요.</p>
+                  <p>{t("home.none", { limit: yen(limit) })}</p>
                 )}
-                {allOrdersOver && <p>오늘 점심 주문은 모두 끝났어요</p>}
+                {allOrdersOver && <p>{t("home.ordersOver")}</p>}
               </div>
             )}
             <button
@@ -349,7 +349,7 @@ export default function HomeScreen() {
               onClick={spin}
               className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
             >
-              오늘 점심 정해줘
+              {t("home.spin")}
             </button>
             {rows.length > 0 && (
               <ul className={listOpen ? "max-h-[40dvh] overflow-y-auto" : ""}>
@@ -364,11 +364,11 @@ export default function HomeScreen() {
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <p className="truncate text-[15px] font-semibold">{s.name}</p>
                       <p className="text-[13px] text-[#5F5E58]">
-                        {s.genre ? `${genreLabel(s.genre)} · ` : ""}
-                        <span className="text-[#1A3F91]">걸어서 {s.walk}분</span>
+                        {s.genre ? `${genreLabel(s.genre, t)} · ` : ""}
+                        <span className="text-[#1A3F91]">{t("common.walk", { n: s.walk })}</span>
                       </p>
                     </div>
-                    <p className="text-base font-semibold">{priceLabel(s)}</p>
+                    <p className="text-base font-semibold">{priceLabel(s, t)}</p>
                   </li>
                 ))}
               </ul>
@@ -378,13 +378,14 @@ export default function HomeScreen() {
                 Powered by ホットペッパー グルメ Webサービス
               </a>
               {" · "}画像提供：ホットペッパー グルメ
+              {machine && ` · ${t("i18n.ai")}`}
             </p>
           </section>
 
-          <nav className="flex border-t border-[#E2E0D8] bg-white" aria-label="아래 탭">
-            <Tab active label="점심" icon={<MapIcon />} />
-            <Tab label="도감" icon={<BookIcon />} />
-            <Tab label="설정" icon={<SlidersIcon />} />
+          <nav className="flex border-t border-[#E2E0D8] bg-white" aria-label={t("home.tabs")}>
+            <Tab active label={t("tab.lunch")} icon={<MapIcon />} />
+            <Tab label={t("tab.zukan")} icon={<BookIcon />} />
+            <Tab label={t("tab.settings")} icon={<SlidersIcon />} />
           </nav>
         </>
       )}

@@ -3,6 +3,21 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+// 휴대폰 언어 문구는 앱이 열릴 때 저장해 둔 것(/push-text.json)을 씀. 없으면 서버가 보낸 한국어
+async function pushText(data) {
+  try {
+    const saved = await caches.match("/push-text.json");
+    const t = saved ? await saved.json() : null;
+    if (t && t.title && t.body && data.shop) {
+      const body = t.body.replace("{shop}", () => data.shop).replace("{limit}", () => data.limit || ""); // 가게 이름의 $ 같은 글자를 그대로
+      return { title: t.title, body };
+    }
+  } catch {
+    // 저장해 둔 문구를 못 읽으면 서버 문구
+  }
+  return { title: data.title || "다녀왔어요?", body: data.body || "" };
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -11,12 +26,14 @@ self.addEventListener("push", (event) => {
     // 내용을 못 읽어도 알림은 띄움 (아이폰은 알림 없이 끝나면 구독을 끊음)
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "다녀왔어요?", {
-      body: data.body || "",
-      tag: data.tag || "visit",
-      icon: "/icons/icon-192.png",
-      data: { url: data.url || "/" },
-    }),
+    pushText(data).then((text) =>
+      self.registration.showNotification(text.title, {
+        body: text.body,
+        tag: data.tag || "visit",
+        icon: "/icons/icon-192.png",
+        data: { url: data.url || "/" },
+      }),
+    ),
   );
 });
 

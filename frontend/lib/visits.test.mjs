@@ -2,6 +2,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canSubmit, chosenLabel, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled } from "./visits.ts";
+import ko from "../public/i18n/ko.json" with { type: "json" };
+import { translator } from "./i18n.ts";
+
+const t = translator(ko);
 
 const NOW = new Date("2026-10-21T04:00:00Z"); // 오사카 13:00
 const draft = (id, chosenAt = "2026-10-21T03:10:00Z") => ({
@@ -36,7 +40,7 @@ test("서버 응답에 따라 대기열에서 뺌", () => {
 });
 
 test("다녀왔어요? 위쪽 시각 표시 (오사카 시간)", () => {
-  assert.equal(chosenLabel("2026-10-21T03:10:00Z", NOW), "오늘 12:10");
-  assert.equal(chosenLabel("2026-10-20T03:05:00Z", NOW), "어제 12:05");
-  assert.equal(chosenLabel("2026-10-18T23:30:00Z", NOW), "10/19 08:30");
+  assert.equal(chosenLabel("2026-10-21T03:10:00Z", NOW, t), "오늘 12:10");
+  assert.equal(chosenLabel("2026-10-20T03:05:00Z", NOW, t), "어제 12:05");
+  assert.equal(chosenLabel("2026-10-18T23:30:00Z", NOW, t), "10/19 08:30");
 });

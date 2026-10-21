@@ -1,4 +1,5 @@
 // 여기 갈래요(S4) · 다녀왔어요?(S5) 규칙. 화면 · 네트워크와 떨어진 순수 함수라 테스트하기 쉬움
+import type { T } from "./i18n";
 
 export type VisitDraft = {
   id: string; // 화면이 만든 id. 저장을 다시 보내도 서버에는 한 번만 남음
@@ -42,15 +43,15 @@ export function settled(status: number): boolean {
 }
 
 // S5 위쪽의 '오늘 12:10 · 여기 갈래요' (오사카 시간)
-export function chosenLabel(chosenAt: string, now: Date): string {
+export function chosenLabel(chosenAt: string, now: Date, t: T): string {
   const fmt = (d: Date, opt: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", ...opt }).format(d);
   const when = new Date(chosenAt);
   const day = (d: Date) => fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" });
   const time = fmt(when, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  if (day(when) === day(now)) return `오늘 ${time}`;
-  if (day(when) === day(yesterday)) return `어제 ${time}`;
+  if (day(when) === day(now)) return t("visit.today", { time });
+  if (day(when) === day(yesterday)) return t("visit.yesterday", { time });
   const [, m, d] = day(when).split("-");
-  return `${Number(m)}/${Number(d)} ${time}`;
+  return t("visit.date", { m: Number(m), d: Number(d), time });
 }
