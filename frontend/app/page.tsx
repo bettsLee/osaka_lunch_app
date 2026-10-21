@@ -1,7 +1,5 @@
+import HomeScreen from "@/components/HomeScreen";
+
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <p>준비 중</p>
-    </main>
-  );
+  return <HomeScreen />;
 }
