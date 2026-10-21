@@ -21,19 +21,20 @@ m(k, metric, n, d) as (
   select 1, '여기 갈래요 (건)', count(*), null::bigint from v
   union all select 2, '여기 갈래요를 누른 사람', count(distinct user_id), null from v
   union all select 3, '룰렛으로 고른 비율 (나머지는 목록)', count(*) filter (where source = 'roulette'), count(*) from v
-  union all select 4, '다녀왔어요?에 답한 비율 (고른 지 1시간 지난 것)',
-    count(*) filter (where answered_at is not null and chosen_at < now() - interval '1 hour'),
-    count(*) filter (where chosen_at < now() - interval '1 hour') from v
+  union all select 4, '다녀왔어요?에 답한 비율 (고른 지 1시간 지났고 취소하지 않은 것)',
+    count(*) filter (where answered_at is not null and cancelled_at is null and chosen_at < now() - interval '1 hour'),
+    count(*) filter (where cancelled_at is null and chosen_at < now() - interval '1 hour') from v
   union all select 5, '실제로 다녀온 비율 (답한 것 중)', count(*) filter (where visited), count(*) filter (where visited is not null) from v
   union all select 6, '영업 맞음 (다녀온 것 중)', count(*) filter (where open_ok), count(*) filter (where open_ok is not null) from v
   union all select 7, '가격 맞음 (다녀온 것 중)', count(*) filter (where price_ok), count(*) filter (where price_ok is not null) from v
   union all select 8, '알림을 받고 답한 비율', count(*) filter (where notified_at is not null and answered_at is not null),
     count(*) filter (where notified_at is not null) from v
   union all select 9, '알림 없이 답한 비율 (앱을 다시 열어서)',
-    count(*) filter (where notified_at is null and answered_at is not null and chosen_at < now() - interval '1 hour'),
-    count(*) filter (where notified_at is null and chosen_at < now() - interval '1 hour') from v
+    count(*) filter (where notified_at is null and answered_at is not null and cancelled_at is null and chosen_at < now() - interval '1 hour'),
+    count(*) filter (where notified_at is null and cancelled_at is null and chosen_at < now() - interval '1 hour') from v
   union all select 10, '이틀 이상 여기 갈래요를 누른 사람 (재방문)', count(*) filter (where days >= 2), count(*)
     from (select user_id, count(distinct (chosen_at at time zone 'Asia/Tokyo')::date) as days from v group by user_id) u
+  union all select 11, '정했다가 취소한 비율 (다른 가게로 다시 정한 것 포함)', count(*) filter (where cancelled_at is not null), count(*) from v
 )
 select metric as "지표", n as "분자", d as "분모",
        case when d > 0 then round(100.0 * n / d, 1) end as "%"
@@ -52,7 +53,8 @@ select (chosen_at at time zone 'Asia/Tokyo')::date as "날짜",
        count(*) as "여기 갈래요", count(distinct user_id) as "사람",
        count(*) filter (where answered_at is not null) as "답함",
        count(*) filter (where visited) as "다녀옴",
-       count(*) filter (where open_ok = false or price_ok = false) as "틀렸다는 답"
+       count(*) filter (where open_ok = false or price_ok = false) as "틀렸다는 답",
+       count(*) filter (where cancelled_at is not null) as "취소"
 from v group by 1 order by 1;
 
 

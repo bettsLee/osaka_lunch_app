@@ -1,11 +1,9 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 길찾기 · 원문
+// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 원문
+// 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
-import {
-  directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange,
-  type Day, type NearbyShop,
-} from "@/lib/lunch";
+import { genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -125,20 +123,6 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           </svg>
           {t("result.orderOpen")}
         </button>
-        <a
-          href={directionsUrl(shop)}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => track("directions_click", { from: "result" })}
-          className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[#2457C5]"
-        >
-          {t("result.directions")}
-          <svg {...svg} width={16} height={16}>
-            <path d="M14 4h6v6" />
-            <path d="M20 4l-9 9" />
-            <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-          </svg>
-        </a>
       </div>
 
       <div className="flex flex-col gap-1 text-xs text-[#5F5E58]">
