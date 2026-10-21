@@ -198,5 +198,10 @@
   "terms.data": "Restaurant info comes from Hot Pepper Gourmet Web Service once a day. Some lunch hours and prices are judged by AI reading the restaurant's text, so they can be wrong. Please check at the restaurant before you go.",
   "terms.liability": "We can't be responsible for problems caused by app info that differs from reality.",
   "terms.change": "Features may change or stop without notice.",
-  "terms.updated": "As of 2026-10-21"
+  "terms.updated": "As of 2026-10-21",
+  "install.title": "Add this app to your Home Screen to get 'Did you go?' reminders",
+  "install.how": "How",
+  "install.step1": "Tap your browser's Share button (a square with an up arrow). In Safari it's at the bottom of the screen.",
+  "install.step2": "Tap 'Add to Home Screen'. If you don't see it, scroll down the list.",
+  "install.step3": "Open the app from your Home Screen."
 }
