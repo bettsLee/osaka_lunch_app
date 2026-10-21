@@ -19,7 +19,9 @@ export type EventName =
   | "zukan_open" // 도감 탭
   | "zukan_add" // '네, 다녀왔어요'로 도감에 한 곳 추가
   | "share_card_create" // 공유 카드를 저장하거나 공유함
-  | "share_open"; // 공유 카드의 링크로 들어옴
+  | "share_open" // 공유 카드의 링크로 들어옴
+  | "list_item_click" // 목록에서 직접 고름 (룰렛 vs 목록)
+  | "app_error"; // 화면에서 난 오류 (원인 확인용)
 
 type Props = Record<string, string | number | boolean | null>;
 
@@ -57,4 +59,23 @@ export function track(name: EventName, props?: Props): void {
   if (!started) return;
   if (amp) amp.track(name, props);
   else waiting.push({ name, props, time: Date.now() });
+}
+
+// 오류 기록: 같은 오류는 한 번만, 한 번 열 때 최대 10개 (오류가 이어져도 이벤트가 넘치지 않게)
+const seenErrors = new Set<string>();
+export function trackError(where: string, error: unknown): void {
+  const message = (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 200);
+  const key = `${where}|${message}`;
+  if (seenErrors.has(key) || seenErrors.size >= 10) return;
+  seenErrors.add(key);
+  track("app_error", { where, message });
+}
+
+// 잡지 못한 오류 · 처리 안 된 Promise 오류
+let watching = false;
+export function watchErrors(): void {
+  if (watching) return;
+  watching = true;
+  window.addEventListener("error", (e) => trackError("window", e.error ?? e.message));
+  window.addEventListener("unhandledrejection", (e) => trackError("promise", e.reason));
 }
