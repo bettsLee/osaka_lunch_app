@@ -3,7 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   areaName, directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
-  pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, walkMinutes,
+  pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
+  walkMinutes,
 } from "./lunch.ts";
 
 const HERE = { lat: 34.68, lng: 135.5 };
@@ -123,6 +124,26 @@ test("결과 카드 가격 · 배지 · 길찾기", () => {
   assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "ai");
   assert.equal(directionsUrl({ lat: 34.1, lng: 135.2 }),
     "https://www.google.com/maps/dir/?api=1&destination=34.1,135.2&travelmode=walking");
+});
+
+test("가격 상한 이하: 대표 메뉴 가격 → 없으면 점심 최고가", () => {
+  assert.equal(underLimit(shop(0, { typicalPrice: 950, priceMax: 1500 }), 990), true); // 대표 메뉴가 기준
+  assert.equal(underLimit(shop(0, { typicalPrice: 1100, priceMax: 900 }), 990), false);
+  assert.equal(underLimit(shop(0, { priceMax: 1190 }), 1190), true);
+  assert.equal(underLimit(shop(0, { priceMax: 1190 }), 990), false);
+  assert.equal(underLimit(shop(0, { priceMax: null, priceMin: 500 }), 1190), false); // '500円～'는 끝을 모름
+});
+
+test("가격 단계: 단계마다 반경을 다시 고르고, 2km 안 5곳 미만이면 잠금", () => {
+  const shops = [
+    ...many(4, 0.5, { priceMax: 780 }), // 790 이하 4곳
+    ...many(10, 0.5, { priceMax: 950 }),
+    ...many(12, 0.8, { priceMax: 1150 }),
+  ];
+  const [t790, t990, t1190] = tierInfo(shops, HERE, "wed");
+  assert.deepEqual([t790.count, t790.radiusKm, t790.locked], [4, 2, true]);
+  assert.deepEqual([t990.count, t990.radiusKm, t990.locked], [14, 2, false]);
+  assert.deepEqual([t1190.count, t1190.radiusKm, t1190.locked], [26, 1, false]);
 });
 
 test("장르는 우리 말로, 모르는 장르는 그대로", () => {

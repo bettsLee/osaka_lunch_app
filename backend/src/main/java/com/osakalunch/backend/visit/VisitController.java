@@ -54,9 +54,10 @@ public class VisitController {
     public record FeedbackRequest(@NotNull Boolean visited, Boolean openOk, Boolean priceOk) {
     }
 
-    public record VisitResponse(UUID id, String shopId, String shopName, Instant chosenAt) {
+    /** priceLimit: 그때 고른 가격 상한. '다녀왔어요?'에서 "n엔 이하였나요?"로 물을 때 씀 */
+    public record VisitResponse(UUID id, String shopId, String shopName, Integer priceLimit, Instant chosenAt) {
         static VisitResponse of(Visit v) {
-            return new VisitResponse(v.getId(), v.getShopId(), v.getShopName(), v.getChosenAt());
+            return new VisitResponse(v.getId(), v.getShopId(), v.getShopName(), v.getPriceLimit(), v.getChosenAt());
         }
     }
 

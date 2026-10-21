@@ -3,6 +3,7 @@
 // S4 여기 갈래요 후: 길찾기 + '다녀온 뒤에 알려 주세요' 안내. 알림은 10/28에 붙이고, 지금은 다음에 앱을 열 때 물어봄
 import { useEffect, useRef } from "react";
 import { directionsUrl, priceRange, type NearbyShop } from "@/lib/lunch";
+import { track } from "@/lib/analytics";
 import { svg } from "./icons";
 
 export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: () => void }) {
@@ -28,6 +29,7 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
         href={directionsUrl(shop)}
         target="_blank"
         rel="noreferrer"
+        onClick={() => track("directions_click", { from: "go" })}
         className="flex h-14 items-center justify-center gap-2 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white"
       >
         구글 지도로 길찾기

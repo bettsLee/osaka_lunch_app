@@ -10,6 +10,7 @@
     "test": "node --test --no-warnings \"lib/**/*.test.mjs\""
   },
   "dependencies": {
+    "@amplitude/analytics-browser": "^2.47.3",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@supabase/auth-js": "^2.117.3",
     "leaflet": "^1.9.4",

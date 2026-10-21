@@ -77,6 +77,7 @@ public class Visit {
     public UUID getUserId() { return userId; }
     public String getShopId() { return shopId; }
     public String getShopName() { return shopName; }
+    public Integer getPriceLimit() { return priceLimit; }
     public Instant getChosenAt() { return chosenAt; }
     public Boolean getVisited() { return visited; }
     public Boolean getOpenOk() { return openOk; }

@@ -29,6 +29,18 @@ export type Point = { lat: number; lng: number };
 export const RADII_KM = [1, 1.5, 2];
 export const MIN_SHOPS = 20;
 
+// 가격 단계 (PRD: 790 / 990 / 1,190엔, 기본 990엔). 2km 안에 5곳이 안 되는 단계는 잠김
+export const PRICE_TIERS = [790, 990, 1190] as const;
+export const DEFAULT_LIMIT = 990;
+export const MIN_TIER_SHOPS = 5;
+
+// 상한 이하인 가게: 대표 메뉴 가격이 있으면 그걸로, 없으면 적힌 점심 최고가로 (10/21 결정 A)
+// AI가 뽑은 가격 숫자로 계산하는 규칙. 990엔에서 AI 판정과 2,758곳 모두 같음을 확인
+export function underLimit(shop: LunchShop, limit: number): boolean {
+  if (shop.typicalPrice !== null) return shop.typicalPrice <= limit;
+  return shop.priceMax !== null && shop.priceMax <= limit;
+}
+
 // 걸어서 n분: 직선거리에 길 돌아가는 만큼(1.3배)을 더해 분속 80m로 나눔 (일본 부동산 표기 기준 속도)
 const DETOUR = 1.3;
 const WALK_M_PER_MIN = 80;
@@ -138,6 +150,17 @@ export function pickNearby(
     }
   }
   return { radiusKm: RADII_KM[0], widened: false, shops: [] }; // 도달하지 않음 (타입용)
+}
+
+// 가격 단계 시트: 단계마다 오늘 보여줄 가게 수 · 반경, 2km 안 5곳 미만이면 잠김
+export type TierInfo = { limit: number; count: number; radiusKm: number; locked: boolean };
+export function tierInfo(shops: LunchShop[], here: Point, day: Day): TierInfo[] {
+  return PRICE_TIERS.map((limit) => {
+    const near = pickNearby(shops.filter((s) => underLimit(s, limit)), here, day);
+    // 2km 전에 멈췄으면 20곳 이상이라 충분. 2km까지 넓혔는데 5곳이 안 되면 잠금
+    const locked = near.radiusKm === RADII_KM[RADII_KM.length - 1] && near.shops.length < MIN_TIER_SHOPS;
+    return { limit, count: near.shops.length, radiusKm: near.radiusKm, locked };
+  });
 }
 
 // 핀 · 목록에 보여줄 한 가지 가격: 대표 메뉴 가격 → 점심 최고가 → 최저가(~)

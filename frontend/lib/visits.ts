@@ -10,7 +10,7 @@ export type VisitDraft = {
   chosenAt: string; // ISO 시각
 };
 
-export type PendingVisit = { id: string; shopId: string; shopName: string; chosenAt: string };
+export type PendingVisit = { id: string; shopId: string; shopName: string; priceLimit: number | null; chosenAt: string };
 
 export type Answers = { visited: boolean | null; openOk: boolean | null; priceOk: boolean | null };
 
