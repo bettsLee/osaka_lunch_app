@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  areaName, directionsUrl, displayPrice, distanceKm, formatDuration, lunchTimeText, openNow, osakaNow,
+  areaName, directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, walkMinutes,
 } from "./lunch.ts";
 
@@ -123,6 +123,12 @@ test("결과 카드 가격 · 배지 · 길찾기", () => {
   assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "ai");
   assert.equal(directionsUrl({ lat: 34.1, lng: 135.2 }),
     "https://www.google.com/maps/dir/?api=1&destination=34.1,135.2&travelmode=walking");
+});
+
+test("장르는 우리 말로, 모르는 장르는 그대로", () => {
+  assert.equal(genreLabel("居酒屋"), "이자카야");
+  assert.equal(genreLabel("お好み焼き・もんじゃ"), "오코노미야키");
+  assert.equal(genreLabel("新ジャンル"), "新ジャンル");
 });
 
 test("동네 이름은 가장 가까운 가게의 지역", () => {

@@ -3,7 +3,7 @@
 // S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 길찾기 · 원문
 import { useEffect, useRef } from "react";
 import {
-  directionsUrl, lunchTimeText, priceBadge, priceRange,
+  directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange,
   type Day, type NearbyShop,
 } from "@/lib/lunch";
 import { svg } from "./icons";
@@ -36,9 +36,10 @@ export default function ResultCard({ shop, day, minutes, onRespin, canRespin }: 
           {shop.name}
         </h1>
         <p className="text-sm text-[#5F5E58]">
-          {shop.genre ? `${shop.genre} · ` : ""}
+          {shop.genre ? `${genreLabel(shop.genre)} · ` : ""}
           <span className="font-semibold text-[#1A3F91]">걸어서 {shop.walk}분</span>
         </p>
+        {shop.catchText && <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
           {time.soon ? "곧 마감 · " : ""}
           {time.text}
@@ -62,6 +63,23 @@ export default function ResultCard({ shop, day, minutes, onRespin, canRespin }: 
         <p className="-mt-1 text-[13px] text-[#5F5E58]">
           {typical && range !== typical ? `대표 점심 메뉴 ${typical} · ` : ""}가게 글을 AI가 읽고 990엔 이하로 판단했어요
         </p>
+      )}
+
+      {/* 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없어서(10/21 확인: 가격 근거에 메뉴가 있는 곳 7/250) 메뉴는 핫페퍼 페이지로 보냄 */}
+      {shop.hotpepperUrl && (
+        <a
+          href={shop.hotpepperUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#2457C5] text-[15px] font-semibold text-[#1A3F91]"
+        >
+          핫페퍼에서 메뉴 · 사진 보기
+          <svg {...svg} width={16} height={16}>
+            <path d="M14 4h6v6" />
+            <path d="M20 4l-9 9" />
+            <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+          </svg>
+        </a>
       )}
 
       <div className="mt-1 flex flex-col gap-2">
@@ -107,16 +125,9 @@ export default function ResultCard({ shop, day, minutes, onRespin, canRespin }: 
             <p className="rounded-lg bg-[#F4F3EF] p-2 leading-relaxed">「{shop.priceEvidence}」</p>
           </details>
         )}
-        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
-          {shop.hotpepperUrl && (
-            <a href={shop.hotpepperUrl} target="_blank" rel="noreferrer" className="text-[#2457C5]">
-              핫페퍼에서 보기
-            </a>
-          )}
-          <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
-            Powered by ホットペッパー グルメ Webサービス
-          </a>
-        </div>
+        <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
+          Powered by ホットペッパー グルメ Webサービス
+        </a>
       </div>
     </section>
   );

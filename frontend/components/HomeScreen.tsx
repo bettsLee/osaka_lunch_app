@@ -4,7 +4,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  areaName, displayPrice, openNow, osakaNow, pickNearby, pickShop, priceLabel, rouletteCandidates, spinSteps,
+  areaName, displayPrice, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceLabel, rouletteCandidates, spinSteps,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
@@ -256,7 +256,7 @@ export default function HomeScreen() {
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <p className="truncate text-[15px] font-semibold">{s.name}</p>
                       <p className="text-[13px] text-[#5F5E58]">
-                        {s.genre ? `${s.genre} · ` : ""}
+                        {s.genre ? `${genreLabel(s.genre)} · ` : ""}
                         <span className="text-[#1A3F91]">걸어서 {s.walk}분</span>
                       </p>
                     </div>

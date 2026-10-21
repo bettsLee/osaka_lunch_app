@@ -20,6 +20,7 @@ export type LunchShop = {
   priceMax: number | null;
   typicalPrice: number | null;
   priceEvidence: string | null; // AI가 가격을 판단한 원문 (결과 카드 '가격 원문 보기')
+  catchText: string | null; // 가게 소개 한 줄 (핫페퍼 원문 그대로. 가게 설명은 번역하지 않음)
 };
 
 export type Point = { lat: number; lng: number };
@@ -41,6 +42,31 @@ const AREA_NAMES: Record<string, string> = {
   Y315: "난바",
   Y866: "구조",
 };
+
+// 핫페퍼 장르 → 화면 표시 이름 (가게 글이 아니라 분류 이름이라 우리 말로 바꿔 보여 줌)
+const GENRE_NAMES: Record<string, string> = {
+  "居酒屋": "이자카야",
+  "ダイニングバー・バル": "다이닝 바",
+  "創作料理": "창작 요리",
+  "和食": "일식",
+  "洋食": "양식",
+  "イタリアン・フレンチ": "이탈리안 · 프렌치",
+  "中華": "중식",
+  "焼肉・ホルモン": "야키니쿠 · 곱창",
+  "韓国料理": "한식",
+  "アジア・エスニック料理": "아시아 · 에스닉",
+  "各国料理": "세계 요리",
+  "カラオケ・パーティ": "노래방 · 파티",
+  "バー・カクテル": "바 · 칵테일",
+  "ラーメン": "라멘",
+  "お好み焼き・もんじゃ": "오코노미야키",
+  "カフェ・スイーツ": "카페 · 디저트",
+  "その他グルメ": "기타",
+};
+
+export function genreLabel(genre: string): string {
+  return GENRE_NAMES[genre] ?? genre;
+}
 
 export function distanceKm(a: Point, b: Point): number {
   const r = (d: number) => (d * Math.PI) / 180;
