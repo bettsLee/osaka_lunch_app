@@ -41,9 +41,20 @@ jobs:
         run: chmod +x gradlew
 
       - name: 빌드 및 테스트
-        run: ./gradlew build
+        run: |
+          set -o pipefail
+          ./gradlew build 2>&1 | tee build.log
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ol_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+          SUPABASE_URL: https://test-project.supabase.co  # 테스트용 가짜 주소 (토큰은 테스트가 직접 만듦)
+
+      # 실패하면 원인 몇 줄을 PR 화면의 알림으로 남김 (로그를 열지 않아도 보이게)
+      - name: 실패 원인 요약
+        if: failure()
+        run: |
+          { grep -E "error:|FAILED|Caused by" build.log || true; \
+            grep -h -A2 "<failure" build/test-results/test/*.xml 2>/dev/null || true; } \
+            | head -30 | while IFS= read -r line; do echo "::error::${line:0:500}"; done
