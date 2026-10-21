@@ -9,13 +9,14 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { fetchPendingVisit, flushVisits, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
+import InstallHint from "./InstallHint";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -33,6 +34,7 @@ type Tab = "lunch" | "zukan" | "settings";
 
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
+const INSTALL_HINT_KEY = "osaka-lunch-install-hint-closed"; // 홈 화면 추가 안내를 닫음
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
 const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
@@ -55,6 +57,7 @@ export default function HomeScreen() {
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
   const [priceOpen, setPriceOpen] = useState(false);
+  const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
@@ -112,7 +115,15 @@ export default function HomeScreen() {
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
     const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 공유 카드로 열었는지
-    track("app_open", { lang: pickLang(navigator.languages ?? []), ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포
+    const standalone = isStandalone();
+    track("app_open", { lang: pickLang(navigator.languages ?? []), standalone, ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포 · standalone: 홈 화면 앱으로 연 비율
+    try {
+      setInstallHint(
+        isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints) && !standalone && !localStorage.getItem(INSTALL_HINT_KEY),
+      );
+    } catch {
+      // 저장소를 못 쓰면 안내를 안 띄움 (닫아도 기억 못 해서 매번 뜨게 됨)
+    }
     if (from === "share") track("share_open");
     if (from) window.history.replaceState(null, "", window.location.pathname);
     try {
@@ -454,6 +465,18 @@ export default function HomeScreen() {
                 )}
                 {allOrdersOver && <p>{t("home.ordersOver")}</p>}
               </div>
+            )}
+            {installHint && (
+              <InstallHint
+                onClose={() => {
+                  setInstallHint(false);
+                  try {
+                    localStorage.setItem(INSTALL_HINT_KEY, "1");
+                  } catch {
+                    // 기억 못 해도 이번에는 닫음
+                  }
+                }}
+              />
             )}
             <button
               type="button"
