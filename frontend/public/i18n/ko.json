@@ -46,7 +46,7 @@
   "result.menuLink": "핫페퍼에서 메뉴 · 사진 보기",
   "result.go": "여기 갈래요",
   "result.respin": "랜덤으로 가게 고르기",
-  "result.orderOpen": "주문 문장 보기",
+  "result.orderOpen": "주문 도우미",
   "result.directions": "구글 지도로 길찾기",
   "result.priceSource": "가격 원문 보기",
   "go.title": "좋아요, 맛있게 드세요",
@@ -215,7 +215,7 @@
   "settings.dietOn": "골랐어요",
   "settings.dietOff": "없음",
   "diet.title": "알레르기 · 식사 제한",
-  "diet.intro": "고르면 결과 카드의 '주문 문장 보기' 맨 위에, 직원에게 보여 줄 일본어 문장이 생겨요.",
+  "diet.intro": "고르면 결과 카드의 '주문 도우미' 맨 위에, 직원에게 보여 줄 일본어 문장이 생겨요.",
   "diet.allergyLabel": "알레르기 (여러 개 고를 수 있어요)",
   "diet.styleLabel": "식사 방식",
   "diet.a.shrimp": "새우",
@@ -260,5 +260,8 @@
   "feedback.titleArrived": "점심 어땠어요?",
   "push.titlePrice": "점심 어땠어요?",
   "push.bodyPrice": "{shop} — 점심 가격이 {limit}엔 이하였는지 알려 주세요",
-  "feedback.priceOnlyQ": "점심 가격이 {limit}엔 이하였나요?"
+  "feedback.priceOnlyQ": "점심 가격이 {limit}엔 이하였나요?",
+  "going.about": "약 {d}",
+  "going.info": "가게 정보",
+  "going.expand": "정한 가게 카드 펼치기"
 }

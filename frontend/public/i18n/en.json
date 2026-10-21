@@ -46,7 +46,7 @@
   "result.menuLink": "See menu and photos on Hot Pepper",
   "result.go": "I'll go here",
   "result.respin": "Pick a random place",
-  "result.orderOpen": "Phrases for ordering",
+  "result.orderOpen": "Order helper",
   "result.directions": "Directions in Google Maps",
   "result.priceSource": "See the original price text",
   "go.title": "Great, enjoy your lunch",
@@ -215,7 +215,7 @@
   "settings.dietOn": "Set",
   "settings.dietOff": "None",
   "diet.title": "Allergies & diet",
-  "diet.intro": "Once you choose, Japanese phrases to show the staff appear at the top of 'Phrases for ordering' on the result card.",
+  "diet.intro": "Once you choose, Japanese phrases to show the staff appear at the top of 'Order helper' on the result card.",
   "diet.allergyLabel": "Allergies (choose any)",
   "diet.styleLabel": "Diet",
   "diet.a.shrimp": "Shrimp",
@@ -260,5 +260,8 @@
   "feedback.titleArrived": "How was lunch?",
   "push.titlePrice": "How was lunch?",
   "push.bodyPrice": "{shop}: tell us if lunch was ¥{limit} or less",
-  "feedback.priceOnlyQ": "Was lunch ¥{limit} or less?"
+  "feedback.priceOnlyQ": "Was lunch ¥{limit} or less?",
+  "going.about": "about {d}",
+  "going.info": "Place info",
+  "going.expand": "Open your place card"
 }

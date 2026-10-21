@@ -105,3 +105,9 @@ export const ARRIVE_MAX_ACCURACY_M = 100; // GPS 오차가 이보다 크면 자�
 export function arrivedNear(distanceM: number, accuracyM: number): boolean {
   return accuracyM <= ARRIVE_MAX_ACCURACY_M && distanceM <= ARRIVE_M;
 }
+
+// 정한 가게 카드의 남은 거리 (10/22 도그푸딩: 내비게이션처럼). 1km 안은 10m 단위, 그 밖은 0.1km 단위
+export function distanceLabel(m: number): string {
+  const tens = Math.max(10, Math.round(m / 10) * 10);
+  return tens < 1000 ? `${tens}m` : `${(Math.round(m / 100) / 10).toFixed(1)}km`;
+}

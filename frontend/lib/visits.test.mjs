@@ -1,7 +1,7 @@
 // 여기 갈래요 · 다녀왔어요? 규칙 테스트. 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { arriveSettled, arrivedNear, cancelSettled, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
+import { arriveSettled, arrivedNear, cancelSettled, distanceLabel, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
 import ko from "../public/i18n/ko.json" with { type: "json" };
 import { translator } from "./i18n.ts";
 
@@ -76,4 +76,11 @@ test("도착 자동 판단: 80m 안이고 GPS 오차가 100m 이하일 때만", 
 test("도착 요청은 서버 문제(5xx)일 때만 다시 보냄", () => {
   for (const code of [204, 400, 404, 409]) assert.equal(arriveSettled(code), true);
   for (const code of [401, 500, 502, 503]) assert.equal(arriveSettled(code), false);
+});
+
+test("남은 거리: 1km 안은 10m 단위, 그 밖은 0.1km 단위", () => {
+  assert.equal(distanceLabel(3), "10m");
+  assert.equal(distanceLabel(404), "400m");
+  assert.equal(distanceLabel(996), "1.0km");
+  assert.equal(distanceLabel(1260), "1.3km");
 });
