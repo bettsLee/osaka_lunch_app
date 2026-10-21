@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -89,6 +90,12 @@ public class VisitController {
                         userId(jwt), now.minus(ASK_WITHIN), now.minus(ASK_AFTER))
                 .map(v -> ResponseEntity.ok(VisitResponse.of(v)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** 도감(S6): '네, 다녀왔어요'라고 답한 기록 (10/21 결정: 답한 곳만). 같은 가게를 여러 번 갔으면 화면이 하나로 합침 */
+    @GetMapping("/zukan")
+    public List<VisitResponse> zukan(@AuthenticationPrincipal Jwt jwt) {
+        return visits.findTop200ByUserIdAndVisitedTrueOrderByChosenAtDesc(userId(jwt)).stream().map(VisitResponse::of).toList();
     }
 
     /** 다녀왔어요? 답. 다녀왔으면 영업 · 가격 두 질문이 다 필요 */

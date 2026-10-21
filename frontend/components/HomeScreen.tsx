@@ -19,12 +19,14 @@ import { useT } from "./I18n";
 import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
+import ZukanScreen from "./ZukanScreen";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
 
 type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point };
 type Data = { status: "loading" } | { status: "error" } | { status: "ok"; shops: LunchShop[] };
 type Mode = "home" | "spin" | "result" | "go";
+type Tab = "lunch" | "zukan";
 
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
 const yen = (n: number) => n.toLocaleString("ja-JP");
@@ -41,6 +43,7 @@ export default function HomeScreen() {
   const [byDistance, setByDistance] = useState(false); // 가까운순 (아니면 싼 순)
   const [listOpen, setListOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("home");
+  const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
@@ -75,9 +78,11 @@ export default function HomeScreen() {
     locate();
     load();
     startAnalytics();
-    const fromPush = new URLSearchParams(window.location.search).get("from") === "push"; // 알림을 눌러 열었는지
-    track("app_open", { lang: pickLang(navigator.languages ?? []), ...(fromPush ? { from: "push" } : {}) }); // 언어: 번역이 필요한 언어 분포
-    if (fromPush) window.history.replaceState(null, "", window.location.pathname);
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 공유 카드로 열었는지
+    track("app_open", { lang: pickLang(navigator.languages ?? []), ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포
+    if (from === "share") track("share_open");
+    if (from) window.history.replaceState(null, "", window.location.pathname);
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
       if (saved) setChosenLimit(saved);
@@ -194,11 +199,32 @@ export default function HomeScreen() {
     setMode("go");
   };
 
+  const openTab = (next: Tab) => {
+    if (next === "zukan" && tab !== "zukan") track("zukan_open");
+    setTab(next);
+  };
+  const tabs = (
+    <nav className="flex border-t border-[#E2E0D8] bg-white" aria-label={t("home.tabs")}>
+      <Tab active={tab === "lunch"} onClick={() => openTab("lunch")} label={t("tab.lunch")} icon={<MapIcon />} />
+      <Tab active={tab === "zukan"} onClick={() => openTab("zukan")} label={t("tab.zukan")} icon={<BookIcon />} />
+      <Tab label={t("tab.settings")} icon={<SlidersIcon />} />
+    </nav>
+  );
+  const mainClass = "mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]";
+  const mainFont = { fontFamily: "-apple-system, 'Apple SD Gothic Neo', 'Hiragino Sans', 'Noto Sans KR', sans-serif" };
+
+  // S6 도감 탭 (점심 탭의 지도 · 목록 대신)
+  if (mode === "home" && tab === "zukan") {
+    return (
+      <main className={mainClass} style={mainFont}>
+        <ZukanScreen shops={data.status === "ok" ? data.shops : null} here={loc.status === "ok" ? loc.point : null} nearby={visible} />
+        {tabs}
+      </main>
+    );
+  }
+
   return (
-    <main
-      className="mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]"
-      style={{ fontFamily: "-apple-system, 'Apple SD Gothic Neo', 'Hiragino Sans', 'Noto Sans KR', sans-serif" }}
-    >
+    <main className={mainClass} style={mainFont}>
       {(mode === "home" || mode === "spin") && (
         <header className="flex flex-col gap-3 px-5 pb-3 pt-5">
           <h1 className="flex items-center gap-1.5 text-[17px] font-semibold">
@@ -309,6 +335,10 @@ export default function HomeScreen() {
             setAsk(null);
             void flushVisits();
           }}
+          onOpenZukan={() => {
+            setAsk(null);
+            openTab("zukan");
+          }}
         />
       )}
 
@@ -382,11 +412,7 @@ export default function HomeScreen() {
             </p>
           </section>
 
-          <nav className="flex border-t border-[#E2E0D8] bg-white" aria-label={t("home.tabs")}>
-            <Tab active label={t("tab.lunch")} icon={<MapIcon />} />
-            <Tab label={t("tab.zukan")} icon={<BookIcon />} />
-            <Tab label={t("tab.settings")} icon={<SlidersIcon />} />
-          </nav>
+          {tabs}
         </>
       )}
     </main>
@@ -408,12 +434,14 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-// 도감 · 설정 화면은 아직 없어서 점심 탭만 켜 둠
-function Tab({ active = false, label, icon }: { active?: boolean; label: string; icon: React.ReactNode }) {
+// 설정 화면은 아직 없어서 점심 · 도감 탭만 켜 둠 (onClick이 없으면 꺼짐)
+function Tab(props: { active?: boolean; onClick?: () => void; label: string; icon: React.ReactNode }) {
+  const { active = false, onClick, label, icon } = props;
   return (
     <button
       type="button"
-      disabled={!active}
+      onClick={onClick}
+      disabled={!onClick}
       aria-current={active ? "page" : undefined}
       className={`flex flex-1 flex-col items-center gap-0.5 pb-3 pt-2 text-xs ${
         active ? "font-semibold text-[#1A3F91]" : "text-[#5F5E58] disabled:opacity-60"
