@@ -40,6 +40,9 @@ public class Translator {
             Map.of("responseFormat", Map.of("text", Map.of("mimeType", "APPLICATION_JSON"))),
             Map.of("responseMimeType", "application/json"));
 
+    /** 지시문을 고치면 올림. 저장된 번역은 원문 버전 + 이 값으로 찾아서, 올리면 언어마다 다시 번역함 */
+    public static final String PROMPT_VERSION = "2";
+
     static final String PROMPT = """
             You translate the UI text of a mobile web app that helps foreigners living in Osaka quickly pick a nearby lunch spot that costs ¥990 or less.
             Translate every value of the JSON object below from Korean into %s.
@@ -47,6 +50,7 @@ public class Translator {
             - Return one JSON object with exactly the same keys. Translate the values only.
             - Keep every {placeholder} exactly as written, braces included. Never translate or drop one.
             - 엔 means Japanese yen. Write prices the way readers of this language usually write yen, around the number placeholder.
+            - 이하 means "or less": the amount itself is included (≤). Translate "{limit}엔 이하" as "¥{limit} or less" or "up to ¥{limit}" in this language, never as "under", "below" or "less than" (a ¥990 lunch must still fit a ¥990 limit).
             - Keep the names Hot Pepper (a Japanese restaurant guide) and Google Maps.
             - Keys starting with "area." are Osaka districts (Umeda, Fukushima, Honmachi, Tenma, Namba, Kujo): write each name the way it is usually written in this language.
             - Keys starting with "genre." are restaurant categories.

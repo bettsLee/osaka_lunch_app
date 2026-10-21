@@ -47,7 +47,7 @@ class I18nControllerTest {
 
         mvc.perform(get("/api/i18n/vi")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.lang").value("vi"))
-                .andExpect(jsonPath("$.version").value("v1"))
+                .andExpect(jsonPath("$.version").value("v1-p" + Translator.PROMPT_VERSION))
                 .andExpect(jsonPath("$.messages['common.walk']").value("Đi bộ {n} phút"));
         mvc.perform(get("/api/i18n/vi")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages['common.walk']").value("Đi bộ {n} phút"));
@@ -61,7 +61,7 @@ class I18nControllerTest {
         when(translator.translate(any(), eq("ne"))).thenReturn(Map.of("common.walk", "हिँडेर {n} मिनेट"));
         mvc.perform(get("/api/i18n/ne")).andExpect(status().isOk());
         when(source.current()).thenReturn(new SourceCatalog.Source("v2", SOURCE));
-        mvc.perform(get("/api/i18n/ne")).andExpect(jsonPath("$.version").value("v2"));
+        mvc.perform(get("/api/i18n/ne")).andExpect(jsonPath("$.version").value("v2-p" + Translator.PROMPT_VERSION));
         verify(translator, times(2)).translate(any(), eq("ne"));
     }
 
