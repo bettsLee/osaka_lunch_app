@@ -118,6 +118,12 @@ def main():
     for label, k in rows:
         print(pad(label, 28) + pad(fmt(r[k]), 18) + fmt(a[k]))
 
+    ok = [rec["ai"] for rec in raw if "error" not in rec["ai"]]
+    if ok:  # 전체 가게 비용 계산용 (생각 토큰도 출력으로 과금)
+        avg = {k: sum(o["tokens"][k] for o in ok) / len(ok) for k in ("prompt", "output", "thinking")}
+        print(f"\n토큰 (가게당 평균): 입력 {avg['prompt']:.0f} · 출력 {avg['output']:.0f} · 생각 {avg['thinking']:.0f}")
+        print(f"점심 요일과 영업 구간이 안 맞는 가게: {sum(o['days_hours_conflict'] for o in ok)}곳")
+
     print("\nAI가 틀린 곳")
     for s, p, rec in zip(shops, ai, raw):
         h = s["human"]
