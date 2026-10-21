@@ -43,7 +43,8 @@ public class TranslationService {
 
     public Result get(String lang) throws IOException, InterruptedException {
         SourceCatalog.Source src = source.current();
-        String id = Translation.key(lang, src.version());
+        String version = src.version() + "-p" + Translator.PROMPT_VERSION; // 원문이나 지시문이 바뀌면 다시 번역
+        String id = Translation.key(lang, version);
         var saved = translations.findById(id);
         if (saved.isPresent()) return result(lang, saved.get());
         if (!translator.ready()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "번역 설정(GEMINI_API_KEY)이 없어요");
@@ -56,9 +57,9 @@ public class TranslationService {
             if (recent.size() >= MAX_PER_HOUR) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
             recent.addLast(now);
             Map<String, String> messages = translator.translate(src.messages(), lang);
-            translations.save(new Translation(lang, src.version(), json.writeValueAsString(messages), translator.model(), now));
-            log.info("새 번역 저장: {} (원문 {})", lang, src.version());
-            return new Result(lang, src.version(), messages);
+            translations.save(new Translation(lang, version, json.writeValueAsString(messages), translator.model(), now));
+            log.info("새 번역 저장: {} ({})", lang, version);
+            return new Result(lang, version, messages);
         }
     }
 
