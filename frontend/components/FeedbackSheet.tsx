@@ -7,12 +7,13 @@ import { sendFeedback } from "@/lib/api";
 import { canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
 import { useT } from "./I18n";
 
-type Props = { visit: PendingVisit; onClose: () => void };
+type Props = { visit: PendingVisit; onClose: () => void; onOpenZukan: () => void };
 
-export default function FeedbackSheet({ visit, onClose }: Props) {
+export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
   const { t } = useT();
   const [a, setA] = useState<Answers>(EMPTY_ANSWERS);
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
+  const [added, setAdded] = useState(false); // '네, 다녀왔어요' → 도감에 한 곳 추가
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
   const limit = visit.priceLimit ?? 990;
@@ -23,6 +24,8 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
       const body = feedbackBody(a);
       await sendFeedback(visit.id, body);
       track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, price_limit: limit });
+      if (body.visited) track("zukan_add");
+      setAdded(body.visited);
       setState("done");
     } catch {
       setState("error");
@@ -54,8 +57,20 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
             <h1 ref={title} id="feedback-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
               {t("feedback.thanks")}
             </h1>
-            <p className="text-sm leading-relaxed text-[#5F5E58]">{t("feedback.thanksBody")}</p>
-            <button type="button" onClick={onClose} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
+            <p className="text-sm leading-relaxed text-[#5F5E58]">
+              {t("feedback.thanksBody")}
+              {added && ` ${t("feedback.zukanAdded")}`}
+            </p>
+            {added && (
+              <button type="button" onClick={onOpenZukan} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
+                {t("feedback.openZukan")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={added ? "h-12 rounded-[14px] border border-[#CFCCC2] text-base" : "h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white"}
+            >
               {t("common.close")}
             </button>
           </>

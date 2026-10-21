@@ -3,6 +3,7 @@
 import { GoTrueClient } from "@supabase/auth-js";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
 import { enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
+import type { ZukanVisit } from "./zukan";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -105,6 +106,14 @@ export async function sendFeedback(
 ): Promise<void> {
   const res = await call(`/api/visits/${id}/feedback`, { method: "PUT", body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`답을 보내지 못했어요 (${res.status})`);
+}
+
+// 도감(S6): '네, 다녀왔어요'라고 답한 기록 (최근 것부터)
+export async function fetchZukan(): Promise<ZukanVisit[]> {
+  await flushVisits();
+  const res = await call("/api/visits/zukan");
+  if (!res.ok) throw new Error(`도감을 불러오지 못했어요 (${res.status})`);
+  return res.json();
 }
 
 // 한국어 · 영어가 아닌 휴대폰 언어의 문구. 서버가 처음 한 번 AI로 번역해 저장해 둔 것 (로그인 필요 없음)

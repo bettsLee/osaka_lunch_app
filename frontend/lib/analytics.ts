@@ -15,7 +15,11 @@ export type EventName =
   | "feedback_submit"
   | "price_limit_change"
   | "push_permission" // '알림 받기'를 누른 결과 (허용률 확인용)
-  | "order_open"; // 결과 카드에서 '주문 문장 보기' (실험 1: 주문 문장 A/B)
+  | "order_open" // 결과 카드에서 '주문 문장 보기' (실험 1: 주문 문장 A/B)
+  | "zukan_open" // 도감 탭
+  | "zukan_add" // '네, 다녀왔어요'로 도감에 한 곳 추가
+  | "share_card_create" // 공유 카드를 저장하거나 공유함
+  | "share_open"; // 공유 카드의 링크로 들어옴
 
 type Props = Record<string, string | number | boolean | null>;
 
