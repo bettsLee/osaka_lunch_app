@@ -13,11 +13,12 @@ type Props = {
   shops: NearbyShop[];
   flashId?: string | null;
   pickedId?: string | null;
+  showLocate?: boolean; // '내 위치로' 버튼
 };
 
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
-export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null }: Props) {
+export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const pins = useRef<L.LayerGroup | null>(null);
@@ -119,7 +120,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   return (
     <div className="absolute inset-0">
       <div ref={box} className="h-full w-full bg-[#ECEAE3]" />
-      {pickedId === null && flashId === null && (
+      {showLocate && pickedId === null && flashId === null && (
         <button
           type="button"
           aria-label="내 위치로 이동"

@@ -1,7 +1,8 @@
 "use client";
 
-// S5 다녀왔어요?: 다녀왔는지 → 그 시간에 영업했는지 → 점심 가격이 990엔 이하였는지 (와이어프레임 검토: 질문 2개로 충분)
+// S5 다녀왔어요?: 다녀왔는지 → 그 시간에 영업했는지 → 점심 가격이 그때 고른 상한 이하였는지 (와이어프레임 검토: 질문 2개로 충분)
 import { useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
 import { canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
 
@@ -12,11 +13,14 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
+  const limit = visit.priceLimit ?? 990;
 
   const submit = async () => {
     setState("sending");
     try {
-      await sendFeedback(visit.id, feedbackBody(a));
+      const body = feedbackBody(a);
+      await sendFeedback(visit.id, body);
+      track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, price_limit: limit });
       setState("done");
     } catch {
       setState("error");
@@ -69,7 +73,7 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
               <div className="flex flex-col gap-3 border-t border-[#ECEAE3] pt-4">
                 <p className="text-base font-semibold">1. 그 시간에 영업하고 있었나요?</p>
                 <Choice value={a.openOk} yes="네, 맞았어요" no="아니요, 닫혀 있었어요" onChange={(openOk) => setA({ ...a, openOk })} />
-                <p className="pt-1 text-base font-semibold">2. 점심 가격이 990엔 이하였나요?</p>
+                <p className="pt-1 text-base font-semibold">2. 점심 가격이 {limit.toLocaleString("ja-JP")}엔 이하였나요?</p>
                 <Choice value={a.priceOk} yes="네, 맞았어요" no="아니요, 더 비쌌어요" onChange={(priceOk) => setA({ ...a, priceOk })} />
               </div>
             )}

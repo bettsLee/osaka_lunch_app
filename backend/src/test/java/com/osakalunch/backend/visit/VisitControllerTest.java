@@ -93,7 +93,8 @@ class VisitControllerTest {
         saved(ALICE, Duration.ofDays(4)); // 너무 옛날
         saved(BOB, Duration.ofHours(1).plusMinutes(30)); // 남의 기록
         mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(recent.getId().toString()));
+                .andExpect(jsonPath("$.id").value(recent.getId().toString()))
+                .andExpect(jsonPath("$.priceLimit").value(990));
 
         mvc.perform(as(ALICE, put("/api/visits/" + recent.getId() + "/feedback")).content("{\"visited\":false}"))
                 .andExpect(status().isNoContent());
