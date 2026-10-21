@@ -8,6 +8,10 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
+import { fetchPendingVisit, flushVisits, saveVisit, wakeServer } from "@/lib/api";
+import type { PendingVisit } from "@/lib/visits";
+import FeedbackSheet from "./FeedbackSheet";
+import GoScreen from "./GoScreen";
 import { svg } from "./icons";
 import ResultCard from "./ResultCard";
 
@@ -15,7 +19,9 @@ const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도�
 
 type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point };
 type Data = { status: "loading" } | { status: "error"; message: string } | { status: "ok"; shops: LunchShop[] };
-type Mode = "home" | "spin" | "result";
+type Mode = "home" | "spin" | "result" | "go";
+
+const PRICE_LIMIT = 990; // 가격 단계(790 / 1,190) 시트를 붙이기 전까지 고정
 
 const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
@@ -30,6 +36,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
 
@@ -58,6 +65,10 @@ export default function HomeScreen() {
   useEffect(() => {
     locate();
     load();
+    wakeServer(); // 룰렛을 돌리는 동안 잠든 서버가 일어나게
+    fetchPendingVisit() // 보관해 둔 '여기 갈래요'를 먼저 보내고, 물어볼 게 있으면 카드로
+      .then(setAsk)
+      .catch(() => {}); // 서버가 아직 안 일어났으면 다음에 열 때 물어봄
     const t = setInterval(() => setNow(new Date()), 60_000); // '지금 영업 중' · 마감까지 n분이 시간에 맞게
     return () => {
       clearInterval(t);
@@ -114,13 +125,27 @@ export default function HomeScreen() {
     setPicked(null);
     setMode("home");
   };
+  // 여기 갈래요: 화면은 바로 넘기고 저장은 뒤에서 (서버가 잠들어 있어도 기다리지 않게)
+  const go = () => {
+    if (!picked) return;
+    saveVisit({
+      id: crypto.randomUUID(),
+      shopId: picked.id,
+      shopName: picked.name,
+      source: "roulette",
+      distanceKm: Math.round(picked.km * 100) / 100,
+      priceLimit: PRICE_LIMIT,
+      chosenAt: new Date().toISOString(),
+    });
+    setMode("go");
+  };
 
   return (
     <main
       className="mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]"
       style={{ fontFamily: "-apple-system, 'Apple SD Gothic Neo', 'Hiragino Sans', 'Noto Sans KR', sans-serif" }}
     >
-      {mode !== "result" && (
+      {(mode === "home" || mode === "spin") && (
         <header className="flex flex-col gap-3 px-5 pb-3 pt-5">
           <h1 className="flex items-center gap-1.5 text-[17px] font-semibold">
             <PinIcon />
@@ -138,7 +163,10 @@ export default function HomeScreen() {
         </header>
       )}
 
-      <section className={`relative bg-[#ECEAE3] ${mode === "result" ? "h-[170px] flex-none" : "flex-1"}`} aria-label="지도">
+      <section
+        className={`relative bg-[#ECEAE3] ${mode === "result" ? "h-[170px] flex-none" : mode === "go" ? "hidden" : "flex-1"}`}
+        aria-label="지도"
+      >
         {loc.status === "ok" && near ? (
           <LunchMap
             here={loc.point}
@@ -203,7 +231,19 @@ export default function HomeScreen() {
       )}
 
       {mode === "result" && picked && (
-        <ResultCard shop={picked} day={day} minutes={minutes} onRespin={spin} canRespin={pool.length > 1} />
+        <ResultCard shop={picked} day={day} minutes={minutes} onGo={go} onRespin={spin} canRespin={pool.length > 1} />
+      )}
+
+      {mode === "go" && picked && <GoScreen shop={picked} onHome={backHome} />}
+
+      {mode === "home" && ask && (
+        <FeedbackSheet
+          visit={ask}
+          onClose={() => {
+            setAsk(null);
+            void flushVisits();
+          }}
+        />
       )}
 
       {mode === "home" && (

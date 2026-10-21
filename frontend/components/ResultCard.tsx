@@ -8,9 +8,9 @@ import {
 } from "@/lib/lunch";
 import { svg } from "./icons";
 
-type Props = { shop: NearbyShop; day: Day; minutes: number; onRespin: () => void; canRespin: boolean };
+type Props = { shop: NearbyShop; day: Day; minutes: number; onGo: () => void; onRespin: () => void; canRespin: boolean };
 
-export default function ResultCard({ shop, day, minutes, onRespin, canRespin }: Props) {
+export default function ResultCard({ shop, day, minutes, onGo, onRespin, canRespin }: Props) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
 
@@ -83,12 +83,7 @@ export default function ResultCard({ shop, day, minutes, onRespin, canRespin }: 
       )}
 
       <div className="mt-1 flex flex-col gap-2">
-        <button
-          type="button"
-          disabled
-          title="다음 단계에서 붙여요"
-          className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
-        >
+        <button type="button" onClick={onGo} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
           여기 갈래요
         </button>
         <button
