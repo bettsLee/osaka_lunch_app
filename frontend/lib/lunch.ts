@@ -1,4 +1,8 @@
 // 홈 화면 규칙: 거리 · 오늘 점심 영업 · 반경 넓히기 · 보여줄 가격 (화면과 떨어진 순수 함수라 테스트하기 쉬움)
+// 화면에 보일 글은 문구 키로 만들고, 휴대폰 언어의 문구(t)는 화면이 넘겨 줌
+import type { T } from "./i18n";
+
+const yen = (n: number) => n.toLocaleString("ja-JP");
 
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Day = (typeof DAYS)[number];
@@ -45,39 +49,32 @@ export function underLimit(shop: LunchShop, limit: number): boolean {
 const DETOUR = 1.3;
 const WALK_M_PER_MIN = 80;
 
-// 핫페퍼 중지역 → 화면에 보여줄 동네 이름
-const AREA_NAMES: Record<string, string> = {
-  Y300: "우메다",
-  Y301: "후쿠시마",
-  Y305: "혼마치",
-  Y310: "덴마",
-  Y315: "난바",
-  Y866: "구조",
+// 핫페퍼 중지역 → 화면에 보여줄 동네 이름 (문구 키 area.코드)
+const AREA_CODES = new Set(["Y300", "Y301", "Y305", "Y310", "Y315", "Y866"]);
+
+// 핫페퍼 장르 → 문구 키 (가게 글이 아니라 분류 이름이라 휴대폰 언어로 바꿔 보여 줌)
+const GENRE_KEYS: Record<string, string> = {
+  "居酒屋": "izakaya",
+  "ダイニングバー・バル": "diningBar",
+  "創作料理": "creative",
+  "和食": "japanese",
+  "洋食": "western",
+  "イタリアン・フレンチ": "italianFrench",
+  "中華": "chinese",
+  "焼肉・ホルモン": "yakiniku",
+  "韓国料理": "korean",
+  "アジア・エスニック料理": "asianEthnic",
+  "各国料理": "international",
+  "カラオケ・パーティ": "karaoke",
+  "バー・カクテル": "bar",
+  "ラーメン": "ramen",
+  "お好み焼き・もんじゃ": "okonomiyaki",
+  "カフェ・スイーツ": "cafe",
+  "その他グルメ": "other",
 };
 
-// 핫페퍼 장르 → 화면 표시 이름 (가게 글이 아니라 분류 이름이라 우리 말로 바꿔 보여 줌)
-const GENRE_NAMES: Record<string, string> = {
-  "居酒屋": "이자카야",
-  "ダイニングバー・バル": "다이닝 바",
-  "創作料理": "창작 요리",
-  "和食": "일식",
-  "洋食": "양식",
-  "イタリアン・フレンチ": "이탈리안 · 프렌치",
-  "中華": "중식",
-  "焼肉・ホルモン": "야키니쿠 · 곱창",
-  "韓国料理": "한식",
-  "アジア・エスニック料理": "아시아 · 에스닉",
-  "各国料理": "세계 요리",
-  "カラオケ・パーティ": "노래방 · 파티",
-  "バー・カクテル": "바 · 칵테일",
-  "ラーメン": "라멘",
-  "お好み焼き・もんじゃ": "오코노미야키",
-  "カフェ・スイーツ": "카페 · 디저트",
-  "その他グルメ": "기타",
-};
-
-export function genreLabel(genre: string): string {
-  return GENRE_NAMES[genre] ?? genre;
+export function genreLabel(genre: string, t: T): string {
+  return GENRE_KEYS[genre] ? t(`genre.${GENRE_KEYS[genre]}`) : genre;
 }
 
 export function distanceKm(a: Point, b: Point): number {
@@ -171,15 +168,15 @@ export function displayPrice(shop: LunchShop): { yen: number; from: boolean } | 
   return null;
 }
 
-export function priceLabel(shop: LunchShop): string {
+export function priceLabel(shop: LunchShop, t: T): string {
   const p = displayPrice(shop);
-  return p ? `${p.yen.toLocaleString("ja-JP")}엔${p.from ? "~" : ""}` : "가격 확인";
+  return p ? t(p.from ? "price.from" : "price.yen", { n: yen(p.yen) }) : t("price.unknown");
 }
 
 // 가장 가까운 가게의 중지역으로 동네 이름을 정함
-export function areaName(shops: NearbyShop[]): string | null {
+export function areaName(shops: NearbyShop[], t: T): string | null {
   const nearest = [...shops].sort((a, b) => a.km - b.km)[0];
-  return (nearest?.areaCode && AREA_NAMES[nearest.areaCode]) || null;
+  return nearest?.areaCode && AREA_CODES.has(nearest.areaCode) ? t(`area.${nearest.areaCode}`) : null;
 }
 
 // ---------------------------------------------------------------- 룰렛 · 결과 카드
@@ -219,37 +216,40 @@ export function spinSteps(pool: { id: string }[], winnerId: string, rand = Math.
   return steps;
 }
 
-export function formatDuration(min: number): string {
+export function formatDuration(min: number, t: T): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
+  return t(h && m ? "time.hm" : h ? "time.h" : "time.m", { h, m });
 }
 
 export const CLOSING_SOON_MIN = 30; // 이보다 적게 남으면 '곧 마감'으로 강조
 
 // 결과 카드의 오늘 점심 시간 한 줄
-export function lunchTimeText(shop: LunchShop, day: Day, minutes: number): { text: string; soon: boolean } {
+export function lunchTimeText(shop: LunchShop, day: Day, minutes: number, t: T): { text: string; soon: boolean } {
   const w = windowOn(shop, day);
   const start = w ? toMinutes(w.start) : null;
   const cutoff = orderCutoff(shop, day);
-  if (!w || start === null || cutoff === null) return { text: "오늘 점심 영업 (시간은 핫페퍼에서 확인)", soon: false };
-  const range = `오늘 점심 ${w.start}~${w.end}${w.last_order ? ` (주문 ${w.last_order}까지)` : ""}`;
-  if (minutes < start) return { text: `${range} · ${w.start}부터`, soon: false };
-  if (minutes >= cutoff) return { text: `${range} · 오늘은 주문이 끝났어요`, soon: false };
+  if (!w || start === null || cutoff === null) return { text: t("lunch.unknown"), soon: false };
+  const range = w.last_order
+    ? t("lunch.rangeLastOrder", { start: w.start, end: w.end, lastOrder: w.last_order })
+    : t("lunch.range", { start: w.start, end: w.end });
+  if (minutes < start) return { text: t("lunch.opensAt", { range, start: w.start }), soon: false };
+  if (minutes >= cutoff) return { text: t("lunch.ordersOver", { range }), soon: false };
   const left = cutoff - minutes;
-  return { text: `${range} · ${w.last_order ? "주문 마감" : "마감"}까지 ${formatDuration(left)}`, soon: left <= CLOSING_SOON_MIN };
+  return {
+    text: t(w.last_order ? "lunch.untilLastOrder" : "lunch.untilClose", { range, left: formatDuration(left, t) }),
+    soon: left <= CLOSING_SOON_MIN,
+  };
 }
 
-const yen = (n: number) => `${n.toLocaleString("ja-JP")}`;
-
 // 결과 카드의 점심 가격: 적힌 범위 그대로, 없으면 대표 메뉴 가격
-export function priceRange(shop: LunchShop): string {
-  const { priceMin: lo, priceMax: hi, typicalPrice: t } = shop;
-  if (lo !== null && hi !== null) return lo === hi ? `${yen(lo)}엔` : `${yen(lo)}~${yen(hi)}엔`;
-  if (hi !== null) return `${yen(hi)}엔`;
-  if (lo !== null) return `${yen(lo)}엔~`;
-  if (t !== null) return `${yen(t)}엔`;
-  return "가격 확인";
+export function priceRange(shop: LunchShop, t: T): string {
+  const { priceMin: lo, priceMax: hi, typicalPrice: typical } = shop;
+  if (lo !== null && hi !== null) return lo === hi ? t("price.yen", { n: yen(lo) }) : t("price.range", { lo: yen(lo), hi: yen(hi) });
+  if (hi !== null) return t("price.yen", { n: yen(hi) });
+  if (lo !== null) return t("price.from", { n: yen(lo) });
+  if (typical !== null) return t("price.yen", { n: yen(typical) });
+  return t("price.unknown");
 }
 
 // 배지: 적힌 점심 가격이 전부 상한 이하면 '가격 확인됨', 대표 메뉴 단서로 AI가 판단했으면 'AI 판단'

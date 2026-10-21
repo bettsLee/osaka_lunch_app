@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
 import { canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
+import { useT } from "./I18n";
 
 type Props = { visit: PendingVisit; onClose: () => void };
 
 export default function FeedbackSheet({ visit, onClose }: Props) {
+  const { t } = useT();
   const [a, setA] = useState<Answers>(EMPTY_ANSWERS);
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
   const title = useRef<HTMLHeadingElement>(null);
@@ -37,10 +39,10 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5">
-            <p className="text-[13px] text-[#5F5E58]">{chosenLabel(visit.chosenAt, new Date())} · 여기 갈래요</p>
+            <p className="text-[13px] text-[#5F5E58]">{t("feedback.chosen", { when: chosenLabel(visit.chosenAt, new Date(), t) })}</p>
             <p className="text-[17px] font-semibold">{visit.shopName}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="나중에 답하기" className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center text-[#5F5E58]">
+          <button type="button" onClick={onClose} aria-label={t("feedback.later")} className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center text-[#5F5E58]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
@@ -50,41 +52,41 @@ export default function FeedbackSheet({ visit, onClose }: Props) {
         {state === "done" ? (
           <>
             <h1 ref={title} id="feedback-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
-              고마워요!
+              {t("feedback.thanks")}
             </h1>
-            <p className="text-sm leading-relaxed text-[#5F5E58]">답해 주신 덕분에 다음 사람에게 더 정확한 가게를 보여 줄 수 있어요.</p>
+            <p className="text-sm leading-relaxed text-[#5F5E58]">{t("feedback.thanksBody")}</p>
             <button type="button" onClick={onClose} className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white">
-              닫기
+              {t("common.close")}
             </button>
           </>
         ) : (
           <>
             <h1 ref={title} id="feedback-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
-              다녀왔어요?
+              {t("feedback.title")}
             </h1>
             <Choice
               value={a.visited}
-              yes="네, 다녀왔어요"
-              no="안 갔어요"
+              yes={t("feedback.visitedYes")}
+              no={t("feedback.visitedNo")}
               onChange={(visited) => setA({ ...EMPTY_ANSWERS, visited })}
               big
             />
             {a.visited && (
               <div className="flex flex-col gap-3 border-t border-[#ECEAE3] pt-4">
-                <p className="text-base font-semibold">1. 그 시간에 영업하고 있었나요?</p>
-                <Choice value={a.openOk} yes="네, 맞았어요" no="아니요, 닫혀 있었어요" onChange={(openOk) => setA({ ...a, openOk })} />
-                <p className="pt-1 text-base font-semibold">2. 점심 가격이 {limit.toLocaleString("ja-JP")}엔 이하였나요?</p>
-                <Choice value={a.priceOk} yes="네, 맞았어요" no="아니요, 더 비쌌어요" onChange={(priceOk) => setA({ ...a, priceOk })} />
+                <p className="text-base font-semibold">{t("feedback.openQ")}</p>
+                <Choice value={a.openOk} yes={t("feedback.yesRight")} no={t("feedback.openNo")} onChange={(openOk) => setA({ ...a, openOk })} />
+                <p className="pt-1 text-base font-semibold">{t("feedback.priceQ", { limit: limit.toLocaleString("ja-JP") })}</p>
+                <Choice value={a.priceOk} yes={t("feedback.yesRight")} no={t("feedback.priceNo")} onChange={(priceOk) => setA({ ...a, priceOk })} />
               </div>
             )}
-            {state === "error" && <p className="text-sm font-semibold text-[#9A4A00]">보내지 못했어요. 잠시 뒤 다시 눌러 주세요.</p>}
+            {state === "error" && <p className="text-sm font-semibold text-[#9A4A00]">{t("feedback.error")}</p>}
             <button
               type="button"
               disabled={!canSubmit(a) || state === "sending"}
               onClick={submit}
               className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
             >
-              {state === "sending" ? "보내는 중…" : "보내기"}
+              {state === "sending" ? t("feedback.sending") : t("feedback.send")}
             </button>
           </>
         )}

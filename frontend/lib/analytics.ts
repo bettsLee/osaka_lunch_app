@@ -14,7 +14,8 @@ export type EventName =
   | "list_open"
   | "feedback_submit"
   | "price_limit_change"
-  | "push_permission"; // '알림 받기'를 누른 결과 (허용률 확인용)
+  | "push_permission" // '알림 받기'를 누른 결과 (허용률 확인용)
+  | "order_open"; // 결과 카드에서 '주문 문장 보기' (실험 1: 주문 문장 A/B)
 
 type Props = Record<string, string | number | boolean | null>;
 
