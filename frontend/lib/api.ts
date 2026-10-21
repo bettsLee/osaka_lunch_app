@@ -108,6 +108,14 @@ export async function sendFeedback(
   if (!res.ok) throw new Error(`답을 보내지 못했어요 (${res.status})`);
 }
 
+// 의견 보내기 (설정 S8, 10/21 결정: 앱 안 입력칸). 하루 5개를 넘으면 "limit"
+export async function sendOpinion(message: string, lang: string): Promise<"sent" | "limit"> {
+  const res = await call("/api/opinions", { method: "POST", body: JSON.stringify({ message, lang }) });
+  if (res.status === 429) return "limit";
+  if (!res.ok) throw new Error(`의견을 보내지 못했어요 (${res.status})`);
+  return "sent";
+}
+
 // 도감(S6): '네, 다녀왔어요'라고 답한 기록 (최근 것부터)
 export async function fetchZukan(): Promise<ZukanVisit[]> {
   await flushVisits();
