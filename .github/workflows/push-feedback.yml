@@ -1,0 +1,27 @@
+name: Feedback Push
+
+# '다녀왔어요?' 알림 보내기. Render 무료 서버는 잠들어서 스스로 시간을 못 재므로 여기서 15분마다 깨워 부름
+# 점심 뒤 시간대만: UTC 03:00~08:45 = 일본 · 한국 12:00~17:45 (예약 실행은 main 브랜치의 이 파일로만 돎)
+on:
+  schedule:
+    - cron: '*/15 3-8 * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 보낼 알림 보내기
+        env:
+          PUSH_CRON_SECRET: ${{ secrets.PUSH_CRON_SECRET }}
+        run: |
+          if [ -z "$PUSH_CRON_SECRET" ]; then
+            echo "::warning::GitHub Secret PUSH_CRON_SECRET 이 없어 건너뜀"
+            exit 0
+          fi
+          # 서버가 자고 있으면 깨는 데 1분쯤 걸려서 넉넉히 기다리고 다시 시도
+          result=$(curl -fsS --retry 3 --retry-delay 20 --retry-all-errors --max-time 90 -X POST \
+            -H "X-Cron-Secret: $PUSH_CRON_SECRET" \
+            https://osaka-lunch-api.onrender.com/internal/push/send-due)
+          echo "::notice::다녀왔어요? 알림 $result"

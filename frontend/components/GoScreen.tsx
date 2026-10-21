@@ -1,14 +1,33 @@
 "use client";
 
-// S4 여기 갈래요 후: 길찾기 + '다녀온 뒤에 알려 주세요' 안내. 알림은 10/28에 붙이고, 지금은 다음에 앱을 열 때 물어봄
-import { useEffect, useRef } from "react";
+// S4 여기 갈래요 후: 길찾기 + '다녀온 뒤에 알려 주세요'. 알림 권한은 여기서 물음 (10/21 결정: 이유가 보이는 순간)
+// 알림을 못 쓰거나 거절하면 1시간 뒤 앱을 열 때 질문 카드로 물어봄
+import { useEffect, useRef, useState } from "react";
 import { directionsUrl, priceRange, type NearbyShop } from "@/lib/lunch";
+import { currentPushState, enablePush } from "@/lib/api";
 import { track } from "@/lib/analytics";
+import type { PushState } from "@/lib/push";
 import { svg } from "./icons";
+
+const WHY = "다음 사람에게 더 정확한 가게를 보여 줄 수 있어요.";
 
 export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: () => void }) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
+  const [push, setPush] = useState<PushState | "working" | "error">(() => currentPushState());
+
+  const turnOn = () => {
+    setPush("working");
+    enablePush()
+      .then((result) => {
+        setPush(result);
+        track("push_permission", { result });
+      })
+      .catch(() => {
+        setPush("error");
+        track("push_permission", { result: "error" });
+      });
+  };
 
   return (
     <section className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 pb-7 pt-12">
@@ -47,9 +66,29 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
           </svg>
           다녀온 뒤에 알려 주세요
         </p>
-        <p className="text-sm leading-relaxed text-[#5F5E58]">
-          1시간쯤 지나 앱을 다시 열면 영업하고 있었는지, 가격이 맞았는지 물어볼게요. 다음 사람에게 더 정확한 가게를 보여 줄 수 있어요.
+        <p className="text-sm leading-relaxed text-[#5F5E58]" aria-live="polite">
+          {push === "on"
+            ? `1시간 반 뒤에 알림으로 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`
+            : push === "ask" || push === "working"
+              ? `알림을 켜 두면 1시간 반 뒤에 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`
+              : `${push === "error" ? "알림을 켜지 못했어요. " : ""}1시간쯤 지나 앱을 다시 열면 영업하고 있었는지, 가격이 맞았는지 물어볼게요. ${WHY}`}
         </p>
+        {push === "install" && (
+          <p className="text-sm leading-relaxed text-[#5F5E58]">
+            아이폰은 홈 화면에 추가하면 알림으로 물어볼 수 있어요. 공유 버튼 → &apos;홈 화면에 추가&apos;를 누르고, 홈 화면의 앱으로 열어 주세요.
+          </p>
+        )}
+        {(push === "ask" || push === "working") && (
+          <button
+            type="button"
+            onClick={turnOn}
+            disabled={push === "working"}
+            className="mt-1 h-12 rounded-xl border border-[#2457C5] text-base font-semibold text-[#1A3F91] disabled:opacity-60"
+          >
+            {push === "working" ? "알림 켜는 중…" : "알림 받기"}
+          </button>
+        )}
+        {push === "on" && <p className="text-sm font-semibold text-[#1A3F91]">알림이 켜져 있어요</p>}
       </div>
       <div className="flex-1" />
       <button type="button" onClick={onHome} className="min-h-11 text-sm text-[#2457C5]">

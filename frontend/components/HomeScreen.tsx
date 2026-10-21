@@ -9,7 +9,7 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { fetchPendingVisit, flushVisits, saveVisit, wakeServer } from "@/lib/api";
+import { fetchPendingVisit, flushVisits, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track } from "@/lib/analytics";
 import type { PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
@@ -72,7 +72,9 @@ export default function HomeScreen() {
     locate();
     load();
     startAnalytics();
-    track("app_open");
+    const fromPush = new URLSearchParams(window.location.search).get("from") === "push"; // 알림을 눌러 열었는지
+    track("app_open", fromPush ? { from: "push" } : undefined);
+    if (fromPush) window.history.replaceState(null, "", window.location.pathname);
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
       if (saved) setChosenLimit(saved);
@@ -80,6 +82,7 @@ export default function HomeScreen() {
       // 저장소를 못 쓰면 기본 990엔
     }
     wakeServer(); // 룰렛을 돌리는 동안 잠든 서버가 일어나게
+    syncPush(); // 알림을 허용했던 휴대폰이면 구독을 다시 저장
     fetchPendingVisit() // 보관해 둔 '여기 갈래요'를 먼저 보내고, 물어볼 게 있으면 카드로
       .then(setAsk)
       .catch(() => {}); // 서버가 아직 안 일어났으면 다음에 열 때 물어봄
