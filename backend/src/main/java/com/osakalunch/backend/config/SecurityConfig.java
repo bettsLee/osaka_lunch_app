@@ -3,6 +3,7 @@ package com.osakalunch.backend.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -38,6 +39,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/health").permitAll() // 화면이 앱을 열 때 서버를 깨우는 용도
                         .requestMatchers("/error").permitAll() // 400 · 404 같은 오류 응답이 401로 바뀌지 않게
+                        .requestMatchers(HttpMethod.POST, "/internal/push/send-due").permitAll() // 로그인 대신 비밀 값으로 확인 (PushController)
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();
