@@ -5,7 +5,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // 읽기 전용 공개 키 (RLS로 읽기만 허용)
 
 const SELECT =
-  "shop_id,lunch_days,lunch_window,lunch_price_min,lunch_price_max,typical_lunch_price," +
+  "shop_id,lunch_days,lunch_window,lunch_price_min,lunch_price_max,typical_lunch_price,price_evidence," +
   "shops(name,genre_name,lat,lng,photo_url,hotpepper_url,middle_area_code)";
 
 type Row = {
@@ -15,6 +15,7 @@ type Row = {
   lunch_price_min: number | null;
   lunch_price_max: number | null;
   typical_lunch_price: number | null;
+  price_evidence: string | null;
   shops: {
     name: string;
     genre_name: string | null;
@@ -54,6 +55,7 @@ export async function fetchLunchShops(): Promise<LunchShop[]> {
         priceMin: r.lunch_price_min,
         priceMax: r.lunch_price_max,
         typicalPrice: r.typical_lunch_price,
+        priceEvidence: r.price_evidence || null,
       },
     ];
   });
