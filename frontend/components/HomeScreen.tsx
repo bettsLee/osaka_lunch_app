@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
+  const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 홈에 가는 중 표시
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
@@ -196,6 +197,7 @@ export default function HomeScreen() {
     setPicked(null);
     const showResult = () => {
       setFlashId(null);
+      setCardHidden(false);
       setPicked(winner);
       setPickedFrom("roulette");
       setMode("result");
@@ -221,6 +223,7 @@ export default function HomeScreen() {
   const pickDirect = (shop: NearbyShop, from: "list" | "map") => {
     clearTimers();
     setFlashId(null);
+    setCardHidden(false);
     setPicked(shop);
     setPickedFrom(from);
     setMode("result");
@@ -381,7 +384,7 @@ export default function HomeScreen() {
       )}
 
       <section
-        className={`relative bg-[#ECEAE3] ${mode === "result" ? "h-[170px] flex-none" : mode === "go" ? "hidden" : "flex-1"}`}
+        className={`relative bg-[#ECEAE3] ${mode === "result" ? (cardHidden ? "flex-1" : "h-[170px] flex-none") : mode === "go" ? "hidden" : "flex-1"}`}
         aria-label={t("home.map")}
       >
         {loc.status === "ok" && near ? (
@@ -455,7 +458,17 @@ export default function HomeScreen() {
       )}
 
       {mode === "result" && picked && (
-        <ResultCard shop={picked} day={day} minutes={minutes} limit={limit} onGo={go} onRespin={spin} canRespin={pool.length > 1} />
+        <ResultCard
+          shop={picked}
+          day={day}
+          minutes={minutes}
+          limit={limit}
+          onGo={go}
+          onRespin={spin}
+          canRespin={pool.length > 1}
+          collapsed={cardHidden}
+          onToggle={() => setCardHidden((v) => !v)}
+        />
       )}
 
       {mode === "go" && picked && <GoScreen shop={picked} onHome={backHome} />}
