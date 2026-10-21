@@ -2,7 +2,7 @@
 
 // S5 다녀왔어요?: 다녀왔는지 → 그 시간에 영업했는지 → 점심 가격이 그때 고른 상한 이하였는지 (와이어프레임 검토: 질문 2개로 충분)
 import { useEffect, useRef, useState } from "react";
-import { track } from "@/lib/analytics";
+import { track, trackError } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
 import { canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
 import { useT } from "./I18n";
@@ -27,7 +27,8 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
       if (body.visited) track("zukan_add");
       setAdded(body.visited);
       setState("done");
-    } catch {
+    } catch (e) {
+      trackError("feedback", e);
       setState("error");
     }
   };

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
 import { fetchZukan } from "@/lib/api";
+import { trackError } from "@/lib/analytics";
 import { collect, monthDay, topArea, type ZukanItem, type ZukanVisit } from "@/lib/zukan";
 import { useT } from "./I18n";
 import ShareCard from "./ShareCard";
@@ -24,7 +25,10 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
     setState({ status: "loading" });
     fetchZukan()
       .then((visits) => setState({ status: "ok", visits }))
-      .catch(() => setState({ status: "error" }));
+      .catch((e: unknown) => {
+        trackError("zukan", e);
+        setState({ status: "error" });
+      });
   }, []);
   useEffect(load, [load]);
 
