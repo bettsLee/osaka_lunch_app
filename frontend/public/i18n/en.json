@@ -25,7 +25,7 @@
   "home.skip": "Show now",
   "home.count": "{n} places up to ¥{limit} within {radius} km",
   "home.countOpenNow": "{n} places up to ¥{limit} open now within {radius} km",
-  "home.listExpand": "Show all",
+  "home.listExpand": "Show list",
   "home.listCollapse": "Show less",
   "home.widened": "Few places nearby, so we widened the search to {radius} km",
   "home.none": "No places up to ¥{limit} serve lunch today within 2 km. For now we only cover 6 central Osaka areas.",
@@ -203,5 +203,14 @@
   "install.how": "How",
   "install.step1": "Tap your browser's Share button (a square with an up arrow). In Safari it's at the bottom of the screen.",
   "install.step2": "Tap 'Add to Home Screen'. If you don't see it, scroll down the list.",
-  "install.step3": "Open the app from your Home Screen."
+  "install.step3": "Open the app from your Home Screen.",
+  "home.sheetHide": "Show a bigger map",
+  "home.sheetShow": "Show the panel",
+  "going.title": "Heading to {shop}",
+  "going.meta": "Chosen at {time} · {n} min walk",
+  "going.directions": "Directions",
+  "going.cancel": "Cancel",
+  "going.confirm": "Cancel going here?",
+  "going.confirmYes": "Yes, cancel",
+  "going.confirmNo": "No"
 }

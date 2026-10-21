@@ -103,6 +103,22 @@ class VisitControllerTest {
     }
 
     @Test
+    void 취소하면_질문_카드에서_빠지고_답한_건_취소할_수_없음() throws Exception {
+        Visit v = saved(ALICE, Duration.ofHours(2));
+        String url = "/api/visits/" + v.getId() + "/cancel";
+        mvc.perform(as(BOB, put(url))).andExpect(status().isNotFound()); // 남의 기록
+        mvc.perform(as(ALICE, put(url))).andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, put(url))).andExpect(status().isNoContent()); // 다시 보내도 괜찮음
+        assertThat(visits.findById(v.getId()).orElseThrow().getCancelledAt()).isNotNull();
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+
+        Visit answered = saved(ALICE, Duration.ofHours(3));
+        answered.answer(false, null, null, Instant.now());
+        visits.save(answered);
+        mvc.perform(as(ALICE, put("/api/visits/" + answered.getId() + "/cancel"))).andExpect(status().isConflict());
+    }
+
+    @Test
     void 다녀왔으면_영업_가격_답이_다_필요() throws Exception {
         Visit v = saved(ALICE, Duration.ofHours(2));
         String url = "/api/visits/" + v.getId() + "/feedback";

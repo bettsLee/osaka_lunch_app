@@ -53,6 +53,9 @@ public class Visit {
     @Column(name = "notified_at")
     private Instant notifiedAt; // '다녀왔어요?' 알림을 보낸 시각 (004)
 
+    @Column(name = "cancelled_at")
+    private Instant cancelledAt; // 정했다가 취소한 시각 (007). 취소하면 알림 · 질문 카드에서 빠짐
+
     protected Visit() {
     }
 
@@ -80,6 +83,11 @@ public class Visit {
         this.notifiedAt = at;
     }
 
+    /** 여기 갈래요 취소. 이미 취소했으면 처음 시각을 그대로 둠 */
+    public void cancel(Instant at) {
+        if (this.cancelledAt == null) this.cancelledAt = at;
+    }
+
     public UUID getId() { return id; }
     public UUID getUserId() { return userId; }
     public String getShopId() { return shopId; }
@@ -91,4 +99,5 @@ public class Visit {
     public Boolean getPriceOk() { return priceOk; }
     public Instant getAnsweredAt() { return answeredAt; }
     public Instant getNotifiedAt() { return notifiedAt; }
+    public Instant getCancelledAt() { return cancelledAt; }
 }

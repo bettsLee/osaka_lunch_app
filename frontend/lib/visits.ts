@@ -42,6 +42,25 @@ export function settled(status: number): boolean {
   return status === 200 || status === 201 || status === 400 || status === 409;
 }
 
+// 취소 요청 응답을 보고 대기열에서 뺄지: 취소됨(204), 저장된 적 없음(404), 이미 답함(409)
+export function cancelSettled(status: number): boolean {
+  return status === 204 || status === 404 || status === 409;
+}
+
+// 홈의 '○○에 가는 중' (10/22 도그푸딩): 여기 갈래요 뒤 1시간까지. 그 뒤로는 '다녀왔어요?'로 물음
+export type Going = { id: string; shopId: string; shopName: string; lat: number; lng: number; walk: number; chosenAt: string };
+export const GOING_FOR_MS = 60 * 60 * 1000; // 서버의 ASK_AFTER(1시간)와 같음
+
+export function stillGoing(g: Going | null, now: Date): Going | null {
+  return g && now.getTime() - new Date(g.chosenAt).getTime() < GOING_FOR_MS ? g : null;
+}
+
+// 고른 시각 (오사카 시간 12:10)
+export function clockTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .format(new Date(iso));
+}
+
 // S5 위쪽의 '오늘 12:10 · 여기 갈래요' (오사카 시간)
 export function chosenLabel(chosenAt: string, now: Date, t: T): string {
   const fmt = (d: Date, opt: Intl.DateTimeFormatOptions) =>
