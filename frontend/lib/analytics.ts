@@ -21,6 +21,7 @@ export type EventName =
   | "share_card_create" // 공유 카드를 저장하거나 공유함
   | "share_open" // 공유 카드의 링크로 들어옴
   | "list_item_click" // 목록에서 직접 고름 (룰렛 vs 목록)
+  | "opinion_submit" // 설정에서 의견을 보냄 (내용은 보내지 않고 글자 수만)
   | "app_error"; // 화면에서 난 오류 (원인 확인용)
 
 type Props = Record<string, string | number | boolean | null>;

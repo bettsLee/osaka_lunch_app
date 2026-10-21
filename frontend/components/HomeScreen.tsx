@@ -21,6 +21,7 @@ import { useT } from "./I18n";
 import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
+import SettingsScreen from "./SettingsScreen";
 import ZukanScreen from "./ZukanScreen";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
@@ -28,7 +29,7 @@ const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도�
 type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point };
 type Data = { status: "loading" } | { status: "error" } | { status: "ok"; shops: LunchShop[] };
 type Mode = "home" | "spin" | "result" | "go";
-type Tab = "lunch" | "zukan";
+type Tab = "lunch" | "zukan" | "settings";
 
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
@@ -257,7 +258,7 @@ export default function HomeScreen() {
     <nav className="flex border-t border-[#E2E0D8] bg-white" aria-label={t("home.tabs")}>
       <Tab active={tab === "lunch"} onClick={() => openTab("lunch")} label={t("tab.lunch")} icon={<MapIcon />} />
       <Tab active={tab === "zukan"} onClick={() => openTab("zukan")} label={t("tab.zukan")} icon={<BookIcon />} />
-      <Tab label={t("tab.settings")} icon={<SlidersIcon />} />
+      <Tab active={tab === "settings"} onClick={() => openTab("settings")} label={t("tab.settings")} icon={<SlidersIcon />} />
     </nav>
   );
   const mainClass = "mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]";
@@ -282,6 +283,16 @@ export default function HomeScreen() {
     return (
       <main className={mainClass} style={mainFont}>
         <ZukanScreen shops={data.status === "ok" ? data.shops : null} here={loc.status === "ok" ? loc.point : null} nearby={visible} />
+        {tabs}
+      </main>
+    );
+  }
+
+  // S8 설정 탭
+  if (mode === "home" && tab === "settings") {
+    return (
+      <main className={mainClass} style={mainFont}>
+        <SettingsScreen limit={limit} />
         {tabs}
       </main>
     );
@@ -507,17 +518,15 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-// 설정 화면은 아직 없어서 점심 · 도감 탭만 켜 둠 (onClick이 없으면 꺼짐)
-function Tab(props: { active?: boolean; onClick?: () => void; label: string; icon: React.ReactNode }) {
-  const { active = false, onClick, label, icon } = props;
+function Tab(props: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode }) {
+  const { active, onClick, label, icon } = props;
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={!onClick}
       aria-current={active ? "page" : undefined}
       className={`flex flex-1 flex-col items-center gap-0.5 pb-3 pt-2 text-xs ${
-        active ? "font-semibold text-[#1A3F91]" : "text-[#5F5E58] disabled:opacity-60"
+        active ? "font-semibold text-[#1A3F91]" : "text-[#5F5E58]"
       }`}
     >
       {icon}
