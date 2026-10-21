@@ -1,11 +1,13 @@
 // Spring Boot 서버(Render) 호출. 사용자는 Supabase 익명 로그인으로 구분하고 그 토큰을 서버에 보냄
 // Render 무료 서버는 쉬면 잠들어서: 앱을 열 때 미리 깨우고, '여기 갈래요'는 기다리지 않게 뒤에서 저장(실패하면 보관 후 다시)
 import { GoTrueClient } from "@supabase/auth-js";
+import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
 import { enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const OUTBOX_KEY = "osaka-lunch-visit-outbox";
 
 let auth: GoTrueClient | null = null;
@@ -103,4 +105,43 @@ export async function sendFeedback(
 ): Promise<void> {
   const res = await call(`/api/visits/${id}/feedback`, { method: "PUT", body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`답을 보내지 못했어요 (${res.status})`);
+}
+
+// '다녀왔어요?' 알림: 이 브라우저에서 지금 할 수 있는 것
+export function currentPushState(): PushState {
+  return pushState({
+    configured: Boolean(API_URL && VAPID_KEY),
+    supported: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window,
+    ios: isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints),
+    standalone:
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true,
+    permission: "Notification" in window ? Notification.permission : "default",
+  });
+}
+
+// 서비스 워커를 등록하고 구독(없으면 새로)해서 서버에 저장. 서버는 같은 브라우저면 한 줄만 둠
+async function saveSubscription(): Promise<void> {
+  await navigator.serviceWorker.register("/push-sw.js");
+  const reg = await navigator.serviceWorker.ready;
+  const sub =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_KEY ?? "") }));
+  const body = subscriptionBody(sub.toJSON());
+  if (!body) throw new Error("알림 구독 정보가 없어요");
+  const res = await call("/api/push/subscriptions", { method: "POST", body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`알림 설정을 저장하지 못했어요 (${res.status})`);
+}
+
+// '알림 받기' 버튼. 권한 묻기는 버튼을 누른 그 순간에 해야 해서(사파리) 맨 먼저 부름
+export async function enablePush(): Promise<PushState> {
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") return permission === "denied" ? "blocked" : "ask";
+  await saveSubscription();
+  return "on";
+}
+
+// 앱을 열 때: 이미 허용했으면 구독을 다시 저장 (익명 사용자가 바뀌었거나 브라우저가 구독을 새로 만든 경우)
+export function syncPush(): void {
+  if (currentPushState() === "on") saveSubscription().catch(() => {});
 }

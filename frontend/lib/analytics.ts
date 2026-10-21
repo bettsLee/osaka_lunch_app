@@ -13,7 +13,8 @@ export type EventName =
   | "menu_link_click"
   | "list_open"
   | "feedback_submit"
-  | "price_limit_change";
+  | "price_limit_change"
+  | "push_permission"; // '알림 받기'를 누른 결과 (허용률 확인용)
 
 type Props = Record<string, string | number | boolean | null>;
 
