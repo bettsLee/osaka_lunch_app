@@ -4,16 +4,17 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  areaName, DEFAULT_LIMIT, displayPrice, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceBadge, priceLabel,
+  areaName, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceBadge, priceLabel,
   rouletteCandidates, spinSteps, tierInfo, underLimit,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { cancelVisit, fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { arriveVisit, cancelVisit, fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
-import { stillGoing, type Going, type PendingVisit } from "@/lib/visits";
+import { arrivedNear, stillGoing, type Going, type PendingVisit } from "@/lib/visits";
+import ArriveSheet from "./ArriveSheet";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
 import InstallHint from "./InstallHint";
@@ -61,9 +62,12 @@ export default function HomeScreen() {
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
   const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 정한 가게 (지도의 파란 핀)
+  const [arrival, setArrival] = useState<{ going: Going; by: "auto" | "manual" } | null>(null); // 도착했어요 시트
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
+  const checkArrival = useRef<() => void>(() => {}); // 앱을 열거나 돌아올 때 정한 가게 근처인지 (도착했어요 자동)
+  const lastCheck = useRef<{ distanceM: number; accuracyM: number } | null>(null); // 마지막으로 잰 거리 · GPS 오차 (80m 기준을 맞추는 지표)
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) return setLoc({ status: "error" });
@@ -94,7 +98,9 @@ export default function HomeScreen() {
     openedAt.current = performance.now();
     // 홈 화면 앱은 뒤로 갔다가 다음 날 다시 쓰기도 해서, 다시 화면에 돌아온 때부터 다시 잼
     const onVisible = () => {
-      if (document.visibilityState === "visible") openedAt.current = performance.now();
+      if (document.visibilityState !== "visible") return;
+      openedAt.current = performance.now();
+      checkArrival.current(); // 길찾기로 구글 지도에 갔다가 돌아오는 경우
     };
     document.addEventListener("visibilitychange", onVisible);
     // 처음이면 S0부터 (위치는 버튼을 누를 때 물음). 이미 시작했거나 위치를 허용해 둔 브라우저면 바로 홈
@@ -152,6 +158,11 @@ export default function HomeScreen() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [locate, load]);
+
+  // 앱을 열 때 (위치를 받은 뒤) 정한 가게 근처인지
+  useEffect(() => {
+    if (loc.status === "ok") checkArrival.current();
+  }, [loc.status]);
 
   const { day, minutes } = osakaNow(now);
   // 가격 단계: 단계마다 근처 가게 수 · 잠금. 고른 단계가 여기서 잠기면 기본 990엔으로
@@ -278,11 +289,49 @@ export default function HomeScreen() {
     track("visit_cancel", { reason, after_min: Math.round((Date.now() - new Date(g.chosenAt).getTime()) / 60000) });
   };
 
+  // 도착했어요 (10/22 결정: 버튼 + 앱을 열 때 가게 근처면 자동): 도감에 바로 넣고, 홈은 처음 상태로 돌린 뒤 영업 여부만 물음
+  const arrive = (g: Going, by: "auto" | "manual") => {
+    if (stillGoing(going, new Date())?.id !== g.id) return; // 위치를 재는 사이 취소했거나 이미 도착함
+    arriveVisit(g.id, by);
+    const m = lastCheck.current;
+    track("visit_arrive", {
+      by,
+      after_min: Math.round((Date.now() - new Date(g.chosenAt).getTime()) / 60000),
+      distance_m: m ? Math.round(m.distanceM / 10) * 10 : null, // 10m 단위 (여기 갈래요의 distance_km과 같은 정도)
+      accuracy_m: m ? Math.round(m.accuracyM / 10) * 10 : null,
+    });
+    track("zukan_add", { from: "arrive" });
+    lastCheck.current = null; // 다음에 정한 가게와 섞이지 않게
+    rememberGoing(null);
+    if (ask?.id === g.id) setAsk(null);
+    setPriceOpen(false);
+    setTab("lunch");
+    backHome();
+    setArrival({ going: g, by });
+  };
+  // 자동: 휴대폰 안에서 위치를 한 번 재서 가게와 비교 (위치는 보내지 않음). GPS 오차가 크면 판단하지 않고 버튼에 맡김
+  checkArrival.current = () => {
+    const g = stillGoing(going, new Date());
+    if (!g || arrival || loc.status !== "ok" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const distanceM = distanceKm({ lat: p.coords.latitude, lng: p.coords.longitude }, g) * 1000;
+        lastCheck.current = { distanceM, accuracyM: p.coords.accuracy };
+        if (arrivedNear(distanceM, p.coords.accuracy)) arriveRef.current(g, "auto");
+      },
+      () => {}, // 못 재면 버튼으로
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }, // 예전에 잰 위치(가게에 오기 전)를 다시 쓰지 않게
+    );
+  };
+  const arriveRef = useRef(arrive);
+  arriveRef.current = arrive; // 위치를 잰 뒤에는 그때의 화면 상태로 판단
+
   // 여기 갈래요: 화면은 바로 넘기고 저장은 뒤에서 (서버가 잠들어 있어도 기다리지 않게)
   const go = () => {
     if (!picked) return;
     const before = stillGoing(going, new Date());
     if (before) cancelGoing(before, "changed");
+    lastCheck.current = null;
     const distanceKm = Math.round(picked.km * 100) / 100;
     const id = crypto.randomUUID();
     const chosenAt = new Date().toISOString();
@@ -295,7 +344,7 @@ export default function HomeScreen() {
       priceLimit: limit,
       chosenAt,
     });
-    rememberGoing({ id, shopId: picked.id, shopName: picked.name, lat: picked.lat, lng: picked.lng, walk: picked.walk, chosenAt });
+    rememberGoing({ id, shopId: picked.id, shopName: picked.name, lat: picked.lat, lng: picked.lng, walk: picked.walk, chosenAt, priceLimit: limit });
     track("go_here_click", {
       source: pickedFrom,
       distance_km: distanceKm,
@@ -474,6 +523,9 @@ export default function HomeScreen() {
             rememberGoing(null);
             backHome();
           }}
+          onArrive={() => {
+            if (goingNow) arrive(goingNow, "manual");
+          }}
         />
       )}
 
@@ -483,7 +535,25 @@ export default function HomeScreen() {
         <PriceSheet tiers={tiers} current={limit} onApply={applyLimit} onClose={() => setPriceOpen(false)} />
       )}
 
-      {mode === "home" && ask && !priceOpen && (
+      {mode === "home" && arrival && (
+        <ArriveSheet
+          visitId={arrival.going.id}
+          shopName={arrival.going.shopName}
+          limit={arrival.going.priceLimit ?? limit}
+          by={arrival.by}
+          onClose={() => setArrival(null)}
+          onOpenZukan={() => {
+            setArrival(null);
+            openTab("zukan");
+          }}
+          onPickAnother={() => {
+            setArrival(null);
+            locate(); // 가게 앞에서 다시 고르니 지금 위치로 근처를 다시 찾음
+          }}
+        />
+      )}
+
+      {mode === "home" && ask && !priceOpen && !arrival && (
         <FeedbackSheet
           visit={ask}
           onClose={() => {

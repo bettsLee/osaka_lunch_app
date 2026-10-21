@@ -56,6 +56,12 @@ public class Visit {
     @Column(name = "cancelled_at")
     private Instant cancelledAt; // 정했다가 취소한 시각 (007). 취소하면 알림 · 질문 카드에서 빠짐
 
+    @Column(name = "arrived_at")
+    private Instant arrivedAt; // 도착했어요 (009). 도착하면 다녀온 것으로 보고 도감에 바로 넣음
+
+    @Column(name = "arrived_by")
+    private String arrivedBy; // auto: 앱을 열 때 가게 근처 / manual: '도착했어요' 버튼
+
     protected Visit() {
     }
 
@@ -83,6 +89,21 @@ public class Visit {
         this.notifiedAt = at;
     }
 
+    /** 도착했어요. 다시 불러도 처음 도착 시각 · 방법은 그대로, 그 자리에서 영업 여부를 답했으면 같이.
+     *  영업을 안 했으면 가격은 알 수 없어서 더 물을 게 없음 → 답한 것으로 (질문 카드 · 알림에서 빠짐) */
+    public void arrive(String by, Boolean openOk, Instant at) {
+        if (this.arrivedAt == null) {
+            this.arrivedAt = at;
+            this.arrivedBy = by;
+        }
+        this.visited = true;
+        if (openOk != null) this.openOk = openOk;
+        if (Boolean.FALSE.equals(openOk)) {
+            this.priceOk = null;
+            this.answeredAt = at;
+        }
+    }
+
     /** 여기 갈래요 취소. 이미 취소했으면 처음 시각을 그대로 둠 */
     public void cancel(Instant at) {
         if (this.cancelledAt == null) this.cancelledAt = at;
@@ -100,4 +121,6 @@ public class Visit {
     public Instant getAnsweredAt() { return answeredAt; }
     public Instant getNotifiedAt() { return notifiedAt; }
     public Instant getCancelledAt() { return cancelledAt; }
+    public Instant getArrivedAt() { return arrivedAt; }
+    public String getArrivedBy() { return arrivedBy; }
 }

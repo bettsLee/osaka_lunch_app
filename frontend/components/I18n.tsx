@@ -36,7 +36,12 @@ function writeCache(lang: string, messages: Messages): void {
 // 알림 문구를 서비스 워커가 읽을 수 있게 저장 (알림은 앱이 닫혀 있을 때 뜸)
 function savePushText(messages: Messages): void {
   if (!("caches" in window)) return;
-  const body = JSON.stringify({ title: messages["push.title"], body: messages["push.body"] });
+  const body = JSON.stringify({
+    title: messages["push.title"],
+    body: messages["push.body"],
+    titlePrice: messages["push.titlePrice"],
+    bodyPrice: messages["push.bodyPrice"],
+  });
   caches
     .open("osaka-lunch-push")
     .then((c) => c.put("/push-text.json", new Response(body, { headers: { "Content-Type": "application/json" } })))
