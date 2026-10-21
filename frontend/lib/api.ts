@@ -2,7 +2,7 @@
 // Render 무료 서버는 쉬면 잠들어서: 앱을 열 때 미리 깨우고, '여기 갈래요'는 기다리지 않게 뒤에서 저장(실패하면 보관 후 다시)
 import { GoTrueClient } from "@supabase/auth-js";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
-import { enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
+import { cancelSettled, enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
@@ -10,6 +10,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const OUTBOX_KEY = "osaka-lunch-visit-outbox";
+const CANCEL_KEY = "osaka-lunch-visit-cancels"; // 보내야 할 취소 (여기 갈래요 id)
 
 let auth: GoTrueClient | null = null;
 
@@ -65,18 +66,44 @@ function writeOutbox(queue: VisitDraft[]): void {
   }
 }
 
+function readCancels(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(CANCEL_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeCancels(ids: string[]): void {
+  try {
+    localStorage.setItem(CANCEL_KEY, JSON.stringify(ids));
+  } catch {
+    // 저장소를 못 쓰면 이번 한 번만 보냄
+  }
+}
+
 let flushing: Promise<void> | null = null;
 
-// 보관해 둔 '여기 갈래요'를 차례로 보냄. 저장됐거나 다시 보내도 소용없는 것만 뺌
+// 보관해 둔 '여기 갈래요'를 차례로 보내고, 다 보냈으면 취소도 보냄 (저장되기 전에 취소하면 404가 나서 순서가 중요)
+// 저장됐거나 다시 보내도 소용없는 것만 뺌
 export function flushVisits(): Promise<void> {
   flushing ??= (async () => {
     for (const draft of readOutbox()) {
       try {
         const res = await call("/api/visits", { method: "POST", body: JSON.stringify(draft) });
-        if (!settled(res.status)) break; // 서버 문제면 다음에 다시
+        if (!settled(res.status)) return; // 서버 문제면 다음에 다시
         writeOutbox(readOutbox().filter((v) => v.id !== draft.id));
       } catch {
-        break; // 연결이 안 되면 다음에 다시
+        return; // 연결이 안 되면 다음에 다시
+      }
+    }
+    for (const id of readCancels()) {
+      try {
+        const res = await call(`/api/visits/${id}/cancel`, { method: "PUT" });
+        if (!cancelSettled(res.status)) return;
+        writeCancels(readCancels().filter((c) => c !== id));
+      } catch {
+        return;
       }
     }
   })().finally(() => {
@@ -89,6 +116,12 @@ export function flushVisits(): Promise<void> {
 export function saveVisit(draft: VisitDraft): void {
   writeOutbox(enqueue(readOutbox(), draft, new Date()));
   void (flushing ? flushing.then(flushVisits) : flushVisits()); // 보내는 중이었으면 끝난 뒤 이것까지
+}
+
+// 여기 갈래요 취소 (10/22 결정: 따로 기록): 먼저 보관하고 뒤에서 보냄
+export function cancelVisit(id: string): void {
+  writeCancels([...readCancels().filter((c) => c !== id), id]);
+  void (flushing ? flushing.then(flushVisits) : flushVisits());
 }
 
 // 지금 물어볼 '다녀왔어요?' (없으면 null)
@@ -122,6 +155,25 @@ export async function fetchZukan(): Promise<ZukanVisit[]> {
   const res = await call("/api/visits/zukan");
   if (!res.ok) throw new Error(`도감을 불러오지 못했어요 (${res.status})`);
   return res.json();
+}
+
+// 결과 카드의 가게 소개 번역 (10/22 결정: AI 번역). 서버가 가게 × 언어마다 한 번 번역해 저장. 없으면 null
+// 다시 돌리기로 같은 가게가 나와도 다시 묻지 않게 이 화면에서 기억
+const catchCache = new Map<string, Promise<string | null>>();
+export function fetchShopCatch(shopId: string, lang: string): Promise<string | null> {
+  const key = `${shopId}:${lang}`;
+  let got = catchCache.get(key);
+  if (!got) {
+    got = call(`/api/shops/${encodeURIComponent(shopId)}/catch?lang=${encodeURIComponent(lang)}`).then(async (res) => {
+      if (res.status === 204) return null;
+      if (!res.ok) throw new Error(`가게 소개를 번역하지 못했어요 (${res.status})`);
+      const body: { text?: unknown } = await res.json();
+      return typeof body.text === "string" ? body.text : null;
+    });
+    got.catch(() => catchCache.delete(key)); // 실패하면 다음에 다시
+    catchCache.set(key, got);
+  }
+  return got;
 }
 
 // 한국어 · 영어가 아닌 휴대폰 언어의 문구. 서버가 처음 한 번 AI로 번역해 저장해 둔 것 (로그인 필요 없음)

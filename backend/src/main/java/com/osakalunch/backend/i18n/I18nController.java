@@ -44,6 +44,11 @@ public class I18nController {
         }
     }
 
+    /** 휴대폰 언어 코드 형식이고 Java가 이름을 아는 언어 (가게 소개 번역에서도 씀) */
+    public static boolean supportedLanguage(String lang) {
+        return lang != null && LANG.matcher(lang).matches() && knownLanguage(lang);
+    }
+
     /** Java가 이름을 아는 언어만 (xx 같은 코드는 이름이 코드 그대로 나옴) */
     static boolean knownLanguage(String lang) {
         String base = lang.split("-")[0];

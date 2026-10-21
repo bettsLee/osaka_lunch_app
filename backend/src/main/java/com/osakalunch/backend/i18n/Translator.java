@@ -60,6 +60,17 @@ public class Translator {
             %s
             """;
 
+    /** 결과 카드의 가게 소개 (10/22 결정). 핫페퍼 글이라 뜻만 옮기고 덧붙이지 않음 */
+    static final String SHOP_PROMPT = """
+            Translate this short Japanese catchphrase from a restaurant's listing on Hot Pepper (a Japanese restaurant guide) into %s.
+            Rules:
+            - Keep the meaning only. Do not add, explain or leave out information. Keep it about as short as the original.
+            - Keep restaurant names as they are. Write yen prices the way readers of this language usually write them.
+            - Return one JSON object: {"text": "<translation>"}
+            Japanese:
+            %s
+            """;
+
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final ObjectMapper json;
     private final String apiKey;
@@ -87,6 +98,17 @@ public class Translator {
             if (out != null && sameShape(source, out)) return out;
         }
         throw new TranslationFailed("번역 결과가 원문과 맞지 않아요 (" + lang + ")");
+    }
+
+    /** 가게 소개 한 줄을 번역. 비었거나 터무니없이 길면 한 번 더 시도 */
+    public String translateShopText(String japanese, String lang) throws IOException, InterruptedException {
+        String prompt = SHOP_PROMPT.formatted(languageName(lang), japanese);
+        for (int attempt = 0; attempt < 2; attempt++) {
+            Map<String, String> out = parse(json, call(prompt));
+            String text = out == null ? null : out.get("text");
+            if (text != null && !text.isBlank() && text.length() <= Math.max(120, japanese.length() * 4)) return text.strip();
+        }
+        throw new TranslationFailed("가게 소개를 번역하지 못했어요 (" + lang + ")");
     }
 
     /** 예: "Vietnamese (vi)", "Chinese (Traditional) (zh-Hant)" */

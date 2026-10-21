@@ -9,14 +9,15 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { cancelVisit, fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
-import type { PendingVisit } from "@/lib/visits";
+import { stillGoing, type Going, type PendingVisit } from "@/lib/visits";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
 import InstallHint from "./InstallHint";
+import GoingBanner from "./GoingBanner";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -35,9 +36,9 @@ type Tab = "lunch" | "zukan" | "settings";
 const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴대폰에만 기억
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
 const INSTALL_HINT_KEY = "osaka-lunch-install-hint-closed"; // 홈 화면 추가 안내를 닫음
+const GOING_KEY = "osaka-lunch-going"; // 지금 가는 중인 가게 (홈의 가는 중 표시)
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
-const COLLAPSED_ROWS = 2; // 접힌 목록에 보이는 줄 수
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
 
 export default function HomeScreen() {
@@ -58,6 +59,8 @@ export default function HomeScreen() {
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
   const [priceOpen, setPriceOpen] = useState(false);
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
+  const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
+  const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 홈에 가는 중 표시
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
@@ -111,6 +114,11 @@ export default function HomeScreen() {
         if (skip) locate();
       });
     load(); // 가게 목록은 S0을 보는 동안 미리 불러 둠
+    try {
+      setGoing(stillGoing(JSON.parse(localStorage.getItem(GOING_KEY) ?? "null"), new Date()));
+    } catch {
+      // 기억 못 하면 가는 중을 안 보여 줌
+    }
     startAnalytics();
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
@@ -170,7 +178,8 @@ export default function HomeScreen() {
   const pool = rouletteCandidates(visible, day, minutes);
   const allOrdersOver = near !== null && near.shops.length > 0 && rouletteCandidates(near.shops, day, minutes).length === 0;
   const area = near ? areaName(near.shops, t) : null;
-  const rows = listOpen ? visible : visible.slice(0, COLLAPSED_ROWS);
+  const rows = listOpen ? visible : []; // 목록은 '목록 보기'를 눌러야 보임 (10/22 도그푸딩: 처음엔 룰렛 버튼만)
+  const goingNow = stillGoing(going, now);
 
   // 룰렛: 결과를 먼저 정하고, 핀을 점점 느리게 깜빡이다 결과에서 멈춤. 움직임 줄이기 설정이면 바로 결과
   const spin = () => {
@@ -239,19 +248,40 @@ export default function HomeScreen() {
     setPicked(null);
     setMode("home");
   };
+  // 가는 중 기억 (이 휴대폰에만)
+  const rememberGoing = (next: Going | null) => {
+    setGoing(next);
+    try {
+      if (next) localStorage.setItem(GOING_KEY, JSON.stringify(next));
+      else localStorage.removeItem(GOING_KEY);
+    } catch {
+      // 기억 못 해도 이번에는 화면에 보임
+    }
+  };
+  // 여기 갈래요 취소 (10/22 결정: 따로 기록). changed: 다른 가게로 다시 정해서 앞의 것이 취소됨
+  const cancelGoing = (g: Going, reason: "cancel" | "changed") => {
+    cancelVisit(g.id);
+    track("visit_cancel", { reason, after_min: Math.round((Date.now() - new Date(g.chosenAt).getTime()) / 60000) });
+  };
+
   // 여기 갈래요: 화면은 바로 넘기고 저장은 뒤에서 (서버가 잠들어 있어도 기다리지 않게)
   const go = () => {
     if (!picked) return;
+    const before = stillGoing(going, new Date());
+    if (before) cancelGoing(before, "changed");
     const distanceKm = Math.round(picked.km * 100) / 100;
+    const id = crypto.randomUUID();
+    const chosenAt = new Date().toISOString();
     saveVisit({
-      id: crypto.randomUUID(),
+      id,
       shopId: picked.id,
       shopName: picked.name,
       source: pickedFrom,
       distanceKm,
       priceLimit: limit,
-      chosenAt: new Date().toISOString(),
+      chosenAt,
     });
+    rememberGoing({ id, shopId: picked.id, shopName: picked.name, lat: picked.lat, lng: picked.lng, walk: picked.walk, chosenAt });
     track("go_here_click", {
       source: pickedFrom,
       distance_km: distanceKm,
@@ -437,15 +467,32 @@ export default function HomeScreen() {
 
       {mode === "home" && (
         <>
-          <section className="relative z-[600] -mt-4 flex flex-col gap-3 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-3.5 pt-2.5">
-            <div className="h-1 w-10 self-center rounded-full bg-[#CFCCC2]" aria-hidden="true" />
-            {near && (
+          <section className="relative z-[600] -mt-4 flex flex-col gap-3 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-3.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setSheetHidden((v) => !v)}
+              aria-expanded={!sheetHidden}
+              aria-label={sheetHidden ? t("home.sheetShow") : t("home.sheetHide")}
+              className="-mb-2 flex h-8 w-full items-center justify-center"
+            >
+              <span className="h-1 w-10 rounded-full bg-[#CFCCC2]" />
+            </button>
+            {!sheetHidden && goingNow && (
+              <GoingBanner
+                going={goingNow}
+                onCancel={() => {
+                  cancelGoing(goingNow, "cancel");
+                  rememberGoing(null);
+                }}
+              />
+            )}
+            {!sheetHidden && near && (
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">
                   <p>
                     {t(nowOnly ? "home.countOpenNow" : "home.count", { radius: near.radiusKm, limit: yen(limit), n: visible.length })}
                   </p>
-                  {visible.length > COLLAPSED_ROWS && (
+                  {visible.length > 0 && (
                     <button
                       type="button"
                       aria-expanded={listOpen}
@@ -466,7 +513,7 @@ export default function HomeScreen() {
                 {allOrdersOver && <p>{t("home.ordersOver")}</p>}
               </div>
             )}
-            {installHint && (
+            {!sheetHidden && installHint && (
               <InstallHint
                 onClose={() => {
                   setInstallHint(false);
@@ -478,15 +525,17 @@ export default function HomeScreen() {
                 }}
               />
             )}
-            <button
-              type="button"
-              disabled={pool.length === 0}
-              onClick={spin}
-              className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
-            >
-              {t("home.spin")}
-            </button>
-            {rows.length > 0 && (
+            {!sheetHidden && (
+              <button
+                type="button"
+                disabled={pool.length === 0}
+                onClick={spin}
+                className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
+              >
+                {t("home.spin")}
+              </button>
+            )}
+            {!sheetHidden && rows.length > 0 && (
               <ul className={listOpen ? "max-h-[40dvh] overflow-y-auto" : ""}>
                 {rows.map((s, i) => (
                   <li key={s.id} className="border-t border-[#ECEAE3]">

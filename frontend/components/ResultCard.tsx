@@ -1,12 +1,11 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 길찾기 · 원문
+// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 다시 돌리기 · 주문 문장 · 원문
+// 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
-import {
-  directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange,
-  type Day, type NearbyShop,
-} from "@/lib/lunch";
+import { genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
+import { fetchShopCatch } from "@/lib/api";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 import OrderSheet from "./OrderSheet";
@@ -22,10 +21,21 @@ type Props = {
 };
 
 export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, canRespin }: Props) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [catchTr, setCatchTr] = useState<{ id: string; text: string } | null>(null); // 가게 소개 AI 번역 (일본어 화면은 원문만)
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
+  useEffect(() => {
+    if (!shop.catchText || lang === "ja") return;
+    let live = true;
+    fetchShopCatch(shop.id, lang)
+      .then((text) => live && text && setCatchTr({ id: shop.id, text }))
+      .catch(() => {}); // 번역이 없으면 원문만 (서버가 잠들어 있으면 다음에)
+    return () => {
+      live = false;
+    };
+  }, [shop.id, shop.catchText, lang]);
 
   const time = lunchTimeText(shop, day, minutes, t);
   const range = priceRange(shop, t);
@@ -54,6 +64,11 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
         </p>
         {shop.catchText && <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>}
+        {catchTr?.id === shop.id && (
+          <p className="text-[13px] leading-snug text-[#1F1F1C]">
+            {catchTr.text} <span className="whitespace-nowrap text-[11px] text-[#5F5E58]">· {t("i18n.ai")}</span>
+          </p>
+        )}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
           {time.soon ? `${t("result.closingSoon")} · ` : ""}
           {time.text}
@@ -125,20 +140,6 @@ export default function ResultCard({ shop, day, minutes, limit, onGo, onRespin, 
           </svg>
           {t("result.orderOpen")}
         </button>
-        <a
-          href={directionsUrl(shop)}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => track("directions_click", { from: "result" })}
-          className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[#2457C5]"
-        >
-          {t("result.directions")}
-          <svg {...svg} width={16} height={16}>
-            <path d="M14 4h6v6" />
-            <path d="M20 4l-9 9" />
-            <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-          </svg>
-        </a>
       </div>
 
       <div className="flex flex-col gap-1 text-xs text-[#5F5E58]">

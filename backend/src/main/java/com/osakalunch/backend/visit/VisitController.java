@@ -82,11 +82,11 @@ public class VisitController {
         return ResponseEntity.status(HttpStatus.CREATED).body(VisitResponse.of(saved));
     }
 
-    /** 지금 물어볼 기록: 1시간 ~ 3일 전에 고르고 아직 답하지 않은 가장 최근 것. 없으면 204 */
+    /** 지금 물어볼 기록: 1시간 ~ 3일 전에 고르고 아직 답하지도 취소하지도 않은 가장 최근 것. 없으면 204 */
     @GetMapping("/pending")
     public ResponseEntity<VisitResponse> pending(@AuthenticationPrincipal Jwt jwt) {
         Instant now = Instant.now();
-        return visits.findFirstByUserIdAndAnsweredAtIsNullAndChosenAtBetweenOrderByChosenAtDesc(
+        return visits.findFirstByUserIdAndAnsweredAtIsNullAndCancelledAtIsNullAndChosenAtBetweenOrderByChosenAtDesc(
                         userId(jwt), now.minus(ASK_WITHIN), now.minus(ASK_AFTER))
                 .map(v -> ResponseEntity.ok(VisitResponse.of(v)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
@@ -109,6 +109,20 @@ public class VisitController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "다녀왔으면 영업 · 가격 답이 필요해요");
         }
         v.answer(req.visited(), req.openOk(), req.priceOk(), Instant.now());
+        visits.save(v);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 여기 갈래요 취소 (10/22 결정: 따로 기록). 이미 답한 기록은 취소할 수 없음(409), 다시 보내도 괜찮음 */
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Void> cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        Visit v = visits.findById(id)
+                .filter(found -> found.getUserId().equals(userId(jwt))) // 남의 기록은 없는 것처럼
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (v.getAnsweredAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 답한 기록이에요");
+        }
+        v.cancel(Instant.now());
         visits.save(v);
         return ResponseEntity.noContent().build();
     }

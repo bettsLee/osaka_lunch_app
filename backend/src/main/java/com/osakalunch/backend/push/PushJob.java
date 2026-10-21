@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 /**
  * '다녀왔어요?' 알림 보내기. GitHub Actions가 점심 뒤 시간대에 15분마다 부름
- * 여기 갈래요 1시간 반 뒤부터 3시간 뒤까지, 아직 답하지 않았고 알림도 안 보낸 기록에 한 번만 보냄
+ * 여기 갈래요 1시간 반 뒤부터 3시간 뒤까지, 아직 답하지 않았고 알림도 안 보냈고 취소하지 않은 기록에 한 번만 보냄
  */
 @Service
 public class PushJob {
@@ -50,7 +50,7 @@ public class PushJob {
 
     @Transactional
     public Result run(Instant now) {
-        List<Visit> due = visits.findByAnsweredAtIsNullAndNotifiedAtIsNullAndChosenAtBetween(now.minus(SEND_WITHIN), now.minus(SEND_AFTER));
+        List<Visit> due = visits.findByAnsweredAtIsNullAndNotifiedAtIsNullAndCancelledAtIsNullAndChosenAtBetween(now.minus(SEND_WITHIN), now.minus(SEND_AFTER));
         Map<UUID, List<Visit>> byUser = due.stream().collect(Collectors.groupingBy(Visit::getUserId));
         Map<UUID, List<PushSubscription>> subsByUser = subscriptions.findByUserIdIn(byUser.keySet()).stream()
                 .collect(Collectors.groupingBy(PushSubscription::getUserId));

@@ -103,6 +103,9 @@ class PushControllerTest {
         answered.answer(true, true, true, Instant.now());
         visits.save(answered);
         Visit noSubscription = visit(BOB, Duration.ofMinutes(100));
+        Visit cancelled = visit(ALICE, Duration.ofMinutes(95)); // 정했다가 취소한 건 보내지 않음
+        cancelled.cancel(Instant.now());
+        visits.save(cancelled);
         when(sender.send(any(), any())).thenReturn(201);
 
         mvc.perform(sendDue()).andExpect(status().isOk())
@@ -115,6 +118,7 @@ class PushControllerTest {
         assertThat(visits.findById(tooEarly.getId()).orElseThrow().getNotifiedAt()).isNull();
         assertThat(visits.findById(tooOld.getId()).orElseThrow().getNotifiedAt()).isNull();
         assertThat(visits.findById(noSubscription.getId()).orElseThrow().getNotifiedAt()).isNull(); // 시간 안에 허용하면 보냄
+        assertThat(visits.findById(cancelled.getId()).orElseThrow().getNotifiedAt()).isNull();
     }
 
     @Test

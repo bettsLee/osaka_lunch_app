@@ -27,6 +27,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   const pins = useRef<L.LayerGroup | null>(null);
   const me = useRef<L.LayerGroup | null>(null);
   const markers = useRef(new Map<string, { marker: L.Marker; z: number }>());
+  const fit = useRef<() => void>(() => {}); // 지금 기준으로 보이는 범위 맞추기 (숨겨졌다 다시 보일 때도 씀)
 
   // 지도는 한 번만 만듦. 지도 칸 크기가 바뀌면(결과 화면 등) 다시 잼
   useEffect(() => {
@@ -39,7 +40,14 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     pins.current = L.layerGroup().addTo(m);
     me.current = L.layerGroup().addTo(m);
     map.current = m;
-    const resize = new ResizeObserver(() => m.invalidateSize());
+    // 여기 갈래요 뒤 화면에서는 지도가 숨겨졌다가 홈에서 다시 보임 → 크기가 0이었다가 돌아오면 범위를 다시 맞춤
+    let hidden = false;
+    const resize = new ResizeObserver(([entry]) => {
+      m.invalidateSize();
+      const zero = entry.contentRect.width === 0 || entry.contentRect.height === 0;
+      if (hidden && !zero) fit.current();
+      hidden = zero;
+    });
     resize.observe(box.current);
     return () => {
       resize.disconnect();
@@ -78,15 +86,18 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    m.invalidateSize();
-    if (visitedSpots) {
-      const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
-      m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
-    } else if (pickedLat !== undefined && pickedLng !== undefined) {
-      m.fitBounds(L.latLngBounds([here.lat, here.lng], [pickedLat, pickedLng]), { padding: [48, 48], maxZoom: 17 });
-    } else {
-      m.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000));
-    }
+    fit.current = () => {
+      m.invalidateSize();
+      if (visitedSpots) {
+        const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
+        m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
+      } else if (pickedLat !== undefined && pickedLng !== undefined) {
+        m.fitBounds(L.latLngBounds([here.lat, here.lng], [pickedLat, pickedLng]), { padding: [48, 48], maxZoom: 17 });
+      } else {
+        m.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000));
+      }
+    };
+    fit.current();
   }, [here, radiusKm, pickedLat, pickedLng, visitedSpots]);
 
   // 보여줄 가게가 바뀌면 가격 핀을 다시 그림
@@ -125,7 +136,8 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   }, [flashId, pickedId, shops]);
 
   return (
-    <div className="absolute inset-0">
+    // isolate: 지도 안의 z-index(출처 표시 1000 등)가 밖으로 새어 주문 문장 · 질문 시트 위에 뜨지 않게
+    <div className="absolute inset-0 isolate">
       <div ref={box} className="h-full w-full bg-[#ECEAE3]" />
       {showLocate && pickedId === null && flashId === null && (
         <button

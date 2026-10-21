@@ -7,10 +7,11 @@ import pkg from "../package.json";
 import { currentPushState, enablePush, sendOpinion } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import { isIOS, type PushState } from "@/lib/push";
+import { ALLERGENS, hasDiet, loadDiet, saveDiet, STYLES, type Allergen, type Diet } from "@/lib/diet";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 
-type View = "main" | "privacy" | "terms" | "opinion";
+type View = "main" | "privacy" | "terms" | "opinion" | "diet";
 
 const SHA = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7); // Vercel이 넣어 주는 커밋 (내 컴퓨터에는 없음)
 const VERSION = SHA ? `${pkg.version} (${SHA})` : pkg.version;
@@ -18,7 +19,7 @@ const MAX_OPINION = 1000; // 서버와 같음 (OpinionController.MAX_LENGTH)
 
 // 개인정보 안내 · 이용 안내 (초안: 10/25 체크인에서 상권 검토)
 const PRIVACY = [
-  "privacy.intro", "privacy.location", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions",
+  "privacy.intro", "privacy.location", "privacy.diet", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions",
   "privacy.events", "privacy.vendors", "privacy.delete", "privacy.keep", "privacy.updated",
 ];
 const TERMS = ["terms.free", "terms.data", "terms.liability", "terms.change", "terms.updated"];
@@ -26,11 +27,24 @@ const TERMS = ["terms.free", "terms.data", "terms.liability", "terms.change", "t
 export default function SettingsScreen({ limit }: { limit: number }) {
   const { t } = useT();
   const [view, setView] = useState<View>("main");
+  const [diet, setDiet] = useState<Diet>(() => loadDiet()); // 이 휴대폰에만 저장
   const back = () => setView("main");
 
   if (view === "privacy") return <Doc title={t("settings.privacy")} keys={PRIVACY} onBack={back} />;
   if (view === "terms") return <Doc title={t("settings.terms")} keys={TERMS} onBack={back} />;
   if (view === "opinion") return <OpinionForm onBack={back} />;
+  if (view === "diet") {
+    return (
+      <DietForm
+        diet={diet}
+        onChange={(next) => {
+          setDiet(next);
+          saveDiet(next);
+        }}
+        onBack={back}
+      />
+    );
+  }
 
   return (
     <>
@@ -48,6 +62,11 @@ export default function SettingsScreen({ limit }: { limit: number }) {
         </p>
 
         <div className="overflow-hidden rounded-[14px] border border-[#E2E0D8] bg-white">
+          <LinkRow
+            label={t("settings.diet")}
+            value={hasDiet(diet) ? t("settings.dietOn") : t("settings.dietOff")}
+            onClick={() => setView("diet")}
+          />
           <LinkRow label={t("settings.privacy")} onClick={() => setView("privacy")} />
           <LinkRow label={t("settings.terms")} onClick={() => setView("terms")} />
           <LinkRow label={t("settings.opinion")} onClick={() => setView("opinion")} last />
@@ -143,7 +162,8 @@ function PushRow() {
   );
 }
 
-function LinkRow({ label, onClick, last = false }: { label: string; onClick: () => void; last?: boolean }) {
+function LinkRow(props: { label: string; value?: string; onClick: () => void; last?: boolean }) {
+  const { label, value, onClick, last = false } = props;
   return (
     <button
       type="button"
@@ -151,6 +171,7 @@ function LinkRow({ label, onClick, last = false }: { label: string; onClick: () 
       className={`flex min-h-[52px] w-full items-center px-4 text-left text-[15px] ${last ? "" : "border-b border-[#ECEAE3]"}`}
     >
       <span className="flex-1">{label}</span>
+      {value && <span className="mr-1.5 text-sm text-[#5F5E58]">{value}</span>}
       <svg {...svg} width={18} height={18} className="text-[#8D8B84]">
         <path d="M9 6l6 6-6 6" />
       </svg>
@@ -254,6 +275,59 @@ function OpinionForm({ onBack }: { onBack: () => void }) {
             </button>
           </>
         )}
+      </section>
+    </>
+  );
+}
+
+// 알레르기 · 식사 제한 (10/22 결정). 건강 정보라 이 휴대폰에만 저장하고 서버 · 사용 기록으로 보내지 않음
+function DietForm({ diet, onChange, onBack }: { diet: Diet; onChange: (d: Diet) => void; onBack: () => void }) {
+  const { t } = useT();
+  const toggle = (a: Allergen) =>
+    onChange({ ...diet, allergens: diet.allergens.includes(a) ? diet.allergens.filter((x) => x !== a) : [...diet.allergens, a] });
+  return (
+    <>
+      <SubHeader title={t("diet.title")} onBack={onBack} />
+      <section className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-6 pt-4">
+        <p className="text-[15px] leading-relaxed text-[#5F5E58]">{t("diet.intro")}</p>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="pb-2 text-base font-semibold">{t("diet.allergyLabel")}</legend>
+          <div className="flex flex-wrap gap-2">
+            {ALLERGENS.map((a) => {
+              const on = diet.allergens.includes(a);
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggle(a)}
+                  className={`h-10 rounded-full border px-3.5 text-[15px] ${
+                    on ? "border-2 border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white"
+                  }`}
+                >
+                  {t(`diet.a.${a}`)}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="pb-2 text-base font-semibold">{t("diet.styleLabel")}</legend>
+          {STYLES.map((s) => (
+            <label key={s} className="flex min-h-11 items-center gap-3 rounded-xl border border-[#D6D4CC] px-4 text-[15px]">
+              <input
+                type="radio"
+                name="diet-style"
+                checked={diet.style === s}
+                onChange={() => onChange({ ...diet, style: s })}
+                className="h-5 w-5 accent-[#2457C5]"
+              />
+              {t(`diet.s.${s}`)}
+            </label>
+          ))}
+        </fieldset>
+        <p className="text-[13px] leading-relaxed text-[#5F5E58]">{t("diet.privacy")}</p>
+        <p className="text-[13px] font-semibold leading-relaxed text-[#9A4A00]">{t("diet.warning")}</p>
       </section>
     </>
   );

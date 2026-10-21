@@ -1,11 +1,11 @@
 "use client";
 
-// S4 여기 갈래요 후: 길찾기 + '다녀온 뒤에 알려 주세요'. 알림 권한은 여기서 물음 (10/21 결정: 이유가 보이는 순간)
+// S4 여기 갈래요 후: 길찾기(누르면 홈의 가는 중으로) + '다녀온 뒤에 알려 주세요'. 알림 권한은 여기서 물음 (10/21 결정: 이유가 보이는 순간)
 // 알림을 못 쓰거나 거절하면 1시간 뒤 앱을 열 때 질문 카드로 물어봄
 import { useEffect, useRef, useState } from "react";
 import { directionsUrl, priceRange, type NearbyShop } from "@/lib/lunch";
 import { currentPushState, enablePush } from "@/lib/api";
-import { track } from "@/lib/analytics";
+import { track, trackError } from "@/lib/analytics";
 import type { PushState } from "@/lib/push";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -23,7 +23,8 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
         setPush(result);
         track("push_permission", { result });
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        trackError("push", e); // 10/22 맥 크롬에서 실패한 원인을 다음에는 볼 수 있게
         setPush("error");
         track("push_permission", { result: "error" });
       });
@@ -48,7 +49,12 @@ export default function GoScreen({ shop, onHome }: { shop: NearbyShop; onHome: (
         href={directionsUrl(shop)}
         target="_blank"
         rel="noreferrer"
-        onClick={() => track("directions_click", { from: "go" })}
+        onClick={() => {
+          track("directions_click", { from: "go" });
+          // 구글 지도는 새 창으로 열리고, 앱은 홈의 가는 중으로 (10/22 도그푸딩)
+          // 바로 화면을 바꾸면 링크가 사라져서 브라우저가 새 창을 열지 않음 → 링크가 열린 다음에
+          setTimeout(onHome, 0);
+        }}
         className="flex h-14 items-center justify-center gap-2 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white"
       >
         {t("result.directions")}
