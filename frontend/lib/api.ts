@@ -133,15 +133,21 @@ export async function fetchTranslation(lang: string): Promise<Record<string, str
   return body.lang === lang && body.messages && typeof body.messages === "object" ? (body.messages as Record<string, string>) : null;
 }
 
+// 홈 화면에 추가한 앱으로 열었는지
+export function isStandalone(): boolean {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
 // '다녀왔어요?' 알림: 이 브라우저에서 지금 할 수 있는 것
 export function currentPushState(): PushState {
   return pushState({
     configured: Boolean(API_URL && VAPID_KEY),
     supported: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window,
     ios: isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints),
-    standalone:
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true,
+    standalone: isStandalone(),
     permission: "Notification" in window ? Notification.permission : "default",
   });
 }
