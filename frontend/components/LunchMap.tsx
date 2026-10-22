@@ -15,7 +15,7 @@ type Props = {
   flashId?: string | null;
   pickedId?: string | null;
   showLocate?: boolean; // '내 위치로' 버튼
-  visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 채운 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤
+  visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 ✓ 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤 (고르면 그 가게로)
   onPick?: (shopId: string) => void; // 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩). 없으면 이름 말풍선 (도감)
   goingId?: string | null; // 여기 갈래요로 정한 가게: 파란 핀으로 크게, 다른 핀 위로
 };
@@ -96,13 +96,17 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     if (!m) return;
     fit.current = () => {
       m.invalidateSize();
-      if (visitedSpots) {
-        const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
-        m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
-      } else if (pickedLat !== undefined && pickedLng !== undefined) {
+      if (pickedLat !== undefined && pickedLng !== undefined) {
+        if (visitedSpots) {
+          m.setView([pickedLat, pickedLng], Math.max(m.getZoom(), 15)); // 도감: 고른 가게로 옮김 (다른 다녀온 곳은 그대로 보이게 확대는 조금만)
+          return;
+        }
         const points: [number, number][] = [[here.lat, here.lng], [pickedLat, pickedLng]];
         if (goingSpot) points.push(goingSpot.split(",").map(Number) as [number, number]);
         m.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 17 });
+      } else if (visitedSpots) {
+        const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
+        m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
       } else {
         m.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000));
       }
