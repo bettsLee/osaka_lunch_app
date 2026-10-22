@@ -10,6 +10,7 @@ import { clockTime } from "@/lib/visits";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 import OrderSheet from "./OrderSheet";
+import type { useSheetSwipe } from "./useSheetSwipe";
 
 type Props = {
   shop: NearbyShop;
@@ -21,13 +22,14 @@ type Props = {
   canRespin: boolean;
   collapsed: boolean; // 손잡이로 카드를 접고 지도를 크게 (10/22 도그푸딩: 홈 시트와 같게)
   onToggle: () => void;
+  handle?: ReturnType<typeof useSheetSwipe>; // 손잡이 스와이프 (없으면 누르기만)
   goingAt?: string | null; // 이미 여기 갈래요로 정한 가게면 정한 시각: 여기 갈래요 · 랜덤 대신 길찾기 · 도착했어요 · 취소 (10/22 도그푸딩: 가는 중 배너 대신)
   onCancelGoing?: () => void;
   onArrive?: () => void; // 도착했어요 버튼 (GPS가 빌딩 사이에서 튀어 자동으로 못 알아챘을 때)
 };
 
 export default function ResultCard(props: Props) {
-  const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, goingAt = null, onCancelGoing, onArrive } = props;
+  const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, handle, goingAt = null, onCancelGoing, onArrive } = props;
   const { t, lang } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
   const [asking, setAsking] = useState(false); // 취소를 한 번 더 물어보는 중
@@ -60,6 +62,7 @@ export default function ResultCard(props: Props) {
       <button
         type="button"
         onClick={onToggle}
+        {...handle}
         aria-expanded={!collapsed}
         aria-label={collapsed ? t("home.sheetShow") : t("home.sheetHide")}
         className="-mb-2 flex h-8 w-full flex-none items-center justify-center"

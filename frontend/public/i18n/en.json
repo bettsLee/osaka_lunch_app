@@ -137,7 +137,6 @@
   "zukan.loading": "Loading your lunch map",
   "zukan.error": "We couldn't load your lunch map.",
   "zukan.empty": "Nothing here yet. Go to a place you picked and answer 'Did you go?' to add it here.",
-  "zukan.date": "{m}/{d}",
   "zukan.times": "{n} times",
   "share.copied": "Link copied",
   "feedback.zukanAdded": "Added to your lunch map.",
@@ -279,5 +278,11 @@
   "shared.count": "{n} places",
   "shared.missing": "{n} of them aren't on the list now. Lunch may have stopped or prices changed.",
   "shared.needLocation": "Allow location to see walking time and tap through to 'I'll go here'.",
-  "shared.home": "See lunch near me"
+  "shared.home": "See lunch near me",
+  "zukan.dateTime": "{m}/{d} {time}",
+  "zukan.filterPeriodLabel": "Period",
+  "zukan.filterPeriod": "Any time",
+  "zukan.period.today": "Today",
+  "zukan.period.week": "This week",
+  "zukan.period.month": "This month"
 }
