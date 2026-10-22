@@ -9,10 +9,17 @@ export function shareLink(origin: string, ids: string[]): string {
   return `${origin}/?ref=share&s=${ids.slice(0, SHARE_MAX).join(",")}`;
 }
 
-// 받은 링크의 가게 번호 (이상한 값은 버리고, 겹치면 하나, 최대 10곳)
+// 받은 링크의 가게 번호 (겹치면 하나, 최대 10곳). 각 칸의 앞부분 번호만 씀:
+// 10/22 맥 카톡이 링크 바로 뒤에 글을 붙여 보내서(s=J001105962오사카…) 마지막 가게가 빠졌음
 export function sharedIds(search: string): string[] {
   const raw = new URLSearchParams(search).get("s") ?? "";
-  return [...new Set(raw.split(",").map((s) => s.trim()).filter((s) => ID.test(s)))].slice(0, SHARE_MAX);
+  const ids = raw.split(",").map((s) => /^[A-Za-z0-9_-]+/.exec(s.trim())?.[0] ?? "").filter((s) => ID.test(s));
+  return [...new Set(ids)].slice(0, SHARE_MAX);
+}
+
+// 공유 창에 넘길 글: 링크를 글 맨 끝에 넣어 한 덩어리로 (url을 따로 주면 앱마다 붙이는 방식이 달라 링크가 깨짐)
+export function shareMessage(text: string, url: string): string {
+  return `${text}\n${url}`;
 }
 
 // 추천 글의 점심 시간: 오늘 점심을 하면 오늘 시간, 아니면 점심을 하는 다음 요일의 시간. 모르면 null

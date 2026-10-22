@@ -6,7 +6,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, osakaNow, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
-import { lunchHours, SHARE_MAX, shareLink } from "@/lib/share";
+import { lunchHours, SHARE_MAX, shareLink, shareMessage } from "@/lib/share";
 import { fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
@@ -86,20 +86,20 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       return `${list.length > 1 ? `${i + 1}. ` : ""}${parts.join(" · ")}`;
     });
     const text = [t("share.recHeader", { n: list.length }), ...lines].join("\n");
-    const url = shareLink(window.location.origin, list.map((it) => it.shopId));
+    const message = shareMessage(text, shareLink(window.location.origin, list.map((it) => it.shopId)));
     let method = "share";
     try {
-      if (navigator.share) await navigator.share({ text, url });
+      if (navigator.share) await navigator.share({ text: message });
       else {
         method = "copy";
-        await navigator.clipboard.writeText(`${text}\n${url}`);
+        await navigator.clipboard.writeText(message);
         setNote(t("share.copied"));
       }
     } catch (e) {
       if ((e as Error)?.name === "AbortError") return; // 공유 창을 닫음
       method = "copy";
       try {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
+        await navigator.clipboard.writeText(message);
         setNote(t("share.copied"));
       } catch {
         trackError("share", e);
@@ -151,7 +151,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       </header>
 
       {here && state.status === "ok" && items.length > 0 && (
-        <section className="relative h-[210px] flex-none bg-[#ECEAE3]" aria-label={t("home.map")}>
+        <section className="relative h-[clamp(130px,26dvh,210px)] flex-none bg-[#ECEAE3]" aria-label={t("home.map")}>{/* 화면이 낮으면 지도를 줄여 목록을 보이게 */}
           <LunchMap
             here={here}
             radiusKm={1}
@@ -182,7 +182,8 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
         {items.length > 0 && (
           <>
             {/* 필터: 동네 · 가격 · 종류 · ♥ 또 갈 곳 (도감에 있는 것만 고를 수 있음) */}
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 pt-2" role="group" aria-label={t("zukan.filter")}>
+            {/* flex-none: 가로 스크롤 줄이라 세로로 찌그러질 수 있음 (10/22 도그푸딩: 맥 크롬 낮은 창에서 칩이 반쯤 잘림) */}
+            <div className="-mx-5 flex flex-none gap-2 overflow-x-auto px-5 pb-1 pt-2" role="group" aria-label={t("zukan.filter")}>
               <FilterSelect
                 label={t("zukan.filterAreaLabel")}
                 value={filter.area ?? ""}
