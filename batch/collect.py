@@ -14,6 +14,7 @@
 
 사용법
   python3 batch/collect.py --list-areas   # 오사카 중지역 코드 목록 (핫페퍼 키만 필요)
+  python3 batch/collect.py --count-areas  # 중지역마다 점심 가게 수 · 처음 AI 비용 (핫페퍼 키만 필요)
   python3 batch/collect.py --dry-run      # 받기만 하고 저장하지 않음 (핫페퍼 키만 필요)
   python3 batch/collect.py                # 받기 + 저장 + 오래된 가게 삭제
 """
@@ -32,6 +33,7 @@ HOTPEPPER = "https://webservice.recruit.co.jp/hotpepper"
 # 수집할 중지역 코드 (오사카 시내 중심: 우메다 ~ 혼마치 ~ 난바). --list-areas 결과를 보고 채움
 AREAS = ["Y300", "Y301", "Y305", "Y310", "Y315", "Y866"]
 CHUNK = 500            # Supabase에 한 번에 보내는 줄 수
+AI_COST_PER_SHOP = 0.006  # 가게 1곳 처음 AI 처리 비용 (달러, 10/19 전체 실행 기준 약 0.6센트)
 MIN_KEEP_RATIO = 0.5   # 이번에 받은 수가 기존의 절반도 안 되면 API 이상으로 보고 삭제하지 않음
 # AI가 읽을 글. 이 글이 바뀐 가게만 AI를 다시 돌리려고 해시를 저장함
 AI_TEXT_FIELDS = ["open_text", "close_text", "budget_name", "budget_average", "budget_memo",
@@ -66,6 +68,17 @@ def list_areas(key):
         print(f"\n[{large['code']}] {large['name']}")
         for middle in hotpepper("middle_area", key, large_area=large["code"]).get("middle_area", []):
             print(f"  {middle['code']}  {middle['name']}")
+
+
+def count_areas(key):
+    # 수집 지역 넓히기 결정용 (10/23): 중지역마다 점심 가게 수만 세고(1곳만 받음) 처음 AI 비용을 어림함
+    for large in hotpepper("large_area", key, keyword="大阪").get("large_area", []):
+        print(f"\n[{large['code']}] {large['name']}")
+        for middle in hotpepper("middle_area", key, large_area=large["code"]).get("middle_area", []):
+            n = int(hotpepper("gourmet", key, middle_area=middle["code"], lunch=1, count=1).get("results_available", 0))
+            mark = " (수집 중)" if middle["code"] in AREAS else ""
+            print(f"  {middle['code']}  {n:5d}곳  약 ${n * AI_COST_PER_SHOP:5.1f}  {middle['name']}{mark}")
+            time.sleep(0.5)
 
 
 def fetch_area(key, code):
@@ -136,12 +149,16 @@ def count_shops():
 def main():
     ap = argparse.ArgumentParser(description="핫페퍼 점심 가게 수집 배치")
     ap.add_argument("--list-areas", action="store_true", help="오사카 중지역 코드 목록 보기")
+    ap.add_argument("--count-areas", action="store_true", help="중지역마다 점심 가게 수 · 처음 AI 비용 보기")
     ap.add_argument("--dry-run", action="store_true", help="받기만 하고 저장하지 않음")
     args = ap.parse_args()
 
     key = env("HOTPEPPER_API_KEY")
     if args.list_areas:
         list_areas(key)
+        return
+    if args.count_areas:
+        count_areas(key)
         return
     if not AREAS:
         sys.exit("AREAS가 비어 있어요. --list-areas 로 코드를 확인해 채워 주세요.")
