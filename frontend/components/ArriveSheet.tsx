@@ -58,11 +58,11 @@ export default function ArriveSheet({ visitId, shopName, limit, by, onClose, onO
         {open === null && (
           <>
             <p className="border-t border-[#ECEAE3] pt-4 text-base font-semibold">{t("arrive.openQ")}</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button type="button" onClick={() => answer(true)} className="h-[52px] rounded-xl border border-[#CFCCC2] bg-white text-base">
+            <div className="grid grid-cols-2 gap-2.5 [&:lang(ko)]:break-keep">
+              <button type="button" onClick={() => answer(true)} className="min-h-[52px] rounded-xl border border-[#CFCCC2] bg-white px-2 py-1.5 text-base leading-snug">
                 {t("arrive.openYes")}
               </button>
-              <button type="button" onClick={() => answer(false)} className="h-[52px] rounded-xl border border-[#CFCCC2] bg-white text-base">
+              <button type="button" onClick={() => answer(false)} className="min-h-[52px] rounded-xl border border-[#CFCCC2] bg-white px-2 py-1.5 text-base leading-snug">
                 {t("arrive.openNo")}
               </button>
             </div>
