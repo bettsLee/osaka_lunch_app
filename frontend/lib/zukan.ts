@@ -67,3 +67,36 @@ export function monthDay(iso: string): { m: number; d: number } {
     .split("-");
   return { m: Number(m), d: Number(d) };
 }
+
+// 도감 필터 (10/22 결정: 동네 · 가격 · 음식 종류 + ♥ 또 갈 곳). 음식 종류는 핫페퍼 장르 그대로
+export type ZukanFilter = { area: string | null; maxPrice: number | null; genre: string | null; liked: boolean };
+export const NO_FILTER: ZukanFilter = { area: null, maxPrice: null, genre: null, liked: false };
+export const FILTER_PRICES = [790, 990, 1190] as const; // 홈 가격 단계(PRICE_TIERS)와 같음 (테스트가 lunch.ts를 불러오지 않게 따로 둠)
+
+export function isFiltering(f: ZukanFilter): boolean {
+  return f.area !== null || f.maxPrice !== null || f.genre !== null || f.liked;
+}
+
+// 가격 필터는 가격을 아는 가게만 남김 (목록 · 카드와 같은 가격: 대표 메뉴 → 점심 최고가)
+export function filterItems(items: ZukanItem[], f: ZukanFilter): ZukanItem[] {
+  return items.filter((it) => {
+    if (f.liked && !it.liked) return false;
+    if (f.area !== null && it.shop?.areaCode !== f.area) return false;
+    if (f.genre !== null && it.shop?.genre !== f.genre) return false;
+    if (f.maxPrice !== null) {
+      const p = priceOf(it.shop);
+      if (p === null || p > f.maxPrice) return false;
+    }
+    return true;
+  });
+}
+
+// 고를 수 있는 동네 · 종류: 도감에 있는 것만, 많은 순
+export function filterOptions(items: ZukanItem[]): { areas: string[]; genres: string[] } {
+  const rank = (values: (string | null | undefined)[]) => {
+    const count = new Map<string, number>();
+    for (const v of values) if (v) count.set(v, (count.get(v) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
+  };
+  return { areas: rank(items.map((it) => it.shop?.areaCode)), genres: rank(items.map((it) => it.shop?.genre)) };
+}

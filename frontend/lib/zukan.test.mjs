@@ -1,7 +1,7 @@
 // 도감 · 공유 카드 규칙 테스트 (가게 원문 없이 만든 값만 씀). 실행: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { averagePrice, cardTiles, collect, monthDay, topArea } from "./zukan.ts";
+import { averagePrice, cardTiles, collect, filterItems, filterOptions, monthDay, NO_FILTER, topArea } from "./zukan.ts";
 
 const shop = (id, over = {}) => ({
   id, name: `가게 ${id}`, genre: "和食", lat: 34.68, lng: 135.5, photoUrl: null, hotpepperUrl: null, areaCode: "Y305",
@@ -59,4 +59,27 @@ test("또 갈래요: 그 가게 기록 중 하나라도 켜져 있으면 ♥", (
     [shop("a"), shop("b")],
   );
   assert.deepEqual(items.map((i) => [i.shopId, i.liked]), [["a", true], ["b", false]]);
+});
+
+test("도감 필터: 동네 · 가격(모르면 뺌) · 종류 · ♥, 고를 수 있는 건 도감에 있는 것만", () => {
+  const items = collect(
+    [
+      { ...visit("a", "2026-10-21T03:00:00Z"), again: true },
+      visit("b", "2026-10-20T03:00:00Z"),
+      visit("c", "2026-10-19T03:00:00Z"),
+      visit("gone", "2026-10-18T03:00:00Z"),
+    ],
+    [
+      shop("a", { areaCode: "Y301", genre: "ラーメン", typicalPrice: 780 }),
+      shop("b", { areaCode: "Y301", genre: "和食", priceMax: 990 }),
+      shop("c", { areaCode: "Y866", genre: "ラーメン", priceMax: 1190 }),
+    ],
+  );
+  const ids = (f) => filterItems(items, { ...NO_FILTER, ...f }).map((i) => i.shopId);
+  assert.deepEqual(ids({}), ["a", "b", "c", "gone"]);
+  assert.deepEqual(ids({ area: "Y301" }), ["a", "b"]);
+  assert.deepEqual(ids({ maxPrice: 990 }), ["a", "b"]); // gone은 가격을 몰라서 빠짐
+  assert.deepEqual(ids({ genre: "ラーメン", maxPrice: 790 }), ["a"]);
+  assert.deepEqual(ids({ liked: true }), ["a"]);
+  assert.deepEqual(filterOptions(items), { areas: ["Y301", "Y866"], genres: ["ラーメン", "和食"] });
 });

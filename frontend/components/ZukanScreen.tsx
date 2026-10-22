@@ -8,7 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
 import { fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
-import { collect, monthDay, topArea, type ZukanItem, type ZukanVisit } from "@/lib/zukan";
+import {
+  collect, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDay, NO_FILTER, topArea,
+  type ZukanFilter, type ZukanItem, type ZukanVisit,
+} from "@/lib/zukan";
 import { useT } from "./I18n";
 import { Heart } from "./FeedbackSheet";
 import ShareCard from "./ShareCard";
@@ -25,6 +28,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
   const [selected, setSelected] = useState<string | null>(null); // 목록 · 지도에서 고른 가게
   const rows = useRef(new Map<string, HTMLLIElement>());
   const [likedNow, setLikedNow] = useState(new Map<string, boolean>()); // 이 화면에서 ♥를 누른 결과 (서버에 보내는 사이에도 바로 보이게)
+  const [filter, setFilter] = useState<ZukanFilter>(NO_FILTER); // 동네 · 가격 · 종류 · ♥ (10/22 결정)
   const select = (id: string, from: "list" | "map") => {
     const next = selected === id ? null : id; // 다시 누르면 풀림
     setSelected(next);
@@ -51,6 +55,18 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
     () => new Set(items.filter((it) => likedNow.get(it.shopId) ?? it.liked).map((it) => it.shopId)),
     [items, likedNow],
   );
+  // 필터: ♥는 이 화면에서 누른 것까지 반영. 고른 가게가 걸러지면 고름을 풂
+  const options = useMemo(() => filterOptions(items), [items]);
+  const shown = useMemo(
+    () => filterItems(items.map((it) => ({ ...it, liked: likedNow.get(it.shopId) ?? it.liked })), filter),
+    [items, likedNow, filter],
+  );
+  const filtering = isFiltering(filter);
+  const changeFilter = (next: ZukanFilter, kind: string) => {
+    setFilter(next);
+    track("zukan_filter", { kind, on: isFiltering(next) });
+    if (selected && !filterItems(items, next).some((it) => it.shopId === selected)) setSelected(null);
+  };
   // 또 갈래요 ♥ 켜고 끄기 (10/22 결정: 다녀온 곳과 좋았던 곳을 구분). 못 보내면 되돌림
   const toggleLike = (it: ZukanItem) => {
     const next = !isLiked(it);
@@ -64,14 +80,14 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
   // 지도: 다녀온 곳(위치를 아는 것) + 지금 근처의 아직 안 간 곳
   const pins = useMemo(() => {
     if (!here) return [];
-    const visited: NearbyShop[] = items
+    const visited: NearbyShop[] = shown
       .filter((i): i is ZukanItem & { shop: LunchShop } => i.shop !== null)
       .map((i) => {
         const km = distanceKm(here, i.shop);
         return { ...i.shop, km, walk: walkMinutes(km) };
       });
     return [...visited, ...nearby.filter((s) => !visitedIds.has(s.id))];
-  }, [here, items, nearby, visitedIds]);
+  }, [here, shown, nearby, visitedIds]);
 
   return (
     <>
@@ -115,8 +131,49 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
         )}
         {items.length > 0 && (
           <>
+            {/* 필터: 동네 · 가격 · 종류 · ♥ 또 갈 곳 (도감에 있는 것만 고를 수 있음) */}
+            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 pt-2" role="group" aria-label={t("zukan.filter")}>
+              <FilterSelect
+                label={t("zukan.filterAreaLabel")}
+                value={filter.area ?? ""}
+                onChange={(v) => changeFilter({ ...filter, area: v || null }, "area")}
+                options={[["", t("zukan.filterArea")], ...options.areas.map((a): [string, string] => [a, t(`area.${a}`)])]}
+              />
+              <FilterSelect
+                label={t("zukan.filterPriceLabel")}
+                value={filter.maxPrice === null ? "" : String(filter.maxPrice)}
+                onChange={(v) => changeFilter({ ...filter, maxPrice: v ? Number(v) : null }, "price")}
+                options={[["", t("zukan.filterPrice")], ...FILTER_PRICES.map((p): [string, string] => [String(p), t("home.limitChip", { limit: p.toLocaleString("ja-JP") })])]}
+              />
+              <FilterSelect
+                label={t("zukan.filterGenreLabel")}
+                value={filter.genre ?? ""}
+                onChange={(v) => changeFilter({ ...filter, genre: v || null }, "genre")}
+                options={[["", t("zukan.filterGenre")], ...options.genres.map((g): [string, string] => [g, genreLabel(g, t)])]}
+              />
+              <button
+                type="button"
+                aria-pressed={filter.liked}
+                onClick={() => changeFilter({ ...filter, liked: !filter.liked }, "liked")}
+                className={`flex h-9 flex-none items-center gap-1 rounded-full border px-3.5 text-sm ${
+                  filter.liked ? "border-[#D43F5E] bg-[#FDECEF] font-semibold text-[#A3213D]" : "border-[#CFCCC2] bg-white"
+                }`}
+              >
+                <Heart filled={filter.liked} size={15} />
+                {t("zukan.filterLiked")}
+              </button>
+            </div>
+            {filtering && (
+              <div className="flex items-center justify-between pt-1 text-[13px] text-[#5F5E58]">
+                <span aria-live="polite">{t("zukan.filtered", { n: shown.length })}</span>
+                <button type="button" onClick={() => changeFilter(NO_FILTER, "clear")} className="-my-2 min-h-11 px-1 font-semibold text-[#1A3F91]">
+                  {t("zukan.filterClear")}
+                </button>
+              </div>
+            )}
+            {shown.length === 0 && <p className="py-6 text-center text-sm text-[#5F5E58]">{t("zukan.filterEmpty")}</p>}
             <ul>
-              {items.map((it) => (
+              {shown.map((it) => (
                 <li
                   key={it.shopId}
                   ref={(el) => {
@@ -180,5 +237,32 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
 
       {sharing && <ShareCard items={items} area={area} onClose={() => setSharing(false)} />}
     </>
+  );
+}
+
+// 필터 칩 모양의 고르기 (휴대폰에서는 기본 고르기 창이 뜸)
+function FilterSelect(props: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  const { label, value, onChange, options } = props;
+  const on = value !== "";
+  return (
+    <label className="relative flex-none">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-9 appearance-none rounded-full border py-0 pl-3.5 pr-8 text-sm ${
+          on ? "border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white text-[#1F1F1C]"
+        }`}
+      >
+        {options.map(([v, text]) => (
+          <option key={v} value={v}>
+            {text}
+          </option>
+        ))}
+      </select>
+      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </label>
   );
 }
