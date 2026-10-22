@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   areaName, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceBadge, priceLabel,
-  rouletteCandidates, spinSteps, tierInfo, underLimit,
+  rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
@@ -13,6 +13,7 @@ import { arriveVisit, cancelVisit, fetchPendingVisit, flushVisits, isStandalone,
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
+import { sharedIds } from "@/lib/share";
 import { arrivedNear, stillGoing, type Going, type PendingVisit } from "@/lib/visits";
 import ArriveSheet from "./ArriveSheet";
 import FeedbackSheet from "./FeedbackSheet";
@@ -25,6 +26,7 @@ import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
 import SettingsScreen from "./SettingsScreen";
+import SharedScreen from "./SharedScreen";
 import ZukanScreen from "./ZukanScreen";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
@@ -54,7 +56,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
-  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map" | "going">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표 (going: 정한 가게 카드의 '가게 정보')
+  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map" | "going" | "shared">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표 (going: 정한 가게 카드의 '가게 정보')
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
@@ -64,6 +66,7 @@ export default function HomeScreen() {
   const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 정한 가게 (지도의 파란 핀)
   const [arrival, setArrival] = useState<{ going: Going; by: "auto" | "manual" } | null>(null); // 도착했어요 시트
+  const [shared, setShared] = useState<string[]>([]); // 친구가 추천한 가게 (추천 링크로 열었을 때)
   const [fix, setFix] = useState<{ shopId: string; distanceM: number } | null>(null); // 정한 가게까지 마지막으로 잰 거리 (정한 가게 카드)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
@@ -130,7 +133,9 @@ export default function HomeScreen() {
     startAnalytics();
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
-    const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 공유 카드로 열었는지
+    const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 추천 링크로 열었는지
+    const recommended = from === "share" ? sharedIds(window.location.search) : []; // 링크의 가게 번호 (주소에서 지우기 전에)
+    setShared(recommended);
     const standalone = isStandalone();
     track("app_open", { lang: pickLang(navigator.languages ?? []), standalone, ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포 · standalone: 홈 화면 앱으로 연 비율
     try {
@@ -140,7 +145,7 @@ export default function HomeScreen() {
     } catch {
       // 저장소를 못 쓰면 안내를 안 띄움 (닫아도 기억 못 해서 매번 뜨게 됨)
     }
-    if (from === "share") track("share_open");
+    if (from === "share") track("share_open", { count: recommended.length });
     if (from) window.history.replaceState(null, "", window.location.pathname);
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
@@ -193,6 +198,17 @@ export default function HomeScreen() {
   const area = near ? areaName(near.shops, t) : null;
   const rows = listOpen ? visible : []; // 목록은 '목록 보기'를 눌러야 보임 (10/22 도그푸딩: 처음엔 룰렛 버튼만)
   const goingNow = stillGoing(going, now);
+  // 친구가 추천한 가게: 지금 가게 목록에서 찾고, 위치를 알면 걸어서 n분
+  const sharedShops = useMemo(() => {
+    if (!shared.length || data.status !== "ok") return [];
+    const byId = new Map(data.shops.map((s) => [s.id, s]));
+    return shared.flatMap((id) => {
+      const s = byId.get(id);
+      if (!s) return [];
+      const km = loc.status === "ok" ? distanceKm(loc.point, s) : 0;
+      return [{ ...s, km, walk: walkMinutes(km) }];
+    });
+  }, [shared, data, loc]);
   // 정한 가게 카드 (10/22 도그푸딩: 내비게이션처럼): 가격 · 남은 거리 (앱을 열 때 · 돌아올 때 잰 위치, 없으면 처음 위치)
   const goingShop = goingNow && data.status === "ok" ? data.shops.find((s) => s.id === goingNow.shopId) : undefined;
   const goingNearby = goingNow ? (near?.shops.find((s) => s.id === goingNow.shopId) ?? null) : null;
@@ -242,7 +258,7 @@ export default function HomeScreen() {
     skipTo.current = showResult;
   };
   // 목록 · 지도 핀에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
-  const pickDirect = (shop: NearbyShop, from: "list" | "map" | "going") => {
+  const pickDirect = (shop: NearbyShop, from: "list" | "map" | "going" | "shared") => {
     clearTimers();
     setFlashId(null);
     setCardHidden(false);
@@ -413,6 +429,25 @@ export default function HomeScreen() {
       locate();
     };
     return <main className={mainClass} style={mainFont}>{firstRun && <FirstRun onStart={start} />}</main>;
+  }
+
+  // 추천 링크로 열었으면 점심 탭 대신 '친구가 추천한 점심' (가게를 누르면 결과 카드, 뒤로 가면 다시 여기)
+  if (mode === "home" && tab === "lunch" && shared.length > 0) {
+    return (
+      <main className={mainClass} style={mainFont}>
+        <SharedScreen
+          shops={sharedShops}
+          missing={data.status === "ok" ? shared.length - sharedShops.length : 0}
+          loading={data.status === "loading"}
+          located={loc.status === "ok"}
+          day={day}
+          minutes={minutes}
+          onOpen={(shop) => pickDirect(shop, "shared")}
+          onClose={() => setShared([])}
+        />
+        {tabs}
+      </main>
+    );
   }
 
   // S6 도감 탭 (점심 탭의 지도 · 목록 대신)

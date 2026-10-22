@@ -62,6 +62,8 @@ public class Visit {
     @Column(name = "arrived_by")
     private String arrivedBy; // auto: 앱을 열 때 가게 근처 / manual: '도착했어요' 버튼
 
+    private Boolean again; // 또 갈래요 (010). null: 답 없음 · true: 또 갈래요 · false: 도감에서 껐음
+
     protected Visit() {
     }
 
@@ -83,6 +85,11 @@ public class Visit {
         this.openOk = visited ? openOk : null;
         this.priceOk = visited ? priceOk : null;
         this.answeredAt = at;
+    }
+
+    /** 또 갈래요 켜고 끄기 (질문 카드 · 도감) */
+    public void markAgain(boolean again) {
+        this.again = again;
     }
 
     public void markNotified(Instant at) {
@@ -123,4 +130,5 @@ public class Visit {
     public Instant getCancelledAt() { return cancelledAt; }
     public Instant getArrivedAt() { return arrivedAt; }
     public String getArrivedBy() { return arrivedBy; }
+    public Boolean getAgain() { return again; }
 }

@@ -17,6 +17,7 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
   const [a, setA] = useState<Answers>(start);
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
   const [added, setAdded] = useState(false); // '네, 다녀왔어요' → 도감에 한 곳 추가
+  const [again, setAgain] = useState(false); // 또 갈래요 ♥ (답하지 않아도 됨)
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
   const limit = visit.priceLimit ?? 990;
@@ -24,9 +25,9 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
   const submit = async () => {
     setState("sending");
     try {
-      const body = feedbackBody(a);
+      const body = feedbackBody(a, again);
       await sendFeedback(visit.id, body);
-      track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, price_limit: limit });
+      track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, again: body.again, price_limit: limit });
       if (body.visited && !arrived) track("zukan_add"); // 도착했어요로 온 기록은 그때 이미 도감에 들어감
       setAdded(body.visited && !arrived);
       setState("done");
@@ -106,6 +107,18 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
                       {t(arrived && start.openOk !== null ? "feedback.priceOnlyQ" : "feedback.priceQ", { limit: limit.toLocaleString("ja-JP") })}
                     </p>
                     <Choice value={a.priceOk} yes={t("feedback.yesRight")} no={t("feedback.priceNo")} onChange={(priceOk) => setA({ ...a, priceOk })} />
+                    {/* 또 갈래요 (10/22 결정: 다녀온 곳과 좋았던 곳을 구분). 누르지 않아도 보낼 수 있음 */}
+                    <button
+                      type="button"
+                      aria-pressed={again}
+                      onClick={() => setAgain((v) => !v)}
+                      className={`mt-1 flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] ${
+                        again ? "border-2 border-[#D43F5E] bg-[#FDECEF] font-semibold text-[#A3213D]" : "border-[#CFCCC2] bg-white"
+                      }`}
+                    >
+                      <Heart filled={again} />
+                      {t("feedback.again")}
+                    </button>
                   </>
                 )}
               </div>
@@ -141,5 +154,13 @@ function Choice(props: { value: boolean | null; yes: string; no: string; onChang
         {no}
       </button>
     </div>
+  );
+}
+
+export function Heart({ filled, size = 18 }: { filled: boolean; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "#D43F5E" : "none"} stroke={filled ? "#D43F5E" : "currentColor"} strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20s-7-4.4-9.2-8.6C1.4 8.6 3.1 5 6.6 5c2.1 0 3.5 1.2 5.4 3.2C13.9 6.2 15.3 5 17.4 5c3.5 0 5.2 3.6 3.8 6.4C19 15.6 12 20 12 20z" />
+    </svg>
   );
 }

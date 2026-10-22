@@ -220,4 +220,27 @@ class VisitControllerTest {
         mvc.perform(as(ALICE, put("/api/visits/" + asked.getId() + "/feedback")).content("{\"visited\":true,\"openOk\":true}"))
                 .andExpect(status().isBadRequest()); // 영업했으면 가격 답은 필요
     }
+
+    @Test
+    void 또_갈래요는_답할_때_켜고_도감에서_가게마다_켜고_끔() throws Exception {
+        Visit first = saved(ALICE, Duration.ofDays(2));
+        Visit second = saved(ALICE, Duration.ofMinutes(90));
+        mvc.perform(as(ALICE, put("/api/visits/" + first.getId() + "/feedback")).content("{\"visited\":true,\"openOk\":true,\"priceOk\":true}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, put("/api/visits/" + second.getId() + "/feedback"))
+                        .content("{\"visited\":true,\"openOk\":true,\"priceOk\":false,\"again\":true}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, get("/api/visits/zukan")))
+                .andExpect(jsonPath("$[0].again").value(true))
+                .andExpect(jsonPath("$[1].again").isEmpty());
+
+        // 도감에서 끔: 그 가게에 다녀온 기록 모두
+        mvc.perform(as(ALICE, put("/api/visits/again")).content("{\"shopId\":\"J000000001\",\"again\":false}"))
+                .andExpect(status().isNoContent());
+        assertThat(visits.findAll()).allMatch(v -> Boolean.FALSE.equals(v.getAgain()));
+        mvc.perform(as(BOB, put("/api/visits/again")).content("{\"shopId\":\"J000000001\",\"again\":true}"))
+                .andExpect(status().isNotFound()); // 다녀온 적 없음
+        mvc.perform(as(ALICE, put("/api/visits/again")).content("{\"shopId\":\"J000000001\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

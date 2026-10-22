@@ -37,6 +37,7 @@ m(k, metric, n, d) as (
   union all select 11, '정했다가 취소한 비율 (다른 가게로 다시 정한 것 포함)', count(*) filter (where cancelled_at is not null), count(*) from v
   union all select 12, '도착했어요 비율 (취소하지 않은 것 중)', count(*) filter (where arrived_at is not null), count(*) filter (where cancelled_at is null) from v
   union all select 13, '자동으로 도착한 비율 (도착한 것 중, 나머지는 버튼)', count(*) filter (where arrived_by = 'auto'), count(*) filter (where arrived_at is not null) from v
+  union all select 14, '또 갈래요 비율 (다녀온 것 중)', count(*) filter (where again), count(*) filter (where visited) from v
 )
 select metric as "지표", n as "분자", d as "분모",
        case when d > 0 then round(100.0 * n / d, 1) end as "%"
