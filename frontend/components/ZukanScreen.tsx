@@ -15,14 +15,15 @@ import {
 } from "@/lib/zukan";
 import { useT } from "./I18n";
 import { Heart } from "./FeedbackSheet";
+import Waiting from "./Waiting";
 
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false });
 
-type Props = { shops: LunchShop[] | null; here: Point | null; nearby: NearbyShop[] };
+type Props = { shops: LunchShop[] | null; here: Point | null; nearby: NearbyShop[]; onGoLunch: () => void };
 type State = { status: "loading" } | { status: "error" } | { status: "ok"; visits: ZukanVisit[] };
 
-export default function ZukanScreen({ shops, here, nearby }: Props) {
+export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>({ status: "loading" });
   const [picking, setPicking] = useState<Set<string> | null>(null); // 맛집 골라서 추천하기 중이면 고른 가게
@@ -47,6 +48,13 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       });
   }, []);
   useEffect(load, [load]);
+  // 인터넷이 다시 연결되면 다시 불러옴 (10/22 화면 점검 08)
+  const failed = state.status === "error";
+  useEffect(() => {
+    if (!failed) return;
+    window.addEventListener("online", load);
+    return () => window.removeEventListener("online", load);
+  }, [failed, load]);
 
   // 가게 목록이 늦게 불러와져도 서버에 다시 묻지 않고 다시 합침
   const items = useMemo(() => (state.status === "ok" ? collect(state.visits, shops ?? []) : []), [state, shops]);
@@ -177,7 +185,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       )}
 
       <section className="flex flex-1 flex-col overflow-y-auto px-5 pb-4 pt-2">
-        {state.status === "loading" && <p className="py-8 text-center text-sm text-[#5F5E58]">{t("zukan.loading")}</p>}
+        {state.status === "loading" && <Waiting text={t("zukan.loading")} />}
         {state.status === "error" && (
           <div className="flex flex-col items-center gap-3 py-8 text-sm text-[#5F5E58]">
             <p>{t("zukan.error")}</p>
@@ -187,7 +195,14 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
           </div>
         )}
         {state.status === "ok" && items.length === 0 && (
-          <p className="py-8 text-center text-sm leading-relaxed text-[#5F5E58]">{t("zukan.empty")}</p>
+          // 10/22 화면 점검 10: 빈 도감에 다음 행동
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-base font-semibold">{t("zukan.empty")}</p>
+            <p className="max-w-[300px] text-sm leading-relaxed text-[#5F5E58]">{t("zukan.emptyHow")}</p>
+            <button type="button" onClick={onGoLunch} className="mt-1 h-12 rounded-[14px] bg-[#2457C5] px-6 text-base font-semibold text-white">
+              {t("zukan.goLunch")}
+            </button>
+          </div>
         )}
         {items.length > 0 && (
           <>
