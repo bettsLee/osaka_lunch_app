@@ -9,11 +9,11 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { arriveVisit, cancelVisit, fetchPendingVisit, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { arriveVisit, cancelVisit, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
-import { sharedIds } from "@/lib/share";
+import { shareCode, sharedIds } from "@/lib/share";
 import { arrivedNear, stillGoing, type Going, type PendingVisit } from "@/lib/visits";
 import ArriveSheet from "./ArriveSheet";
 import FeedbackSheet from "./FeedbackSheet";
@@ -68,6 +68,7 @@ export default function HomeScreen() {
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 정한 가게 (지도의 파란 핀)
   const [arrival, setArrival] = useState<{ going: Going; by: "auto" | "manual" } | null>(null); // 도착했어요 시트
   const [shared, setShared] = useState<string[]>([]); // 친구가 추천한 가게 (추천 링크로 열었을 때)
+  const [sharedLoading, setSharedLoading] = useState(false); // 짧은 링크의 가게 번호를 서버에 묻는 중
   const [fix, setFix] = useState<{ shopId: string; distanceM: number } | null>(null); // 정한 가게까지 마지막으로 잰 거리 (정한 가게 카드)
   const sheetSwipe = useSheetSwipe(sheetHidden, setSheetHidden); // 손잡이를 끌어서 내리고 올리기 (누르기도 그대로)
   const cardSwipe = useSheetSwipe(cardHidden, setCardHidden);
@@ -137,8 +138,19 @@ export default function HomeScreen() {
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
     const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 추천 링크로 열었는지
-    const recommended = from === "share" ? sharedIds(window.location.search) : []; // 링크의 가게 번호 (주소에서 지우기 전에)
+    const recommended = from === "share" ? sharedIds(window.location.search) : []; // 긴 링크의 가게 번호 (주소에서 지우기 전에)
+    const code = from === "share" ? shareCode(window.location.search) : null; // 짧은 링크의 코드 (10/22 결정)
     setShared(recommended);
+    if (code) {
+      setSharedLoading(true);
+      fetchSharedShops(code) // 서버가 잠들어 있으면 깨는 동안 '불러오는 중'
+        .then((ids) => {
+          setShared(ids);
+          track("share_open", { count: ids.length, short: true });
+        })
+        .catch((e: unknown) => trackError("share_open", e))
+        .finally(() => setSharedLoading(false));
+    }
     const standalone = isStandalone();
     track("app_open", { lang: pickLang(navigator.languages ?? []), standalone, ...(from ? { from } : {}) }); // 언어: 번역이 필요한 언어 분포 · standalone: 홈 화면 앱으로 연 비율
     try {
@@ -148,7 +160,7 @@ export default function HomeScreen() {
     } catch {
       // 저장소를 못 쓰면 안내를 안 띄움 (닫아도 기억 못 해서 매번 뜨게 됨)
     }
-    if (from === "share") track("share_open", { count: recommended.length });
+    if (from === "share" && !code) track("share_open", { count: recommended.length, short: false });
     if (from) window.history.replaceState(null, "", window.location.pathname);
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
@@ -435,13 +447,13 @@ export default function HomeScreen() {
   }
 
   // 추천 링크로 열었으면 점심 탭 대신 '친구가 추천한 점심' (가게를 누르면 결과 카드, 뒤로 가면 다시 여기)
-  if (mode === "home" && tab === "lunch" && shared.length > 0) {
+  if (mode === "home" && tab === "lunch" && (shared.length > 0 || sharedLoading)) {
     return (
       <main className={mainClass} style={mainFont}>
         <SharedScreen
           shops={sharedShops}
           missing={data.status === "ok" ? shared.length - sharedShops.length : 0}
-          loading={data.status === "loading"}
+          loading={data.status === "loading" || sharedLoading}
           located={loc.status === "ok"}
           day={day}
           minutes={minutes}

@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll() // 400 · 404 같은 오류 응답이 401로 바뀌지 않게
                         .requestMatchers(HttpMethod.POST, "/internal/push/send-due").permitAll() // 로그인 대신 비밀 값으로 확인 (PushController)
                         .requestMatchers(HttpMethod.GET, "/api/i18n/*").permitAll() // 앱 문구 번역 (누구에게나 같은 내용, 로그인 전에 필요)
+                        .requestMatchers(HttpMethod.GET, "/api/share-links/*").permitAll() // 추천 링크를 받은 사람 (코드 → 가게 번호만)
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

@@ -284,5 +284,6 @@
   "zukan.filterPeriod": "Any time",
   "zukan.period.today": "Today",
   "zukan.period.week": "This week",
-  "zukan.period.month": "This month"
+  "zukan.period.month": "This month",
+  "privacy.share": "Recommendation links: we save the chosen place numbers with a short code. People who open the link only see the place numbers, not who sent it."
 }

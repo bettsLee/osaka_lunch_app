@@ -284,5 +284,6 @@
   "zukan.filterPeriod": "모든 기간",
   "zukan.period.today": "오늘",
   "zukan.period.week": "이번 주",
-  "zukan.period.month": "이번 달"
+  "zukan.period.month": "이번 달",
+  "privacy.share": "맛집 추천 링크: 고른 가게 번호를 짧은 코드와 함께 저장해요. 링크를 받은 사람에게는 가게 번호만 보이고, 보낸 사람이 누구인지는 들어가지 않아요."
 }

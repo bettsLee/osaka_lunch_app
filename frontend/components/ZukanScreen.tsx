@@ -6,8 +6,8 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, osakaNow, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
-import { lunchHours, SHARE_MAX, shareLink, shareMessage } from "@/lib/share";
-import { fetchZukan, setAgain } from "@/lib/api";
+import { lunchHours, SHARE_MAX, shareLink, shareMessage, shortLink } from "@/lib/share";
+import { createShareCode, fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
   collect, FILTER_PERIODS, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDayTime, NO_FILTER, topArea,
@@ -86,7 +86,17 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       return `${list.length > 1 ? `${i + 1}. ` : ""}${parts.join(" · ")}`;
     });
     const text = [t("share.recHeader", { n: list.length }), ...lines].join("\n");
-    const message = shareMessage(text, shareLink(window.location.origin, list.map((it) => it.shopId)));
+    const ids = list.map((it) => it.shopId);
+    // 짧은 링크 (10/22 결정). 서버가 잠들어 있거나 실패하면 긴 링크로 (받는 쪽은 둘 다 열림)
+    let short = true;
+    const link = await createShareCode(ids)
+      .then((code) => shortLink(window.location.origin, code))
+      .catch((e: unknown) => {
+        short = false;
+        trackError("share_code", e);
+        return shareLink(window.location.origin, ids);
+      });
+    const message = shareMessage(text, link);
     let method = "share";
     try {
       if (navigator.share) await navigator.share({ text: message });
@@ -106,7 +116,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
         return;
       }
     }
-    track("share_create", { count: list.length, from, method });
+    track("share_create", { count: list.length, from, method, short });
     setPicking(null);
   };
   const togglePick = (id: string) =>
