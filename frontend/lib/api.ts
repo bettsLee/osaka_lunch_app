@@ -181,6 +181,31 @@ export async function setAgain(shopId: string, again: boolean): Promise<void> {
   if (!res.ok) throw new Error(`또 갈래요를 저장하지 못했어요 (${res.status})`);
 }
 
+// 맛집 추천 짧은 코드 (10/22 결정). 서버가 잠들어 있으면 기다리지 않게 4초까지만 (못 만들면 화면이 긴 링크로)
+export async function createShareCode(shopIds: string[]): Promise<string> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 4000);
+  try {
+    const res = await call("/api/share-links", { method: "POST", body: JSON.stringify({ shopIds }), signal: stop.signal });
+    if (!res.ok) throw new Error(`짧은 링크를 만들지 못했어요 (${res.status})`);
+    const body: { code?: unknown } = await res.json();
+    if (typeof body.code !== "string") throw new Error("짧은 링크 코드가 없어요");
+    return body.code;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 받은 짧은 링크의 가게 번호 (로그인 필요 없음). 없는 코드면 빈 목록
+export async function fetchSharedShops(code: string): Promise<string[]> {
+  if (!API_URL) return [];
+  const res = await fetch(`${API_URL}/api/share-links/${encodeURIComponent(code)}`);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`추천 링크를 불러오지 못했어요 (${res.status})`);
+  const body: { shopIds?: unknown } = await res.json();
+  return Array.isArray(body.shopIds) ? body.shopIds.filter((s): s is string => typeof s === "string") : [];
+}
+
 // 의견 보내기 (설정 S8, 10/21 결정: 앱 안 입력칸). 하루 5개를 넘으면 "limit"
 export async function sendOpinion(message: string, lang: string): Promise<"sent" | "limit"> {
   const res = await call("/api/opinions", { method: "POST", body: JSON.stringify({ message, lang }) });

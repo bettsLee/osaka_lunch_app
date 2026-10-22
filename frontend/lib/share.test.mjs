@@ -1,7 +1,7 @@
 // 맛집 추천 공유 규칙 테스트. 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lunchHours, shareLink, sharedIds, shareMessage, SHARE_MAX } from "./share.ts";
+import { lunchHours, shareCode, shareLink, sharedIds, shareMessage, shortLink, SHARE_MAX } from "./share.ts";
 
 test("링크에는 가게 번호만, 최대 10곳", () => {
   assert.equal(shareLink("https://a.app", ["J1", "J2"]), "https://a.app/?ref=share&s=J1,J2");
@@ -29,4 +29,12 @@ test("점심 시간: 오늘 하면 오늘, 아니면 다음 영업일", () => {
 
 test("공유 글은 링크를 맨 끝 줄에", () => {
   assert.equal(shareMessage("추천 1곳\n가게", "https://a.app/?ref=share&s=J1"), "추천 1곳\n가게\nhttps://a.app/?ref=share&s=J1");
+});
+
+test("짧은 링크: /r/코드, 받은 코드는 영문 · 숫자 6자만 (뒤에 글이 붙어 와도)", () => {
+  assert.equal(shortLink("https://a.app", "k7Qx2A"), "https://a.app/r/k7Qx2A");
+  assert.equal(shareCode("?ref=share&c=k7Qx2A"), "k7Qx2A");
+  assert.equal(shareCode(`?ref=share&c=${encodeURIComponent("k7Qx2A오사카")}`), "k7Qx2A");
+  assert.equal(shareCode("?ref=share&c=abc"), null);
+  assert.equal(shareCode("?ref=share"), null);
 });
