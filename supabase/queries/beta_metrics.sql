@@ -3,10 +3,20 @@
 --
 -- 쿼리마다 맨 위 두 줄만 고치면 돼요
 --   params   : 기간 (오사카 시간). 끝 날짜는 그 날 0시 = 그 전날까지
---   excluded : 뺄 사용자 = 상권 휴대폰 · 맥의 익명 ID. 앱을 연 탭의 콘솔에서
---              JSON.parse(localStorage.getItem("osaka-lunch-auth")).user.id  로 확인
+--   excluded : 뺄 사용자 = 상권 휴대폰 · 맥의 익명 ID. 아래 0번 쿼리로 찾음
+--              (Amplitude 차트에서도 같은 ID로 "User ID is not …" 하면 같은 사람이 빠짐. 10/22 OL-42부터)
 -- TEST 가게(콘솔로 만든 테스트 기록)는 항상 뺌
 -- 읽기만 해요 (아무것도 바꾸지 않음)
+
+
+-- 0. 내 기기 익명 ID 찾기 (베타 전 기록은 모두 상권 기기 · 테스트라서, 베타 시작 전 기록의 user_id = 뺄 ID) ---------
+select user_id, count(*) as "여기 갈래요",
+       to_char(min(chosen_at) at time zone 'Asia/Tokyo', 'MM-DD HH24:MI') as "처음",
+       to_char(max(chosen_at) at time zone 'Asia/Tokyo', 'MM-DD HH24:MI') as "마지막"
+from visits
+where chosen_at < timestamptz '2026-11-09 00:00+09'
+group by user_id
+order by max(chosen_at) desc;
 
 
 -- 1. 한 표로 보기 -----------------------------------------------------------------------------------------
@@ -38,6 +48,9 @@ m(k, metric, n, d) as (
   union all select 12, '도착했어요 비율 (취소하지 않은 것 중)', count(*) filter (where arrived_at is not null), count(*) filter (where cancelled_at is null) from v
   union all select 13, '자동으로 도착한 비율 (도착한 것 중, 나머지는 버튼)', count(*) filter (where arrived_by = 'auto'), count(*) filter (where arrived_at is not null) from v
   union all select 14, '또 갈래요 비율 (다녀온 것 중)', count(*) filter (where again), count(*) filter (where visited) from v
+  union all select 15, '답했거나 도착한 비율 (고른 지 1시간 지났고 취소하지 않은 것, 베타 기준 3)',
+    count(*) filter (where (answered_at is not null or arrived_at is not null) and cancelled_at is null and chosen_at < now() - interval '1 hour'),
+    count(*) filter (where cancelled_at is null and chosen_at < now() - interval '1 hour') from v
 )
 select metric as "지표", n as "분자", d as "분모",
        case when d > 0 then round(100.0 * n / d, 1) end as "%"
