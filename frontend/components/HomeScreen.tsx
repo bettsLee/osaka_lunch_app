@@ -9,7 +9,7 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { arriveVisit, cancelVisit, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { arriveVisit, cancelVisit, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, linkAnalyticsUser, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
@@ -146,6 +146,7 @@ export default function HomeScreen() {
       // 기억 못 하면 가는 중을 안 보여 줌
     }
     startAnalytics();
+    void linkAnalyticsUser(); // 사용 기록을 익명 ID로 묶음 (지표에서 상권 기기를 빼려고)
     watchErrors(); // 화면에서 난 오류를 남김 (베타 중 원격으로 원인 확인)
     const params = new URLSearchParams(window.location.search);
     const from = params.get("from") === "push" ? "push" : params.get("ref") === "share" ? "share" : null; // 알림 · 추천 링크로 열었는지

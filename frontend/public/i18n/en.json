@@ -184,7 +184,7 @@
   "privacy.answers": "'Did you go?' answers: whether you went, whether it was open, whether the price was right, and whether you'd go again. Used to make restaurant info more accurate.",
   "privacy.push": "If you turn on notifications: the notification address your browser gives us. Used only to send the 'Did you go?' reminder. Notifications pass through your browser maker's service (Google, Apple, etc.) and are encrypted.",
   "privacy.opinions": "Feedback: what you wrote and the app language.",
-  "privacy.events": "Usage records: things like which buttons you tapped, and screen errors. Used to improve the app. Your IP address is not sent.",
+  "privacy.events": "Usage records: things like which buttons you tapped, and screen errors (with your anonymous ID). Used to improve the app. Your IP address is not sent.",
   "privacy.vendors": "Services we use: Supabase (anonymous sign-in, storing records), Render (server), Vercel (app pages), Amplitude (usage records). We use Google Gemini to translate app text and read restaurant info, but your records are never sent to it.",
   "privacy.delete": "To delete your data: send 'Please delete my records' through Send feedback, and we'll delete everything linked to this anonymous ID. If you clear your browser data, a new anonymous ID is created and older records are no longer linked to this phone.",
   "privacy.keep": "Retention: kept while the service runs, and deleted when it ends.",

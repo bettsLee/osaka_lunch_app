@@ -1,6 +1,7 @@
 // Spring Boot 서버(Render) 호출. 사용자는 Supabase 익명 로그인으로 구분하고 그 토큰을 서버에 보냄
 // Render 무료 서버는 쉬면 잠들어서: 앱을 열 때 미리 깨우고, '여기 갈래요'는 기다리지 않게 뒤에서 저장(실패하면 보관 후 다시)
 import { GoTrueClient } from "@supabase/auth-js";
+import { setAnalyticsUser } from "./analytics";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
 import { arriveSettled, cancelSettled, enqueue, settled, type FeedbackBody, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
@@ -31,10 +32,24 @@ function authClient(): GoTrueClient {
 async function accessToken(): Promise<string> {
   const client = authClient();
   const { data } = await client.getSession();
-  if (data.session) return data.session.access_token;
+  if (data.session) {
+    setAnalyticsUser(data.session.user.id);
+    return data.session.access_token;
+  }
   const { data: signed, error } = await client.signInAnonymously();
   if (error || !signed.session) throw error ?? new Error("익명 로그인에 실패했어요");
+  setAnalyticsUser(signed.session.user.id);
   return signed.session.access_token;
+}
+
+// 앱을 열 때: 이미 익명 ID가 있으면 사용 기록에 붙임 (없으면 만들지 않고 첫 로그인 때 붙음)
+export async function linkAnalyticsUser(): Promise<void> {
+  try {
+    const { data } = await authClient().getSession();
+    if (data.session) setAnalyticsUser(data.session.user.id);
+  } catch {
+    // 설정이 없거나(내 컴퓨터) 저장소를 못 읽으면 기기 ID만 씀
+  }
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {
