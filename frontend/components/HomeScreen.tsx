@@ -22,6 +22,7 @@ import { GoingBar, GoingPanel } from "./GoingCard";
 import InstallHint from "./InstallHint";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
+import { useSheetSwipe } from "./useSheetSwipe";
 import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
@@ -68,6 +69,8 @@ export default function HomeScreen() {
   const [arrival, setArrival] = useState<{ going: Going; by: "auto" | "manual" } | null>(null); // 도착했어요 시트
   const [shared, setShared] = useState<string[]>([]); // 친구가 추천한 가게 (추천 링크로 열었을 때)
   const [fix, setFix] = useState<{ shopId: string; distanceM: number } | null>(null); // 정한 가게까지 마지막으로 잰 거리 (정한 가게 카드)
+  const sheetSwipe = useSheetSwipe(sheetHidden, setSheetHidden); // 손잡이를 끌어서 내리고 올리기 (누르기도 그대로)
+  const cardSwipe = useSheetSwipe(cardHidden, setCardHidden);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
@@ -587,6 +590,7 @@ export default function HomeScreen() {
           canRespin={pool.length > 1}
           collapsed={cardHidden}
           onToggle={() => setCardHidden((v) => !v)}
+          handle={cardSwipe}
           goingAt={goingNow?.shopId === picked.id ? goingNow.chosenAt : null}
           onCancelGoing={cancelChosen}
           onArrive={() => {
@@ -638,7 +642,7 @@ export default function HomeScreen() {
           <section className="relative z-[600] -mt-4 flex flex-col gap-3 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-3.5 pt-0.5">
             <button
               type="button"
-              onClick={() => setSheetHidden((v) => !v)}
+              {...sheetSwipe}
               aria-expanded={!sheetHidden}
               aria-label={sheetHidden ? t("home.sheetShow") : t("home.sheetHide")}
               className="-mb-2 flex h-8 w-full items-center justify-center"

@@ -137,7 +137,6 @@
   "zukan.loading": "도감을 불러오는 중이에요",
   "zukan.error": "도감을 불러오지 못했어요.",
   "zukan.empty": "아직 모은 가게가 없어요. 고른 가게에 다녀와서 '다녀왔어요?'에 답하면 여기에 모여요.",
-  "zukan.date": "{m}월 {d}일",
   "zukan.times": "{n}번",
   "share.copied": "링크를 복사했어요",
   "feedback.zukanAdded": "도감에 추가됐어요.",
@@ -279,5 +278,11 @@
   "shared.count": "{n}곳",
   "shared.missing": "{n}곳은 지금 목록에 없어요. 점심을 그만했거나 가격이 바뀌었을 수 있어요.",
   "shared.needLocation": "위치를 허용하면 걸어서 몇 분인지 보이고, 눌러서 '여기 갈래요'까지 할 수 있어요.",
-  "shared.home": "내 근처 점심 보기"
+  "shared.home": "내 근처 점심 보기",
+  "zukan.dateTime": "{m}월 {d}일 {time}",
+  "zukan.filterPeriodLabel": "기간",
+  "zukan.filterPeriod": "모든 기간",
+  "zukan.period.today": "오늘",
+  "zukan.period.week": "이번 주",
+  "zukan.period.month": "이번 달"
 }

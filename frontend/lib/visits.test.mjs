@@ -66,9 +66,10 @@ test("영업을 안 했으면 가격 답 없이 보낼 수 있고, 가격은 비
   assert.deepEqual(feedbackBody({ visited: true, openOk: false, priceOk: true }), { visited: true, openOk: false, priceOk: null, again: null });
 });
 
-test("도착 자동 판단: 80m 안이고 GPS 오차가 100m 이하일 때만", () => {
+test("도착 자동 판단: 60m 안이고 GPS 오차가 100m 이하일 때만", () => {
   assert.equal(arrivedNear(60, 30), true);
-  assert.equal(arrivedNear(80, 100), true);
+  assert.equal(arrivedNear(45, 100), true);
+  assert.equal(arrivedNear(80, 20), false); // 10/22 실제 테스트에서 살짝 빨랐던 거리
   assert.equal(arrivedNear(120, 20), false); // 아직 멀어요
   assert.equal(arrivedNear(40, 250), false); // 오차가 커서 믿을 수 없음
 });

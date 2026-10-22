@@ -10,7 +10,7 @@ import { lunchHours, SHARE_MAX, shareLink, shareMessage } from "@/lib/share";
 import { fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
-  collect, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDay, NO_FILTER, topArea,
+  collect, FILTER_PERIODS, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDayTime, NO_FILTER, topArea,
   type ZukanFilter, type ZukanItem, type ZukanVisit,
 } from "@/lib/zukan";
 import { useT } from "./I18n";
@@ -185,6 +185,12 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
             {/* flex-none: 가로 스크롤 줄이라 세로로 찌그러질 수 있음 (10/22 도그푸딩: 맥 크롬 낮은 창에서 칩이 반쯤 잘림) */}
             <div className="-mx-5 flex flex-none gap-2 overflow-x-auto px-5 pb-1 pt-2" role="group" aria-label={t("zukan.filter")}>
               <FilterSelect
+                label={t("zukan.filterPeriodLabel")}
+                value={filter.period ?? ""}
+                onChange={(v) => changeFilter({ ...filter, period: (v || null) as ZukanFilter["period"] }, "period")}
+                options={[["", t("zukan.filterPeriod")], ...FILTER_PERIODS.map((p): [string, string] => [p, t(`zukan.period.${p}`)])]}
+              />
+              <FilterSelect
                 label={t("zukan.filterAreaLabel")}
                 value={filter.area ?? ""}
                 onChange={(v) => changeFilter({ ...filter, area: v || null }, "area")}
@@ -269,7 +275,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
                           {[
                             it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
                             it.shop ? priceLabel(it.shop, t) : null,
-                            t("zukan.date", monthDay(it.lastAt)),
+                            t("zukan.dateTime", monthDayTime(it.lastAt)),
                             it.times > 1 ? t("zukan.times", { n: it.times }) : null,
                           ]
                             .filter(Boolean)
