@@ -93,8 +93,9 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
                 big
               />
             )}
+            {/* 한국어는 낱말 중간에서 줄이 바뀌지 않게 (큰 글자 기기 점검 "다녀왔어/요") */}
             {a.visited && (
-              <div className={`flex flex-col gap-3 ${arrived ? "" : "border-t border-[#ECEAE3] pt-4"}`}>
+              <div className={`flex flex-col gap-3 [&:lang(ko)]:break-keep ${arrived ? "" : "border-t border-[#ECEAE3] pt-4"}`}>
                 {!(arrived && start.openOk !== null) && (
                   <>
                     <p className="text-base font-semibold">{t("feedback.openQ")}</p>
@@ -142,11 +143,11 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
 function Choice(props: { value: boolean | null; yes: string; no: string; onChange: (v: boolean) => void; big?: boolean }) {
   const { value, yes, no, onChange, big = false } = props;
   const cls = (on: boolean) =>
-    `${big ? "h-[52px] text-base" : "h-12 text-[15px]"} rounded-xl border ${
+    `${big ? "min-h-[52px] text-base" : "min-h-12 text-[15px]"} rounded-xl border px-2 py-1.5 leading-snug ${
       on ? "border-2 border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white"
     }`;
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5 [&:lang(ko)]:break-keep">
       <button type="button" aria-pressed={value === true} onClick={() => onChange(true)} className={cls(value === true)}>
         {yes}
       </button>
