@@ -35,6 +35,7 @@ type Props = Record<string, string | number | boolean | null>;
 
 let started = false;
 let amp: Amplitude | null = null;
+let userId: string | null = null;
 const waiting: { name: EventName; props?: Props; time: number }[] = [];
 
 export function startAnalytics(): void {
@@ -59,8 +60,17 @@ export function startAnalytics(): void {
       trackingOptions: { ipAddress: false }, // IP로 위치를 추정하지 않게
     });
     amp = a;
+    if (userId) a.setUserId(userId);
     for (const e of waiting.splice(0)) a.track(e.name, e.props, { time: e.time });
   });
+}
+
+// 앱의 익명 ID를 Amplitude 사용자 ID로 (10/22: 지표에서 상권 기기를 빼고, Supabase 기록과 같은 사람으로 세려고)
+// 처음 여는 사람은 첫 익명 로그인 때 붙고, 그 전 기록은 Amplitude가 같은 기기로 이어 줌
+export function setAnalyticsUser(id: string): void {
+  if (userId === id) return;
+  userId = id;
+  amp?.setUserId(id);
 }
 
 export function track(name: EventName, props?: Props): void {
