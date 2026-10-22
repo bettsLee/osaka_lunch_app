@@ -23,7 +23,7 @@ test("같은 가게는 한 칸으로 합치고 최근 것부터, 가게 목록�
   assert.equal(items[2].name, "기록 gone");
 });
 
-test("가장 많이 간 동네 · 평균 가격(10엔 단위)", () => {
+test("주로 다닌 동네(절반 넘게) · 평균 가격(10엔 단위)", () => {
   const items = collect(
     [visit("a", "2026-10-21T03:00:00Z"), visit("b", "2026-10-20T03:00:00Z"), visit("c", "2026-10-19T03:00:00Z"), visit("x", "2026-10-18T03:00:00Z")],
     [shop("a", { areaCode: "Y315", typicalPrice: 880 }), shop("b", { areaCode: "Y305", priceMax: 990 }), shop("c", { areaCode: "Y315", priceMax: 790 })],
@@ -31,6 +31,9 @@ test("가장 많이 간 동네 · 평균 가격(10엔 단위)", () => {
   assert.equal(topArea(items), "Y315");
   assert.equal(averagePrice(items), 890); // (880 + 990 + 790) / 3 = 886.7
   assert.equal(topArea([]), null);
+  // 동네가 반반이면 어느 한 동네라고 하지 않음
+  const split = collect([visit("a", "2026-10-21T03:00:00Z"), visit("b", "2026-10-20T03:00:00Z")], [shop("a", { areaCode: "Y301" }), shop("b", { areaCode: "Y866" })]);
+  assert.equal(topArea(split), null);
   assert.equal(averagePrice(collect([visit("x", "2026-10-18T03:00:00Z")], [])), null);
 });
 

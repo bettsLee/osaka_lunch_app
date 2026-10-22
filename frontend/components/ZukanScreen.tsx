@@ -1,9 +1,10 @@
 "use client";
 
 // S6 내 점심 도감: '네, 다녀왔어요'라고 답한 가게를 지도 · 목록으로 모음 (10/21 결정) + 공유 카드 만들기
-// 지도는 홈과 같은 부품. 다녀온 곳은 채운 핀, 지금 근처의 아직 안 간 곳은 점선 핀
+// 지도는 홈과 같은 부품. 다녀온 곳은 ✓ 핀, 지금 근처의 아직 안 간 곳은 점선 핀
+// 처음에는 아무것도 고르지 않은 상태, 목록 줄이나 다녀온 곳 핀을 누르면 그 가게를 파랗게 (10/22 도그푸딩)
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
 import { fetchZukan } from "@/lib/api";
 import { trackError } from "@/lib/analytics";
@@ -20,6 +21,13 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>({ status: "loading" });
   const [sharing, setSharing] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null); // 목록 · 지도에서 고른 가게
+  const rows = useRef(new Map<string, HTMLLIElement>());
+  const select = (id: string, from: "list" | "map") => {
+    const next = selected === id ? null : id; // 다시 누르면 풀림
+    setSelected(next);
+    if (next && from === "map") rows.current.get(next)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
 
   const load = useCallback(() => {
     setState({ status: "loading" });
@@ -61,7 +69,15 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
 
       {here && state.status === "ok" && items.length > 0 && (
         <section className="relative h-[210px] flex-none bg-[#ECEAE3]" aria-label={t("home.map")}>
-          <LunchMap here={here} radiusKm={1} shops={pins} visitedIds={visitedIds} showLocate={false} />
+          <LunchMap
+            here={here}
+            radiusKm={1}
+            shops={pins}
+            visitedIds={visitedIds}
+            showLocate={false}
+            pickedId={selected}
+            onPick={(id) => visitedIds.has(id) && select(id, "map")} // 아직 안 간 곳은 누르지 않음
+          />
           <span className="absolute bottom-3 left-3 z-[500] rounded-xl bg-white px-2.5 py-1 text-xs text-[#5F5E58]">{t("zukan.legend")}</span>
         </section>
       )}
@@ -83,26 +99,43 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
           <>
             <ul>
               {items.map((it) => (
-                <li key={it.shopId} className="flex items-center gap-3 border-b border-[#ECEAE3] py-3">
-                  {it.shop?.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- 핫페퍼 사진을 그대로 씀
-                    <img src={it.shop.photoUrl} alt="" loading="lazy" className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3] object-cover" />
-                  ) : (
-                    <div className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3]" />
-                  )}
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-base font-semibold">{it.name}</p>
-                    <p className="text-[13px] text-[#5F5E58]">
-                      {[
-                        it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
-                        it.shop ? priceLabel(it.shop, t) : null,
-                        t("zukan.date", monthDay(it.lastAt)),
-                        it.times > 1 ? t("zukan.times", { n: it.times }) : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
+                <li
+                  key={it.shopId}
+                  ref={(el) => {
+                    if (el) rows.current.set(it.shopId, el);
+                    else rows.current.delete(it.shopId);
+                  }}
+                  className="border-b border-[#ECEAE3]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => select(it.shopId, "list")}
+                    disabled={it.shop === null} // 지금 가게 목록에 없으면 지도에 핀이 없음
+                    aria-pressed={selected === it.shopId}
+                    className={`-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-xl px-2 py-3 text-left ${
+                      selected === it.shopId ? "bg-[#E8EEFA]" : ""
+                    }`}
+                  >
+                    {it.shop?.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- 핫페퍼 사진을 그대로 씀
+                      <img src={it.shop.photoUrl} alt="" loading="lazy" className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3] object-cover" />
+                    ) : (
+                      <div className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3]" />
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <p className="truncate text-base font-semibold">{it.name}</p>
+                      <p className="text-[13px] text-[#5F5E58]">
+                        {[
+                          it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
+                          it.shop ? priceLabel(it.shop, t) : null,
+                          t("zukan.date", monthDay(it.lastAt)),
+                          it.times > 1 ? t("zukan.times", { n: it.times }) : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  </button>
                 </li>
               ))}
             </ul>
