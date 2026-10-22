@@ -23,6 +23,7 @@ import InstallHint from "./InstallHint";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
 import { useSheetSwipe } from "./useSheetSwipe";
+import Waiting from "./Waiting";
 import { svg } from "./icons";
 import PriceSheet from "./PriceSheet";
 import ResultCard from "./ResultCard";
@@ -519,14 +520,15 @@ export default function HomeScreen() {
             <PinIcon />
             {area ? t("home.near", { area }) : t("home.nearHere")}
           </h1>
+          {/* 작은 화면 · 큰 글자에서 칩 글자가 두 줄로 깨지지 않게 한 줄 + 가로 스크롤 (10/22 기기 점검) */}
           {mode === "home" && (
-            <div className="flex gap-2">
+            <div className="-mx-5 flex gap-2 overflow-x-auto px-5">
               <button
                 type="button"
                 disabled={!tiers}
                 onClick={() => setPriceOpen(true)}
                 aria-haspopup="dialog"
-                className="flex h-9 items-center gap-1 rounded-full border border-[#2457C5] bg-[#E8EEFA] px-3.5 text-sm font-semibold text-[#1A3F91]"
+                className="flex h-9 flex-none items-center gap-1 whitespace-nowrap rounded-full border border-[#2457C5] bg-[#E8EEFA] px-3.5 text-sm font-semibold text-[#1A3F91]"
               >
                 {t("home.limitChip", { limit: yen(limit) })}
                 <svg {...svg} width={14} height={14} strokeWidth={2.5}>
@@ -580,7 +582,7 @@ export default function HomeScreen() {
                 )}
               </>
             )}
-            {loc.status === "ok" && data.status === "loading" && <p>{t("home.loading")}</p>}
+            {loc.status === "ok" && data.status === "loading" && <Waiting text={t("home.loading")} />}
             {loc.status === "ok" && data.status === "error" && (
               <>
                 <p>{t("home.loadError")}</p>
@@ -822,7 +824,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`h-9 rounded-full border px-3.5 text-sm ${
+      className={`h-9 flex-none whitespace-nowrap rounded-full border px-3.5 text-sm ${
         on ? "border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white"
       }`}
     >
