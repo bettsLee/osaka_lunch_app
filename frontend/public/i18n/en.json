@@ -265,5 +265,16 @@
   "going.info": "Place info",
   "going.expand": "Open your place card",
   "feedback.again": "I'd go again",
-  "zukan.again": "I'd go again"
+  "zukan.again": "I'd go again",
+  "zukan.filter": "Filter your lunch map",
+  "zukan.filterAreaLabel": "Area",
+  "zukan.filterArea": "All areas",
+  "zukan.filterPriceLabel": "Price",
+  "zukan.filterPrice": "Any price",
+  "zukan.filterGenreLabel": "Food type",
+  "zukan.filterGenre": "All types",
+  "zukan.filterLiked": "Would go again",
+  "zukan.filtered": "{n} matching",
+  "zukan.filterClear": "Clear filters",
+  "zukan.filterEmpty": "No places match."
 }

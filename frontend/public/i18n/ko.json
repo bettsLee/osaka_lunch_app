@@ -265,5 +265,16 @@
   "going.info": "가게 정보",
   "going.expand": "정한 가게 카드 펼치기",
   "feedback.again": "또 갈래요",
-  "zukan.again": "또 갈래요"
+  "zukan.again": "또 갈래요",
+  "zukan.filter": "도감 필터",
+  "zukan.filterAreaLabel": "동네",
+  "zukan.filterArea": "모든 동네",
+  "zukan.filterPriceLabel": "가격",
+  "zukan.filterPrice": "모든 가격",
+  "zukan.filterGenreLabel": "음식 종류",
+  "zukan.filterGenre": "모든 종류",
+  "zukan.filterLiked": "또 갈 곳",
+  "zukan.filtered": "조건에 맞는 곳 {n}곳",
+  "zukan.filterClear": "필터 지우기",
+  "zukan.filterEmpty": "조건에 맞는 가게가 없어요."
 }
