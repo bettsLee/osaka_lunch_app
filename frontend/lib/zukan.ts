@@ -19,16 +19,18 @@ export function collect(visits: ZukanVisit[], shops: LunchShop[]): ZukanItem[] {
   return [...items.values()];
 }
 
-// 가장 많이 다녀온 동네 (같으면 최근에 간 쪽). 모르면 null
+// 주로 다닌 동네: 동네를 아는 가게의 절반을 넘는 동네만 (10/22 도그푸딩: 후쿠시마 1곳 · 다른 동네 1곳인데 '후쿠시마'로 나왔음). 없으면 null
 export function topArea(items: ZukanItem[]): string | null {
   const count = new Map<string, number>();
+  let known = 0;
   for (const it of items) {
     const code = it.shop?.areaCode;
-    if (code) count.set(code, (count.get(code) ?? 0) + 1);
+    if (!code) continue;
+    known += 1;
+    count.set(code, (count.get(code) ?? 0) + 1);
   }
-  let best: string | null = null;
-  for (const [code, n] of count) if (best === null || n > (count.get(best) ?? 0)) best = code;
-  return best;
+  for (const [code, n] of count) if (n * 2 > known) return code;
+  return null;
 }
 
 // 카드 · 목록에 쓰는 가게 가격: 대표 메뉴 → 점심 최고가 (목록 핀과 같은 기준)
