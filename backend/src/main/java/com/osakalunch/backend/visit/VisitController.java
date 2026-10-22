@@ -52,7 +52,12 @@ public class VisitController {
             @NotNull Instant chosenAt) {
     }
 
-    public record FeedbackRequest(@NotNull Boolean visited, Boolean openOk, Boolean priceOk) {
+    /** again: 또 갈래요 (답하지 않아도 됨) */
+    public record FeedbackRequest(@NotNull Boolean visited, Boolean openOk, Boolean priceOk, Boolean again) {
+    }
+
+    /** 도감에서 가게마다 또 갈래요 켜고 끄기 */
+    public record AgainRequest(@NotBlank @Size(max = 40) String shopId, @NotNull Boolean again) {
     }
 
     /** 도착했어요. by: auto(앱을 열 때 가게 근처) · manual(버튼). openOk: 그 자리에서 영업 여부를 답했으면 */
@@ -60,12 +65,13 @@ public class VisitController {
     }
 
     /** priceLimit: 그때 고른 가격 상한. '다녀왔어요?'에서 "n엔 이하였나요?"로 물을 때 씀
-     *  arrived · openOk: 도착했어요로 이미 다녀온 기록이면 질문 카드는 남은 것(가격)만 물음 */
+     *  arrived · openOk: 도착했어요로 이미 다녀온 기록이면 질문 카드는 남은 것(가격)만 물음
+     *  again: 또 갈래요 (도감의 ♥) */
     public record VisitResponse(UUID id, String shopId, String shopName, Integer priceLimit, Instant chosenAt,
-                                boolean arrived, Boolean openOk) {
+                                boolean arrived, Boolean openOk, Boolean again) {
         static VisitResponse of(Visit v) {
             return new VisitResponse(v.getId(), v.getShopId(), v.getShopName(), v.getPriceLimit(), v.getChosenAt(),
-                    v.getArrivedAt() != null, v.getOpenOk());
+                    v.getArrivedAt() != null, v.getOpenOk(), v.getAgain());
         }
     }
 
@@ -117,7 +123,18 @@ public class VisitController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "다녀왔으면 영업 · 가격 답이 필요해요");
         }
         v.answer(req.visited(), req.openOk(), req.priceOk(), Instant.now());
+        if (req.visited() && req.again() != null) v.markAgain(req.again());
         visits.save(v);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 또 갈래요 (10/22 결정: 다녀온 곳과 좋았던 곳을 구분). 그 가게에 다녀온 기록 모두에 켜거나 끔. 다녀온 적 없으면 404 */
+    @PutMapping("/again")
+    public ResponseEntity<Void> again(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AgainRequest req) {
+        List<Visit> found = visits.findByUserIdAndShopIdAndVisitedTrue(userId(jwt), req.shopId());
+        if (found.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        found.forEach(v -> v.markAgain(req.again()));
+        visits.saveAll(found);
         return ResponseEntity.noContent().build();
     }
 

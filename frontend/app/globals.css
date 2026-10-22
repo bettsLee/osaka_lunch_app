@@ -85,6 +85,14 @@ body {
 .price-pin.is-visited::before {
   content: "✓ ";
 }
+/* 또 갈래요: ✓ 대신 ♥ (10/22 결정: 다녀온 곳과 좋았던 곳을 구분) */
+.price-pin.is-liked::before {
+  content: "♥ ";
+  color: #d43f5e;
+}
+.is-choosing .price-pin.is-picked.is-liked::before {
+  color: #ffffff;
+}
 .price-pin.is-unvisited {
   border-style: dashed;
   color: #5f5e58;

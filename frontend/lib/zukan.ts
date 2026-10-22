@@ -2,8 +2,9 @@
 // 서버에는 고른 기록만 있어서, 지도 · 장르 · 가격은 화면이 불러 둔 가게 목록에서 찾아 붙임
 import type { LunchShop } from "./lunch";
 
-export type ZukanVisit = { shopId: string; shopName: string; chosenAt: string };
-export type ZukanItem = { shopId: string; name: string; lastAt: string; times: number; shop: LunchShop | null };
+export type ZukanVisit = { shopId: string; shopName: string; chosenAt: string; again?: boolean | null };
+// liked: 또 갈래요 ♥ (그 가게 기록 중 하나라도 켜져 있으면)
+export type ZukanItem = { shopId: string; name: string; lastAt: string; times: number; liked: boolean; shop: LunchShop | null };
 
 export const CARD_TILES = 6;
 
@@ -13,8 +14,12 @@ export function collect(visits: ZukanVisit[], shops: LunchShop[]): ZukanItem[] {
   const items = new Map<string, ZukanItem>();
   for (const v of [...visits].sort((a, b) => b.chosenAt.localeCompare(a.chosenAt))) {
     const seen = items.get(v.shopId);
-    if (seen) seen.times += 1;
-    else items.set(v.shopId, { shopId: v.shopId, name: v.shopName, lastAt: v.chosenAt, times: 1, shop: byId.get(v.shopId) ?? null });
+    if (seen) {
+      seen.times += 1;
+      seen.liked ||= v.again === true;
+    } else {
+      items.set(v.shopId, { shopId: v.shopId, name: v.shopName, lastAt: v.chosenAt, times: 1, liked: v.again === true, shop: byId.get(v.shopId) ?? null });
+    }
   }
   return [...items.values()];
 }

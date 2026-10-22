@@ -6,10 +6,11 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
-import { fetchZukan } from "@/lib/api";
-import { trackError } from "@/lib/analytics";
+import { fetchZukan, setAgain } from "@/lib/api";
+import { track, trackError } from "@/lib/analytics";
 import { collect, monthDay, topArea, type ZukanItem, type ZukanVisit } from "@/lib/zukan";
 import { useT } from "./I18n";
+import { Heart } from "./FeedbackSheet";
 import ShareCard from "./ShareCard";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false });
@@ -23,6 +24,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
   const [sharing, setSharing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null); // 목록 · 지도에서 고른 가게
   const rows = useRef(new Map<string, HTMLLIElement>());
+  const [likedNow, setLikedNow] = useState(new Map<string, boolean>()); // 이 화면에서 ♥를 누른 결과 (서버에 보내는 사이에도 바로 보이게)
   const select = (id: string, from: "list" | "map") => {
     const next = selected === id ? null : id; // 다시 누르면 풀림
     setSelected(next);
@@ -44,6 +46,21 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
   const items = useMemo(() => (state.status === "ok" ? collect(state.visits, shops ?? []) : []), [state, shops]);
   const area = topArea(items);
   const visitedIds = useMemo(() => new Set(items.map((i) => i.shopId)), [items]);
+  const isLiked = (it: ZukanItem) => likedNow.get(it.shopId) ?? it.liked;
+  const likedIds = useMemo(
+    () => new Set(items.filter((it) => likedNow.get(it.shopId) ?? it.liked).map((it) => it.shopId)),
+    [items, likedNow],
+  );
+  // 또 갈래요 ♥ 켜고 끄기 (10/22 결정: 다녀온 곳과 좋았던 곳을 구분). 못 보내면 되돌림
+  const toggleLike = (it: ZukanItem) => {
+    const next = !isLiked(it);
+    setLikedNow((m) => new Map(m).set(it.shopId, next));
+    track("again_toggle", { again: next, from: "zukan" });
+    setAgain(it.shopId, next).catch((e: unknown) => {
+      trackError("again", e);
+      setLikedNow((m) => new Map(m).set(it.shopId, !next));
+    });
+  };
   // 지도: 다녀온 곳(위치를 아는 것) + 지금 근처의 아직 안 간 곳
   const pins = useMemo(() => {
     if (!here) return [];
@@ -74,6 +91,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
             radiusKm={1}
             shops={pins}
             visitedIds={visitedIds}
+            likedIds={likedIds}
             showLocate={false}
             pickedId={selected}
             onPick={(id) => visitedIds.has(id) && select(id, "map")} // 아직 안 간 곳은 누르지 않음
@@ -105,14 +123,14 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
                     if (el) rows.current.set(it.shopId, el);
                     else rows.current.delete(it.shopId);
                   }}
-                  className="border-b border-[#ECEAE3]"
+                  className="-mx-2 flex items-center border-b border-[#ECEAE3]"
                 >
                   <button
                     type="button"
                     onClick={() => select(it.shopId, "list")}
                     disabled={it.shop === null} // 지금 가게 목록에 없으면 지도에 핀이 없음
                     aria-pressed={selected === it.shopId}
-                    className={`-mx-2 flex w-[calc(100%+16px)] items-center gap-3 rounded-xl px-2 py-3 text-left ${
+                    className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left ${
                       selected === it.shopId ? "bg-[#E8EEFA]" : ""
                     }`}
                   >
@@ -135,6 +153,15 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
                           .join(" · ")}
                       </p>
                     </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleLike(it)}
+                    aria-pressed={isLiked(it)}
+                    aria-label={t("zukan.again")}
+                    className={`flex h-12 w-12 flex-none items-center justify-center ${isLiked(it) ? "" : "text-[#9C9A92]"}`}
+                  >
+                    <Heart filled={isLiked(it)} size={22} />
                   </button>
                 </li>
               ))}
