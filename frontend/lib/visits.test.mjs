@@ -20,8 +20,8 @@ test("다녀왔어요? 보내기 버튼이 켜지는 때", () => {
 });
 
 test("안 갔으면 영업 · 가격은 비워서 보냄", () => {
-  assert.deepEqual(feedbackBody({ visited: false, openOk: true, priceOk: true }), { visited: false, openOk: null, priceOk: null });
-  assert.deepEqual(feedbackBody({ visited: true, openOk: true, priceOk: false }), { visited: true, openOk: true, priceOk: false });
+  assert.deepEqual(feedbackBody({ visited: false, openOk: true, priceOk: true }), { visited: false, openOk: null, priceOk: null, again: null });
+  assert.deepEqual(feedbackBody({ visited: true, openOk: true, priceOk: false }), { visited: true, openOk: true, priceOk: false, again: null });
 });
 
 test("저장 대기열: 같은 id는 한 번, 3일 지난 것은 버림, 개수 제한", () => {
@@ -63,7 +63,7 @@ test("취소 요청은 취소됨 · 저장된 적 없음 · 이미 답함이면 
 
 test("영업을 안 했으면 가격 답 없이 보낼 수 있고, 가격은 비워서 보냄", () => {
   assert.equal(canSubmit({ visited: true, openOk: false, priceOk: null }), true);
-  assert.deepEqual(feedbackBody({ visited: true, openOk: false, priceOk: true }), { visited: true, openOk: false, priceOk: null });
+  assert.deepEqual(feedbackBody({ visited: true, openOk: false, priceOk: true }), { visited: true, openOk: false, priceOk: null, again: null });
 });
 
 test("도착 자동 판단: 80m 안이고 GPS 오차가 100m 이하일 때만", () => {
@@ -83,4 +83,11 @@ test("남은 거리: 1km 안은 10m 단위, 그 밖은 0.1km 단위", () => {
   assert.equal(distanceLabel(404), "400m");
   assert.equal(distanceLabel(996), "1.0km");
   assert.equal(distanceLabel(1260), "1.3km");
+});
+
+test("또 갈래요는 눌렀을 때만 true, 닫혀 있었거나 안 갔으면 보내지 않음", () => {
+  assert.equal(feedbackBody({ visited: true, openOk: true, priceOk: true }, true).again, true);
+  assert.equal(feedbackBody({ visited: true, openOk: true, priceOk: true }).again, null);
+  assert.equal(feedbackBody({ visited: true, openOk: false, priceOk: null }, true).again, null);
+  assert.equal(feedbackBody({ visited: false, openOk: null, priceOk: null }, true).again, null);
 });

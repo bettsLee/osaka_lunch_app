@@ -33,9 +33,12 @@ export function canSubmit(a: Answers): boolean {
   return a.visited === false || (a.visited === true && a.openOk !== null && (a.openOk === false || a.priceOk !== null));
 }
 
-export function feedbackBody(a: Answers): { visited: boolean; openOk: boolean | null; priceOk: boolean | null } {
-  if (a.visited !== true) return { visited: false, openOk: null, priceOk: null };
-  return { visited: true, openOk: a.openOk, priceOk: a.openOk === false ? null : a.priceOk };
+// again: 또 갈래요 (10/22 결정). 눌렀을 때만 true, 아니면 답 없음(null). 안 갔거나 닫혀 있었으면 묻지 않음
+export type FeedbackBody = { visited: boolean; openOk: boolean | null; priceOk: boolean | null; again: boolean | null };
+export function feedbackBody(a: Answers, again = false): FeedbackBody {
+  if (a.visited !== true) return { visited: false, openOk: null, priceOk: null, again: null };
+  const open = a.openOk !== false;
+  return { visited: true, openOk: a.openOk, priceOk: open ? a.priceOk : null, again: open && again ? true : null };
 }
 
 // 저장 대기열에 넣기: 같은 id는 한 번만, 3일 지난 것은 버림, 최근 것 위주로 OUTBOX_MAX개까지

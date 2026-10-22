@@ -2,7 +2,7 @@
 // Render 무료 서버는 쉬면 잠들어서: 앱을 열 때 미리 깨우고, '여기 갈래요'는 기다리지 않게 뒤에서 저장(실패하면 보관 후 다시)
 import { GoTrueClient } from "@supabase/auth-js";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
-import { arriveSettled, cancelSettled, enqueue, settled, type PendingVisit, type VisitDraft } from "./visits";
+import { arriveSettled, cancelSettled, enqueue, settled, type FeedbackBody, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
@@ -170,12 +170,15 @@ export async function fetchPendingVisit(): Promise<PendingVisit | null> {
   return res.json();
 }
 
-export async function sendFeedback(
-  id: string,
-  body: { visited: boolean; openOk: boolean | null; priceOk: boolean | null },
-): Promise<void> {
+export async function sendFeedback(id: string, body: FeedbackBody): Promise<void> {
   const res = await call(`/api/visits/${id}/feedback`, { method: "PUT", body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`답을 보내지 못했어요 (${res.status})`);
+}
+
+// 도감에서 가게마다 또 갈래요 켜고 끄기 (그 가게에 다녀온 기록 모두)
+export async function setAgain(shopId: string, again: boolean): Promise<void> {
+  const res = await call("/api/visits/again", { method: "PUT", body: JSON.stringify({ shopId, again }) });
+  if (!res.ok) throw new Error(`또 갈래요를 저장하지 못했어요 (${res.status})`);
 }
 
 // 의견 보내기 (설정 S8, 10/21 결정: 앱 안 입력칸). 하루 5개를 넘으면 "limit"

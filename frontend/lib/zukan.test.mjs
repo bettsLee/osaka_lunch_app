@@ -52,3 +52,11 @@ test("카드 칸은 최근 6곳(가게 목록에 없는 곳은 뺌), 모자라�
 test("날짜는 오사카 기준", () => {
   assert.deepEqual(monthDay("2026-10-18T15:30:00Z"), { m: 10, d: 19 }); // 오사카 0:30
 });
+
+test("또 갈래요: 그 가게 기록 중 하나라도 켜져 있으면 ♥", () => {
+  const items = collect(
+    [{ ...visit("a", "2026-10-21T03:00:00Z"), again: null }, { ...visit("a", "2026-10-18T03:00:00Z"), again: true }, { ...visit("b", "2026-10-20T03:00:00Z"), again: false }],
+    [shop("a"), shop("b")],
+  );
+  assert.deepEqual(items.map((i) => [i.shopId, i.liked]), [["a", true], ["b", false]]);
+});

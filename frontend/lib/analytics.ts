@@ -26,6 +26,7 @@ export type EventName =
   | "visit_cancel" // 여기 갈래요 취소 (cancel: 직접 취소 · changed: 다른 가게로 다시 정함)
   | "visit_arrive" // 도착했어요 (auto: 앱을 열 때 가게 근처 · manual: 버튼). 도감에 바로 들어감
   | "arrive_answer" // 도착했어요에서 '지금 영업하고 있나요?'에 답함
+  | "again_toggle" // 도감에서 또 갈래요 ♥를 켜거나 끔 (질문 카드에서 켠 건 feedback_submit의 again)
   | "app_error"; // 화면에서 난 오류 (원인 확인용)
 
 type Props = Record<string, string | number | boolean | null>;

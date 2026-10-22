@@ -15,6 +15,7 @@ type Props = {
   flashId?: string | null;
   pickedId?: string | null;
   showLocate?: boolean; // '내 위치로' 버튼
+  likedIds?: ReadonlySet<string>; // 도감: 또 갈래요 ♥
   visitedIds?: ReadonlySet<string>; // 도감: 다녀온 가게는 ✓ 핀, 나머지는 점선 핀. 다녀온 곳이 다 보이게 맞춤 (고르면 그 가게로)
   onPick?: (shopId: string) => void; // 핀을 누르면 그 가게 결과 카드 (10/22 도그푸딩). 없으면 이름 말풍선 (도감)
   goingId?: string | null; // 여기 갈래요로 정한 가게: 파란 핀으로 크게, 다른 핀 위로
@@ -22,7 +23,7 @@ type Props = {
 
 const TOP_Z = 100000; // 강조한 핀은 다른 핀 위로
 
-export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds, onPick, goingId = null }: Props) {
+export default function LunchMap({ here, radiusKm, shops, flashId = null, pickedId = null, showLocate = true, visitedIds, likedIds, onPick, goingId = null }: Props) {
   const { t } = useT();
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -122,7 +123,9 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
     markers.current.clear();
     shops.forEach((s, i) => {
       const pin = document.createElement("span");
-      pin.className = visitedIds ? `price-pin ${visitedIds.has(s.id) ? "is-visited" : "is-unvisited"}` : "price-pin";
+      pin.className = visitedIds
+        ? `price-pin ${visitedIds.has(s.id) ? (likedIds?.has(s.id) ? "is-visited is-liked" : "is-visited") : "is-unvisited"}`
+        : "price-pin";
       pin.textContent = priceLabel(s, t);
       const z = (shops.length - i) * 10; // 겹치면 목록 앞쪽(싼 곳 · 가까운 곳)이 위로
       const marker = L.marker([s.lat, s.lng], {
@@ -139,7 +142,7 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
       }
       markers.current.set(s.id, { marker, z });
     });
-  }, [shops, t, visitedIds, pickable]);
+  }, [shops, t, visitedIds, likedIds, pickable]);
 
   // 룰렛 깜빡임 · 결과 강조 · 정한 가게
   useEffect(() => {

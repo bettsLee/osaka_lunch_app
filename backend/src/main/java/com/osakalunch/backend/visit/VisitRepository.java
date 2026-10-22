@@ -16,6 +16,9 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
     /** 도감: '네, 다녀왔어요'라고 답한 기록, 최근 것부터 */
     List<Visit> findTop200ByUserIdAndVisitedTrueOrderByChosenAtDesc(UUID userId);
 
+    /** 또 갈래요를 켜고 끌 때: 그 가게에 다녀온 기록 모두 */
+    List<Visit> findByUserIdAndShopIdAndVisitedTrue(UUID userId, String shopId);
+
     /** 알림 보낼 기록: 답도 알림도 취소도 아직이고 chosenAt이 from ~ to 사이 */
     List<Visit> findByAnsweredAtIsNullAndNotifiedAtIsNullAndCancelledAtIsNullAndChosenAtBetween(Instant from, Instant to);
 }
