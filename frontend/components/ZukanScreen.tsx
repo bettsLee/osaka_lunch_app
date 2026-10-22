@@ -6,11 +6,11 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, osakaNow, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
-import { lunchHours, SHARE_MAX, shareLink, shareMessage } from "@/lib/share";
-import { fetchZukan, setAgain } from "@/lib/api";
+import { lunchHours, SHARE_MAX, shareLink, shareMessage, shortLink } from "@/lib/share";
+import { createShareCode, fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
-  collect, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDay, NO_FILTER, topArea,
+  collect, FILTER_PERIODS, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDayTime, NO_FILTER, topArea,
   type ZukanFilter, type ZukanItem, type ZukanVisit,
 } from "@/lib/zukan";
 import { useT } from "./I18n";
@@ -86,7 +86,17 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
       return `${list.length > 1 ? `${i + 1}. ` : ""}${parts.join(" · ")}`;
     });
     const text = [t("share.recHeader", { n: list.length }), ...lines].join("\n");
-    const message = shareMessage(text, shareLink(window.location.origin, list.map((it) => it.shopId)));
+    const ids = list.map((it) => it.shopId);
+    // 짧은 링크 (10/22 결정). 서버가 잠들어 있거나 실패하면 긴 링크로 (받는 쪽은 둘 다 열림)
+    let short = true;
+    const link = await createShareCode(ids)
+      .then((code) => shortLink(window.location.origin, code))
+      .catch((e: unknown) => {
+        short = false;
+        trackError("share_code", e);
+        return shareLink(window.location.origin, ids);
+      });
+    const message = shareMessage(text, link);
     let method = "share";
     try {
       if (navigator.share) await navigator.share({ text: message });
@@ -106,7 +116,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
         return;
       }
     }
-    track("share_create", { count: list.length, from, method });
+    track("share_create", { count: list.length, from, method, short });
     setPicking(null);
   };
   const togglePick = (id: string) =>
@@ -184,6 +194,12 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
             {/* 필터: 동네 · 가격 · 종류 · ♥ 또 갈 곳 (도감에 있는 것만 고를 수 있음) */}
             {/* flex-none: 가로 스크롤 줄이라 세로로 찌그러질 수 있음 (10/22 도그푸딩: 맥 크롬 낮은 창에서 칩이 반쯤 잘림) */}
             <div className="-mx-5 flex flex-none gap-2 overflow-x-auto px-5 pb-1 pt-2" role="group" aria-label={t("zukan.filter")}>
+              <FilterSelect
+                label={t("zukan.filterPeriodLabel")}
+                value={filter.period ?? ""}
+                onChange={(v) => changeFilter({ ...filter, period: (v || null) as ZukanFilter["period"] }, "period")}
+                options={[["", t("zukan.filterPeriod")], ...FILTER_PERIODS.map((p): [string, string] => [p, t(`zukan.period.${p}`)])]}
+              />
               <FilterSelect
                 label={t("zukan.filterAreaLabel")}
                 value={filter.area ?? ""}
@@ -269,7 +285,7 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
                           {[
                             it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
                             it.shop ? priceLabel(it.shop, t) : null,
-                            t("zukan.date", monthDay(it.lastAt)),
+                            t("zukan.dateTime", monthDayTime(it.lastAt)),
                             it.times > 1 ? t("zukan.times", { n: it.times }) : null,
                           ]
                             .filter(Boolean)

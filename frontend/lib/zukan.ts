@@ -41,26 +41,51 @@ function priceOf(shop: LunchShop | null): number | null {
   return shop?.typicalPrice ?? shop?.priceMax ?? null;
 }
 
-// 목록의 날짜 (오사카 시간 월 · 일)
-export function monthDay(iso: string): { m: number; d: number } {
-  const [, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" })
-    .format(new Date(iso))
-    .split("-");
-  return { m: Number(m), d: Number(d) };
+// 오사카 시간의 연 · 월 · 일 · 시각
+function osakaParts(date: Date): { y: number; m: number; d: number; time: string } {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+    })
+      .formatToParts(date)
+      .map((x) => [x.type, x.value]),
+  );
+  return { y: Number(p.year), m: Number(p.month), d: Number(p.day), time: `${p.hour === "24" ? "00" : p.hour}:${p.minute}` };
+}
+
+// 목록의 날짜 · 시각 (10/22 결정: 도감에 언제 추가됐는지). '여기 갈래요'를 누른 시각 = 그날 점심
+export function monthDayTime(iso: string): { m: number; d: number; time: string } {
+  const { m, d, time } = osakaParts(new Date(iso));
+  return { m, d, time };
+}
+
+// 기간 필터 (오사카 시간): 오늘 · 이번 주(월요일부터) · 이번 달
+export type Period = "today" | "week" | "month";
+export function inPeriod(iso: string, period: Period, now: Date): boolean {
+  const a = osakaParts(new Date(iso));
+  const b = osakaParts(now);
+  if (period === "month") return a.y === b.y && a.m === b.m;
+  const dayNo = (x: { y: number; m: number; d: number }) => Date.UTC(x.y, x.m - 1, x.d) / 86_400_000;
+  if (period === "today") return dayNo(a) === dayNo(b);
+  const monday = dayNo(b) - ((new Date(Date.UTC(b.y, b.m - 1, b.d)).getUTCDay() + 6) % 7);
+  return dayNo(a) >= monday && dayNo(a) <= dayNo(b);
 }
 
 // 도감 필터 (10/22 결정: 동네 · 가격 · 음식 종류 + ♥ 또 갈 곳). 음식 종류는 핫페퍼 장르 그대로
-export type ZukanFilter = { area: string | null; maxPrice: number | null; genre: string | null; liked: boolean };
-export const NO_FILTER: ZukanFilter = { area: null, maxPrice: null, genre: null, liked: false };
+export type ZukanFilter = { period: Period | null; area: string | null; maxPrice: number | null; genre: string | null; liked: boolean };
+export const NO_FILTER: ZukanFilter = { period: null, area: null, maxPrice: null, genre: null, liked: false };
+export const FILTER_PERIODS: Period[] = ["today", "week", "month"];
 export const FILTER_PRICES = [790, 990, 1190] as const; // 홈 가격 단계(PRICE_TIERS)와 같음 (테스트가 lunch.ts를 불러오지 않게 따로 둠)
 
 export function isFiltering(f: ZukanFilter): boolean {
-  return f.area !== null || f.maxPrice !== null || f.genre !== null || f.liked;
+  return f.period !== null || f.area !== null || f.maxPrice !== null || f.genre !== null || f.liked;
 }
 
 // 가격 필터는 가격을 아는 가게만 남김 (목록 · 카드와 같은 가격: 대표 메뉴 → 점심 최고가)
-export function filterItems(items: ZukanItem[], f: ZukanFilter): ZukanItem[] {
+// 기간은 가장 최근에 간 날 기준 (목록 순서 · 날짜 표시와 같음)
+export function filterItems(items: ZukanItem[], f: ZukanFilter, now: Date = new Date()): ZukanItem[] {
   return items.filter((it) => {
+    if (f.period !== null && !inPeriod(it.lastAt, f.period, now)) return false;
     if (f.liked && !it.liked) return false;
     if (f.area !== null && it.shop?.areaCode !== f.area) return false;
     if (f.genre !== null && it.shop?.genre !== f.genre) return false;

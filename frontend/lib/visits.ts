@@ -102,7 +102,7 @@ export function chosenLabel(chosenAt: string, now: Date, t: T): string {
 }
 
 // 도착했어요 자동 판단 (10/22 결정: 버튼 + 앱을 열 때 가게 근처면 자동). 위치는 휴대폰 안에서만 비교함
-export const ARRIVE_M = 80; // 가게에서 이만큼 안이면 도착
+export const ARRIVE_M = 60; // 가게에서 이만큼 안이면 도착 (10/22 결정: 80m는 실제로 써 보니 살짝 빨라서 60m)
 export const ARRIVE_MAX_ACCURACY_M = 100; // GPS 오차가 이보다 크면 자동으로 판단하지 않음 (빌딩 사이에서 튀는 값. 버튼은 그대로)
 
 export function arrivedNear(distanceM: number, accuracyM: number): boolean {

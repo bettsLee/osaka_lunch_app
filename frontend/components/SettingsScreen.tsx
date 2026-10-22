@@ -19,7 +19,7 @@ const MAX_OPINION = 1000; // 서버와 같음 (OpinionController.MAX_LENGTH)
 
 // 개인정보 안내 · 이용 안내 (초안: 10/25 체크인에서 상권 검토)
 const PRIVACY = [
-  "privacy.intro", "privacy.location", "privacy.diet", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions",
+  "privacy.intro", "privacy.location", "privacy.diet", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions", "privacy.share",
   "privacy.events", "privacy.vendors", "privacy.delete", "privacy.keep", "privacy.updated",
 ];
 const TERMS = ["terms.free", "terms.data", "terms.liability", "terms.change", "terms.updated"];
