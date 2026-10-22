@@ -17,6 +17,7 @@ import { arrivedNear, stillGoing, type Going, type PendingVisit } from "@/lib/vi
 import ArriveSheet from "./ArriveSheet";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
+import { GoingBar, GoingPanel } from "./GoingCard";
 import InstallHint from "./InstallHint";
 import GoScreen from "./GoScreen";
 import { useT } from "./I18n";
@@ -53,7 +54,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<Mode>("home");
   const [tab, setTab] = useState<Tab>("lunch");
   const [picked, setPicked] = useState<NearbyShop | null>(null);
-  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표
+  const [pickedFrom, setPickedFrom] = useState<"roulette" | "list" | "map" | "going">("roulette"); // 룰렛 vs 목록 vs 지도 핀 지표 (going: 정한 가게 카드의 '가게 정보')
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
@@ -63,6 +64,7 @@ export default function HomeScreen() {
   const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
   const [going, setGoing] = useState<Going | null>(null); // 여기 갈래요 뒤 1시간 동안 정한 가게 (지도의 파란 핀)
   const [arrival, setArrival] = useState<{ going: Going; by: "auto" | "manual" } | null>(null); // 도착했어요 시트
+  const [fix, setFix] = useState<{ shopId: string; distanceM: number } | null>(null); // 정한 가게까지 마지막으로 잰 거리 (정한 가게 카드)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
@@ -191,6 +193,16 @@ export default function HomeScreen() {
   const area = near ? areaName(near.shops, t) : null;
   const rows = listOpen ? visible : []; // 목록은 '목록 보기'를 눌러야 보임 (10/22 도그푸딩: 처음엔 룰렛 버튼만)
   const goingNow = stillGoing(going, now);
+  // 정한 가게 카드 (10/22 도그푸딩: 내비게이션처럼): 가격 · 남은 거리 (앱을 열 때 · 돌아올 때 잰 위치, 없으면 처음 위치)
+  const goingShop = goingNow && data.status === "ok" ? data.shops.find((s) => s.id === goingNow.shopId) : undefined;
+  const goingNearby = goingNow ? (near?.shops.find((s) => s.id === goingNow.shopId) ?? null) : null;
+  const goingDistanceM = !goingNow
+    ? null
+    : fix?.shopId === goingNow.shopId
+      ? fix.distanceM
+      : loc.status === "ok"
+        ? distanceKm(loc.point, goingNow) * 1000
+        : null;
 
   // 룰렛: 결과를 먼저 정하고, 핀을 점점 느리게 깜빡이다 결과에서 멈춤. 움직임 줄이기 설정이면 바로 결과
   const spin = () => {
@@ -230,7 +242,7 @@ export default function HomeScreen() {
     skipTo.current = showResult;
   };
   // 목록 · 지도 핀에서 직접 고르기 (PRD: 목록을 펼쳐 직접 고를 수도 있음). 결과 카드는 룰렛과 같음
-  const pickDirect = (shop: NearbyShop, from: "list" | "map") => {
+  const pickDirect = (shop: NearbyShop, from: "list" | "map" | "going") => {
     clearTimers();
     setFlashId(null);
     setCardHidden(false);
@@ -283,6 +295,12 @@ export default function HomeScreen() {
       // 기억 못 해도 이번에는 화면에 보임
     }
   };
+  // 정한 가게 카드 · 결과 카드의 취소 (한 번 더 물어본 뒤)
+  const cancelChosen = () => {
+    if (goingNow) cancelGoing(goingNow, "cancel");
+    rememberGoing(null);
+    backHome();
+  };
   // 여기 갈래요 취소 (10/22 결정: 따로 기록). changed: 다른 가게로 다시 정해서 앞의 것이 취소됨
   const cancelGoing = (g: Going, reason: "cancel" | "changed") => {
     cancelVisit(g.id);
@@ -317,6 +335,7 @@ export default function HomeScreen() {
       (p) => {
         const distanceM = distanceKm({ lat: p.coords.latitude, lng: p.coords.longitude }, g) * 1000;
         lastCheck.current = { distanceM, accuracyM: p.coords.accuracy };
+        setFix({ shopId: g.shopId, distanceM });
         if (arrivedNear(distanceM, p.coords.accuracy)) arriveRef.current(g, "auto");
       },
       () => {}, // 못 재면 버튼으로
@@ -339,7 +358,7 @@ export default function HomeScreen() {
       id,
       shopId: picked.id,
       shopName: picked.name,
-      source: pickedFrom === "map" ? "list" : pickedFrom, // 서버에는 직접 고름(list)으로. 지도 핀인지는 이벤트로 봄
+      source: pickedFrom === "roulette" ? "roulette" : "list", // 서버에는 직접 고름(list)으로. 지도 핀인지는 이벤트로 봄
       distanceKm,
       priceLimit: limit,
       chosenAt,
@@ -365,6 +384,20 @@ export default function HomeScreen() {
       <Tab active={tab === "settings"} onClick={() => openTab("settings")} label={t("tab.settings")} icon={<SlidersIcon />} />
     </nav>
   );
+  // 도감 · 설정 탭에서도 정한 가게는 탭 위에 한 줄로 (누르면 점심 탭의 카드로)
+  const goingBarAboveTabs = goingNow && (
+    <GoingBar
+      going={goingNow}
+      price={null}
+      distanceM={goingDistanceM}
+      onArrive={() => arrive(goingNow, "manual")}
+      onOpen={() => {
+        setSheetHidden(false);
+        openTab("lunch");
+      }}
+      className="flex-none border-t border-[#E2E0D8] bg-white px-4 py-1.5"
+    />
+  );
   const mainClass = "mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-white text-[#1F1F1C]";
   const mainFont = { fontFamily: "-apple-system, 'Apple SD Gothic Neo', 'Hiragino Sans', 'Noto Sans KR', sans-serif" };
 
@@ -387,6 +420,7 @@ export default function HomeScreen() {
     return (
       <main className={mainClass} style={mainFont}>
         <ZukanScreen shops={data.status === "ok" ? data.shops : null} here={loc.status === "ok" ? loc.point : null} nearby={visible} />
+        {goingBarAboveTabs}
         {tabs}
       </main>
     );
@@ -397,6 +431,7 @@ export default function HomeScreen() {
     return (
       <main className={mainClass} style={mainFont}>
         <SettingsScreen limit={limit} />
+        {goingBarAboveTabs}
         {tabs}
       </main>
     );
@@ -441,10 +476,10 @@ export default function HomeScreen() {
             radiusKm={near.radiusKm}
             shops={visible}
             flashId={mode === "spin" ? flashId : null}
-            showLocate={mode === "home" && (!listOpen || sheetHidden)} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감 (시트를 접으면 다시 보임)
+            showLocate={mode === "home" && (!listOpen || sheetHidden || goingNow !== null)} // 목록을 펼치면 지도가 작아져 버튼이 칩 위로 올라감 (시트를 접거나 정한 가게 카드면 다시 보임)
             pickedId={mode === "result" ? (picked?.id ?? null) : null}
             onPick={pickFromMap}
-            goingId={mode === "home" ? (goingNow?.shopId ?? null) : null} // 정한 가게는 파란 핀으로 (10/22 도그푸딩)
+            goingId={goingNow?.shopId ?? null} // 정한 가게는 ✓ 파란 핀으로, 다른 가게를 볼 때도 (10/22 도그푸딩)
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-[#5F5E58]">
@@ -518,11 +553,7 @@ export default function HomeScreen() {
           collapsed={cardHidden}
           onToggle={() => setCardHidden((v) => !v)}
           goingAt={goingNow?.shopId === picked.id ? goingNow.chosenAt : null}
-          onCancelGoing={() => {
-            if (goingNow) cancelGoing(goingNow, "cancel");
-            rememberGoing(null);
-            backHome();
-          }}
+          onCancelGoing={cancelChosen}
           onArrive={() => {
             if (goingNow) arrive(goingNow, "manual");
           }}
@@ -579,7 +610,26 @@ export default function HomeScreen() {
             >
               <span className="h-1 w-10 rounded-full bg-[#CFCCC2]" />
             </button>
-            {!sheetHidden && near && (
+            {goingNow && sheetHidden && (
+              <GoingBar
+                going={goingNow}
+                price={null}
+                distanceM={goingDistanceM}
+                onArrive={() => arrive(goingNow, "manual")}
+                onOpen={() => setSheetHidden(false)}
+              />
+            )}
+            {goingNow && !sheetHidden && (
+              <GoingPanel
+                going={goingNow}
+                price={goingShop ? priceLabel(goingShop, t) : null}
+                distanceM={goingDistanceM}
+                onArrive={() => arrive(goingNow, "manual")}
+                onCancel={cancelChosen}
+                onInfo={goingNearby ? () => pickDirect(goingNearby, "going") : null}
+              />
+            )}
+            {!goingNow && !sheetHidden && near && (
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">
                   <p>
@@ -606,7 +656,7 @@ export default function HomeScreen() {
                 {allOrdersOver && <p>{t("home.ordersOver")}</p>}
               </div>
             )}
-            {!sheetHidden && installHint && (
+            {!goingNow && !sheetHidden && installHint && (
               <InstallHint
                 onClose={() => {
                   setInstallHint(false);
@@ -618,7 +668,7 @@ export default function HomeScreen() {
                 }}
               />
             )}
-            {!sheetHidden && (
+            {!goingNow && !sheetHidden && (
               <button
                 type="button"
                 disabled={pool.length === 0}
@@ -628,7 +678,7 @@ export default function HomeScreen() {
                 {t("home.spin")}
               </button>
             )}
-            {!sheetHidden && rows.length > 0 && (
+            {!goingNow && !sheetHidden && rows.length > 0 && (
               <ul className={listOpen ? "max-h-[40dvh] overflow-y-auto" : ""}>
                 {rows.map((s, i) => (
                   <li key={s.id} className="border-t border-[#ECEAE3]">

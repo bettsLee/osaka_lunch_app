@@ -1,6 +1,6 @@
 "use client";
 
-// S3 '주문 문장 보기': 직원에게 보여 줄 일본어 문장과 휴대폰 언어 뜻 (10/21 결정: 주문 · 추천 · 카드 3문장)
+// S3 '주문 도우미'(10/22: '주문 문장 보기'에서 이름 바꿈): 직원에게 보여 줄 일본어 문장과 휴대폰 언어 뜻 (10/21 결정: 주문 · 추천 · 카드 3문장)
 // 10/22 결정: 설정에서 고른 알레르기 · 식사 제한 문장을 맨 위에. 일본어는 우리가 쓴 그대로 두고 뜻만 번역함
 import { useEffect, useRef, useState } from "react";
 import { dietPhrases, loadDiet, type DietPhrase } from "@/lib/diet";

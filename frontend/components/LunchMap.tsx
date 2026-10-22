@@ -87,6 +87,9 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   const picked = shops.find((s) => s.id === pickedId) ?? null;
   const pickedLat = picked?.lat;
   const pickedLng = picked?.lng;
+  // 다른 가게를 볼 때 정한 가게도 화면 안에 (10/22 도그푸딩: 다른 핀을 누르면 정한 핀이 안 보였음)
+  const goingShop = goingId !== null && goingId !== pickedId ? (shops.find((s) => s.id === goingId) ?? null) : null;
+  const goingSpot = goingShop ? `${goingShop.lat},${goingShop.lng}` : "";
   const visitedSpots = visitedIds ? shops.filter((s) => visitedIds.has(s.id)).map((s) => `${s.lat},${s.lng}`).join(";") : "";
   useEffect(() => {
     const m = map.current;
@@ -97,13 +100,15 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
         const points = visitedSpots.split(";").map((p) => p.split(",").map(Number) as [number, number]);
         m.fitBounds(L.latLngBounds([[here.lat, here.lng], ...points]), { padding: [40, 40], maxZoom: 16 });
       } else if (pickedLat !== undefined && pickedLng !== undefined) {
-        m.fitBounds(L.latLngBounds([here.lat, here.lng], [pickedLat, pickedLng]), { padding: [48, 48], maxZoom: 17 });
+        const points: [number, number][] = [[here.lat, here.lng], [pickedLat, pickedLng]];
+        if (goingSpot) points.push(goingSpot.split(",").map(Number) as [number, number]);
+        m.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 17 });
       } else {
         m.fitBounds(L.latLng(here.lat, here.lng).toBounds(radiusKm * 2000));
       }
     };
     fit.current();
-  }, [here, radiusKm, pickedLat, pickedLng, visitedSpots]);
+  }, [here, radiusKm, pickedLat, pickedLng, visitedSpots, goingSpot]);
 
   // 보여줄 가게가 바뀌면 가격 핀을 다시 그림
   useEffect(() => {
@@ -139,9 +144,11 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
       const el = marker.getElement()?.querySelector(".price-pin");
       el?.classList.toggle("is-flash", id === flashId && pickedId === null);
       el?.classList.toggle("is-picked", id === pickedId);
-      const going = id === goingId && pickedId === null && flashId === null;
+      // 정한 가게는 다른 가게를 보거나 룰렛을 돌릴 때도 표시 (10/22 도그푸딩: 다른 핀을 누르면 파란 핀이 사라졌음)
+      const going = id === goingId && id !== pickedId;
       el?.classList.toggle("is-going", going);
-      marker.setZIndexOffset(id === pickedId || (id === flashId && pickedId === null) || going ? TOP_Z : z);
+      const top = id === pickedId || (id === flashId && pickedId === null);
+      marker.setZIndexOffset(top ? TOP_Z : going ? TOP_Z - 1 : z);
     });
   }, [flashId, pickedId, shops, goingId]);
 
