@@ -50,7 +50,8 @@ const DETOUR = 1.3;
 const WALK_M_PER_MIN = 80;
 
 // 핫페퍼 중지역 → 화면에 보여줄 동네 이름 (문구 키 area.코드)
-const AREA_CODES = new Set(["Y300", "Y301", "Y305", "Y310", "Y315", "Y866"]);
+// Y329(오사카시 기타)는 여기저기 흩어져 있어서 '지금 위치 근처' 이름 · 동네 골라서 보기에서는 뺌
+const AREA_CODES = new Set(["Y300", "Y301", "Y305", "Y310", "Y315", "Y866", "Y360", "Y325", "Y326", "Y327", "Y328"]);
 
 // 핫페퍼 장르 → 문구 키 (가게 글이 아니라 분류 이름이라 휴대폰 언어로 바꿔 보여 줌)
 const GENRE_KEYS: Record<string, string> = {

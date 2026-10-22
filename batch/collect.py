@@ -30,8 +30,10 @@ import urllib.parse
 import urllib.request
 
 HOTPEPPER = "https://webservice.recruit.co.jp/hotpepper"
-# 수집할 중지역 코드 (오사카 시내 중심: 우메다 ~ 혼마치 ~ 난바). --list-areas 결과를 보고 채움
-AREAS = ["Y300", "Y301", "Y305", "Y310", "Y315", "Y866"]
+# 수집할 중지역 코드 (오사카 시내 전체). --list-areas · --count-areas 결과를 보고 채움
+# 10/22 결정: 시내 중심 6곳 → 시내 전체 (신오사카 · 덴노지 · 쓰루하시 · 나가이 · 세키메 · 시내 기타 추가, 약 1,350곳)
+AREAS = ["Y300", "Y301", "Y305", "Y310", "Y315", "Y866",
+         "Y360", "Y325", "Y326", "Y327", "Y328", "Y329"]
 CHUNK = 500            # Supabase에 한 번에 보내는 줄 수
 AI_COST_PER_SHOP = 0.006  # 가게 1곳 처음 AI 처리 비용 (달러, 10/19 전체 실행 기준 약 0.6센트)
 MIN_KEEP_RATIO = 0.5   # 이번에 받은 수가 기존의 절반도 안 되면 API 이상으로 보고 삭제하지 않음
