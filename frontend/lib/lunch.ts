@@ -179,6 +179,36 @@ export function areaName(shops: NearbyShop[], t: T): string | null {
   return nearest?.areaCode && AREA_CODES.has(nearest.areaCode) ? t(`area.${nearest.areaCode}`) : null;
 }
 
+// 동네 골라서 보기 (10/22 결정: 위치를 못 쓰거나 근처에 가게가 없을 때). 동네마다 가게들의 가운데, 가게 많은 순
+export function areaCenters(shops: LunchShop[]): { code: string; point: Point; count: number }[] {
+  const sums = new Map<string, { lat: number; lng: number; count: number }>();
+  for (const s of shops) {
+    if (!s.areaCode || !AREA_CODES.has(s.areaCode)) continue;
+    const a = sums.get(s.areaCode) ?? { lat: 0, lng: 0, count: 0 };
+    sums.set(s.areaCode, { lat: a.lat + s.lat, lng: a.lng + s.lng, count: a.count + 1 });
+  }
+  return [...sums.entries()]
+    .map(([code, a]) => ({ code, point: { lat: a.lat / a.count, lng: a.lng / a.count }, count: a.count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+// 점심이 다 끝난 뒤: 다음에 점심을 여는 날(며칠 뒤)과 그날 가장 이른 시작 시각. 모르면 null
+export function nextLunch(shops: LunchShop[], today: Day): { days: number; day: Day; start: string } | null {
+  const from = DAYS.indexOf(today);
+  for (let days = 1; days <= 7; days += 1) {
+    const day = DAYS[(from + days) % 7];
+    let best: string | null = null;
+    for (const s of shops) {
+      const w = windowOn(s, day);
+      if (!lunchOpenOn(s, day) || !w) continue;
+      const m = toMinutes(w.start);
+      if (m !== null && (best === null || m < (toMinutes(best) ?? Infinity))) best = w.start;
+    }
+    if (best) return { days, day, start: best };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- 룰렛 · 결과 카드
 
 // 오늘 주문할 수 있는 마지막 시각(분): 라스트오더가 있으면 그것, 없으면 점심 영업 끝. 모르면 null

@@ -4,6 +4,7 @@
 // 핫페퍼 사진은 앱 화면 안에서 출처와 같이 보여 줌
 import { genreLabel, lunchTimeText, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { useT } from "./I18n";
+import Waiting from "./Waiting";
 
 type Props = {
   shops: NearbyShop[]; // 지금 가게 목록에 있는 추천 가게 (링크 순서)
@@ -25,7 +26,7 @@ export default function SharedScreen({ shops, missing, loading, located, day, mi
         {!loading && <p className="text-sm text-[#5F5E58]">{t("shared.count", { n: shops.length })}</p>}
       </header>
       <section className="flex flex-1 flex-col gap-3 overflow-y-auto bg-[#F4F3EF] px-4 pb-4 pt-4">
-        {loading && <p className="py-8 text-center text-sm text-[#5F5E58]">{t("home.loading")}</p>}
+        {loading && <Waiting text={t("home.loading")} />}
         {!located && !loading && <p className="rounded-[14px] bg-[#E8EEFA] px-4 py-3 text-sm leading-relaxed text-[#1A3F91]">{t("shared.needLocation")}</p>}
         {shops.map((s) => (
           <button

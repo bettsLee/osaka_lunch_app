@@ -5,6 +5,8 @@ import {
   areaName, directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
+  areaCenters,
+  nextLunch,
 } from "./lunch.ts";
 import ko from "../public/i18n/ko.json" with { type: "json" };
 import { translator } from "./i18n.ts";
@@ -161,4 +163,22 @@ test("동네 이름은 가장 가까운 가게의 지역", () => {
   const far = { ...shop(0.9), km: 0.9, walk: 15 };
   assert.equal(areaName([far, near], t), "난바");
   assert.equal(areaName([], t), null);
+});
+
+test("동네 골라서 보기: 동네마다 가게들의 가운데, 가게 많은 순 (모르는 동네는 뺌)", () => {
+  const mk = (id, areaCode, lat, lng) => ({ id, areaCode, lat, lng, lunchDays: "OOOOOXX", lunchWindow: {} });
+  const centers = areaCenters([mk("a", "Y315", 34.66, 135.50), mk("b", "Y315", 34.68, 135.52), mk("c", "Y300", 34.70, 135.49), mk("d", "Z999", 1, 1)]);
+  assert.deepEqual(centers.map((c) => [c.code, c.count]), [["Y315", 2], ["Y300", 1]]);
+  assert.ok(Math.abs(centers[0].point.lat - 34.67) < 1e-9 && Math.abs(centers[0].point.lng - 135.51) < 1e-9);
+});
+
+test("점심이 끝난 뒤 다음 점심: 내일 가장 이른 시작, 주말에 쉬면 월요일", () => {
+  const w = (start) => ({ start, end: "15:00", last_order: null });
+  const shops = [
+    { lunchDays: "OOOOOXX", lunchWindow: { mon: w("11:30"), fri: w("11:30") } },
+    { lunchDays: "OOOOOXX", lunchWindow: { mon: w("11:00"), fri: w("11:15") } },
+  ];
+  assert.deepEqual(nextLunch(shops, "thu"), { days: 1, day: "fri", start: "11:15" });
+  assert.deepEqual(nextLunch(shops, "fri"), { days: 3, day: "mon", start: "11:00" });
+  assert.equal(nextLunch([], "mon"), null);
 });

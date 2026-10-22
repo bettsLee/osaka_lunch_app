@@ -4,7 +4,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  areaName, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, pickNearby, pickShop, priceBadge, priceLabel,
+  areaCenters, areaName, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, nextLunch, pickNearby, pickShop, priceBadge, priceLabel,
   rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
@@ -32,7 +32,8 @@ import ZukanScreen from "./ZukanScreen";
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false }); // 지도는 브라우저에서만
 
-type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point };
+// area: 위치 대신 고른 동네 (10/22 화면 점검 01 · 02 · 04: 동네 골라서 보기)
+type Loc = { status: "asking" } | { status: "denied" } | { status: "error" } | { status: "ok"; point: Point; area?: string };
 type Data = { status: "loading" } | { status: "error" } | { status: "ok"; shops: LunchShop[] };
 type Mode = "home" | "spin" | "result" | "go";
 type Tab = "lunch" | "zukan" | "settings";
@@ -97,6 +98,15 @@ export default function HomeScreen() {
         setData({ status: "error" });
       });
   }, []);
+
+  // 동네 골라서 보기 (10/22 화면 점검 01 · 02 · 04): 위치를 못 쓰거나 근처에 가게가 없을 때 그 동네 가운데를 기준으로
+  const chooseArea = (code: string, reason: string) => {
+    if (data.status !== "ok") return;
+    const area = areaCenters(data.shops).find((a) => a.code === code);
+    if (!area) return;
+    setLoc({ status: "ok", point: area.point, area: code });
+    track("area_pick", { code, reason });
+  };
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -181,6 +191,14 @@ export default function HomeScreen() {
     };
   }, [locate, load]);
 
+  // 인터넷이 다시 연결되면 못 불러온 가게 목록을 다시 (10/22 화면 점검 08)
+  const failed = data.status === "error";
+  useEffect(() => {
+    if (!failed) return;
+    window.addEventListener("online", load);
+    return () => window.removeEventListener("online", load);
+  }, [failed, load]);
+
   // 앱을 열 때 (위치를 받은 뒤) 정한 가게 근처인지
   useEffect(() => {
     if (loc.status === "ok") checkArrival.current();
@@ -210,6 +228,7 @@ export default function HomeScreen() {
 
   const pool = rouletteCandidates(visible, day, minutes);
   const allOrdersOver = near !== null && near.shops.length > 0 && rouletteCandidates(near.shops, day, minutes).length === 0;
+  const next = allOrdersOver && near ? nextLunch(near.shops, day) : null;
   const area = near ? areaName(near.shops, t) : null;
   const rows = listOpen ? visible : []; // 목록은 '목록 보기'를 눌러야 보임 (10/22 도그푸딩: 처음엔 룰렛 버튼만)
   const goingNow = stillGoing(going, now);
@@ -469,7 +488,12 @@ export default function HomeScreen() {
   if (mode === "home" && tab === "zukan") {
     return (
       <main className={mainClass} style={mainFont}>
-        <ZukanScreen shops={data.status === "ok" ? data.shops : null} here={loc.status === "ok" ? loc.point : null} nearby={visible} />
+        <ZukanScreen
+          shops={data.status === "ok" ? data.shops : null}
+          here={loc.status === "ok" ? loc.point : null}
+          nearby={visible}
+          onGoLunch={() => openTab("lunch")}
+        />
         {goingBarAboveTabs}
         {tabs}
       </main>
@@ -539,6 +563,7 @@ export default function HomeScreen() {
                 <p>
                   {loc.status === "denied" ? t("home.locationDenied") : t("home.locationError")}
                 </p>
+                {loc.status === "error" && <p className="text-[13px]">{t("home.locationErrorHint")}</p>}
                 {loc.status === "denied" && ( // 거부한 뒤에는 다시 눌러도 묻지 않아서, 설정에서 켜는 방법을 알려 줌
                   <p className="text-left text-[13px] leading-relaxed">
                     {isIOS(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)
@@ -549,6 +574,10 @@ export default function HomeScreen() {
                 <button type="button" onClick={locate} className="h-11 rounded-xl border border-[#CFCCC2] bg-white px-4 text-[#1F1F1C]">
                   {t("home.retry")}
                 </button>
+                {/* 위치 없이도 쓰게: 동네를 고르면 그 동네 가운데를 기준으로 */}
+                {data.status === "ok" && (
+                  <AreaPicker shops={data.shops} onPick={(code) => chooseArea(code, loc.status)} className="mt-2 items-center" />
+                )}
               </>
             )}
             {loc.status === "ok" && data.status === "loading" && <p>{t("home.loading")}</p>}
@@ -702,9 +731,27 @@ export default function HomeScreen() {
                 </div>
                 {near.widened && near.shops.length > 0 && <p>{t("home.widened", { radius: near.radiusKm })}</p>}
                 {near.shops.length === 0 && (
-                  <p>{t("home.none", { limit: yen(limit) })}</p>
+                  <>
+                    <p>{t("home.none", { limit: yen(limit) })}</p>
+                    {data.status === "ok" && <AreaPicker shops={data.shops} onPick={(code) => chooseArea(code, "none")} className="pt-1" />}
+                  </>
+                )}
+                {loc.status === "ok" && loc.area && (
+                  <p className="flex items-center justify-between gap-2">
+                    <span>{t("home.pickAreaNote")}</span>
+                    <button type="button" onClick={locate} className="-my-2 h-11 flex-none px-1 font-semibold text-[#1A3F91]">
+                      {t("home.useMyLocation")}
+                    </button>
+                  </p>
                 )}
                 {allOrdersOver && <p>{t("home.ordersOver")}</p>}
+                {allOrdersOver && next && ( // 10/22 화면 점검 03: 언제 다시 되는지
+                  <p>
+                    {next.days === 1
+                      ? t("home.nextLunchTomorrow", { time: next.start })
+                      : t("home.nextLunchOn", { day: t(`day.${next.day}`), time: next.start })}
+                  </p>
+                )}
               </div>
             )}
             {!goingNow && !sheetHidden && installHint && (
@@ -827,3 +874,28 @@ const SlidersIcon = () => (
     <circle cx="18" cy="18" r="2" />
   </svg>
 );
+
+// 동네 칩 (가게가 많은 동네부터)
+function AreaPicker(props: { shops: LunchShop[]; onPick: (code: string) => void; className?: string }) {
+  const { shops, onPick, className = "" } = props;
+  const { t } = useT();
+  const areas = useMemo(() => areaCenters(shops), [shops]);
+  if (!areas.length) return null;
+  return (
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <p className="text-[13px] font-semibold text-[#1F1F1C]">{t("home.pickArea")}</p>
+      <div className={`flex flex-wrap gap-2 ${className.includes("items-center") ? "justify-center" : ""}`}>
+        {areas.map((a) => (
+          <button
+            key={a.code}
+            type="button"
+            onClick={() => onPick(a.code)}
+            className="h-9 rounded-full border border-[#2457C5] bg-white px-3.5 text-sm font-semibold text-[#1A3F91]"
+          >
+            {t(`area.${a.code}`)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
