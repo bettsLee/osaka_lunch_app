@@ -18,8 +18,8 @@ export type EventName =
   | "order_open" // 결과 카드에서 '주문 도우미' (실험 1: 주문 문장 A/B)
   | "zukan_open" // 도감 탭
   | "zukan_add" // '네, 다녀왔어요'로 도감에 한 곳 추가
-  | "share_card_create" // 공유 카드를 저장하거나 공유함
-  | "share_open" // 공유 카드의 링크로 들어옴
+  | "share_create" // 맛집 추천 링크를 보냄 (10/22: 공유 카드 이미지 대신. from: row 한 곳 · pick 여러 곳, method: share · copy)
+  | "share_open" // 추천 링크로 들어옴 (count: 받은 가게 수)
   | "list_item_click" // 목록에서 직접 고름 (룰렛 vs 목록)
   | "map_pin_click" // 지도 핀을 눌러 결과 카드를 봄
   | "opinion_submit" // 설정에서 의견을 보냄 (내용은 보내지 않고 글자 수만)

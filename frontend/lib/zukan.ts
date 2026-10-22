@@ -1,12 +1,10 @@
-// S6 도감 · S7 공유 카드 규칙 (10/21 결정: '네, 다녀왔어요'라고 답한 곳만 · 카드 칸은 장르 · 가격)
+// S6 도감 규칙 (10/21 결정: '네, 다녀왔어요'라고 답한 곳만). 공유 카드(S7)는 10/22에 맛집 추천 링크로 바뀜 (lib/share.ts)
 // 서버에는 고른 기록만 있어서, 지도 · 장르 · 가격은 화면이 불러 둔 가게 목록에서 찾아 붙임
 import type { LunchShop } from "./lunch";
 
 export type ZukanVisit = { shopId: string; shopName: string; chosenAt: string; again?: boolean | null };
 // liked: 또 갈래요 ♥ (그 가게 기록 중 하나라도 켜져 있으면)
 export type ZukanItem = { shopId: string; name: string; lastAt: string; times: number; liked: boolean; shop: LunchShop | null };
-
-export const CARD_TILES = 6;
 
 // 같은 가게는 한 칸 (가장 최근에 간 날 · 몇 번 갔는지). 최근 것부터
 export function collect(visits: ZukanVisit[], shops: LunchShop[]): ZukanItem[] {
@@ -38,26 +36,9 @@ export function topArea(items: ZukanItem[]): string | null {
   return null;
 }
 
-// 카드 · 목록에 쓰는 가게 가격: 대표 메뉴 → 점심 최고가 (목록 핀과 같은 기준)
+// 필터에 쓰는 가게 가격: 대표 메뉴 → 점심 최고가 (목록 핀과 같은 기준)
 function priceOf(shop: LunchShop | null): number | null {
   return shop?.typicalPrice ?? shop?.priceMax ?? null;
-}
-
-// 평균 가격 (가격을 아는 가게만, 10엔 단위 반올림). 하나도 없으면 null
-export function averagePrice(items: ZukanItem[]): number | null {
-  const prices = items.map((it) => priceOf(it.shop)).filter((p): p is number => p !== null);
-  if (!prices.length) return null;
-  return Math.round(prices.reduce((a, b) => a + b, 0) / prices.length / 10) * 10;
-}
-
-// 카드 칸: 최근 6곳의 장르 · 가격 (지금 가게 목록에 없는 곳은 장르 · 가격을 몰라서 뺌). 모자라면 빈 칸
-export function cardTiles(items: ZukanItem[]): ({ genre: string | null; price: number | null } | null)[] {
-  const tiles: ({ genre: string | null; price: number | null } | null)[] = items
-    .filter((it) => it.shop !== null)
-    .slice(0, CARD_TILES)
-    .map((it) => ({ genre: it.shop?.genre || null, price: priceOf(it.shop) }));
-  while (tiles.length < CARD_TILES) tiles.push(null);
-  return tiles;
 }
 
 // 목록의 날짜 (오사카 시간 월 · 일)

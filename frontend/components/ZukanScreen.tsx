@@ -1,11 +1,12 @@
 "use client";
 
-// S6 내 점심 도감: '네, 다녀왔어요'라고 답한 가게를 지도 · 목록으로 모음 (10/21 결정) + 공유 카드 만들기
+// S6 내 점심 도감: '네, 다녀왔어요'라고 답한 가게를 지도 · 목록으로 모음 (10/21 결정) + 맛집 추천 (10/22 결정: 공유 카드 이미지 대신 링크)
 // 지도는 홈과 같은 부품. 다녀온 곳은 ✓ 핀, 지금 근처의 아직 안 간 곳은 점선 핀
 // 처음에는 아무것도 고르지 않은 상태, 목록 줄이나 다녀온 곳 핀을 누르면 그 가게를 파랗게 (10/22 도그푸딩)
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
+import { distanceKm, genreLabel, osakaNow, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
+import { lunchHours, SHARE_MAX, shareLink } from "@/lib/share";
 import { fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/lib/zukan";
 import { useT } from "./I18n";
 import { Heart } from "./FeedbackSheet";
-import ShareCard from "./ShareCard";
+
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false });
 
@@ -24,7 +25,8 @@ type State = { status: "loading" } | { status: "error" } | { status: "ok"; visit
 export default function ZukanScreen({ shops, here, nearby }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>({ status: "loading" });
-  const [sharing, setSharing] = useState(false);
+  const [picking, setPicking] = useState<Set<string> | null>(null); // 맛집 골라서 추천하기 중이면 고른 가게
+  const [note, setNote] = useState<string | null>(null); // 링크를 복사했어요
   const [selected, setSelected] = useState<string | null>(null); // 목록 · 지도에서 고른 가게
   const rows = useRef(new Map<string, HTMLLIElement>());
   const [likedNow, setLikedNow] = useState(new Map<string, boolean>()); // 이 화면에서 ♥를 누른 결과 (서버에 보내는 사이에도 바로 보이게)
@@ -67,6 +69,54 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
     track("zukan_filter", { kind, on: isFiltering(next) });
     if (selected && !filterItems(items, next).some((it) => it.shopId === selected)) setSelected(null);
   };
+  // 맛집 추천 (10/22 결정: 이미지 대신 링크, 한 곳 + 여러 곳). 휴대폰 공유 창 → 카톡 · 라인. 못 쓰면 복사
+  const recommend = async (chosen: ZukanItem[], from: "row" | "pick") => {
+    const list = chosen.filter((it): it is ZukanItem & { shop: LunchShop } => it.shop !== null).slice(0, SHARE_MAX);
+    if (!list.length) return;
+    const { day } = osakaNow(new Date());
+    const lines = list.map((it, i) => {
+      const hours = lunchHours(it.shop, day);
+      const parts = [
+        it.name,
+        it.shop.genre ? genreLabel(it.shop.genre, t) : null,
+        priceLabel(it.shop, t),
+        hours ? t("share.recHours", { hours }) : null,
+        it.shop.areaCode ? t(`area.${it.shop.areaCode}`) : null,
+      ].filter(Boolean);
+      return `${list.length > 1 ? `${i + 1}. ` : ""}${parts.join(" · ")}`;
+    });
+    const text = [t("share.recHeader", { n: list.length }), ...lines].join("\n");
+    const url = shareLink(window.location.origin, list.map((it) => it.shopId));
+    let method = "share";
+    try {
+      if (navigator.share) await navigator.share({ text, url });
+      else {
+        method = "copy";
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        setNote(t("share.copied"));
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return; // 공유 창을 닫음
+      method = "copy";
+      try {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        setNote(t("share.copied"));
+      } catch {
+        trackError("share", e);
+        return;
+      }
+    }
+    track("share_create", { count: list.length, from, method });
+    setPicking(null);
+  };
+  const togglePick = (id: string) =>
+    setPicking((cur) => {
+      if (!cur) return cur;
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < SHARE_MAX) next.add(id);
+      return next;
+    });
   // 또 갈래요 ♥ 켜고 끄기 (10/22 결정: 다녀온 곳과 좋았던 곳을 구분). 못 보내면 되돌림
   const toggleLike = (it: ZukanItem) => {
     const next = !isLiked(it);
@@ -180,62 +230,126 @@ export default function ZukanScreen({ shops, here, nearby }: Props) {
                     if (el) rows.current.set(it.shopId, el);
                     else rows.current.delete(it.shopId);
                   }}
-                  className="-mx-2 flex items-center border-b border-[#ECEAE3]"
+                  className="-mx-2 border-b border-[#ECEAE3]"
                 >
-                  <button
-                    type="button"
-                    onClick={() => select(it.shopId, "list")}
-                    disabled={it.shop === null} // 지금 가게 목록에 없으면 지도에 핀이 없음
-                    aria-pressed={selected === it.shopId}
-                    className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left ${
-                      selected === it.shopId ? "bg-[#E8EEFA]" : ""
-                    }`}
-                  >
-                    {it.shop?.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- 핫페퍼 사진을 그대로 씀
-                      <img src={it.shop.photoUrl} alt="" loading="lazy" className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3] object-cover" />
-                    ) : (
-                      <div className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3]" />
-                    )}
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <p className="truncate text-base font-semibold">{it.name}</p>
-                      <p className="text-[13px] text-[#5F5E58]">
-                        {[
-                          it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
-                          it.shop ? priceLabel(it.shop, t) : null,
-                          t("zukan.date", monthDay(it.lastAt)),
-                          it.times > 1 ? t("zukan.times", { n: it.times }) : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleLike(it)}
-                    aria-pressed={isLiked(it)}
-                    aria-label={t("zukan.again")}
-                    className={`flex h-12 w-12 flex-none items-center justify-center ${isLiked(it) ? "" : "text-[#9C9A92]"}`}
-                  >
-                    <Heart filled={isLiked(it)} size={22} />
-                  </button>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => (picking ? togglePick(it.shopId) : select(it.shopId, "list"))}
+                      disabled={it.shop === null} // 지금 가게 목록에 없으면 지도에 핀이 없고 추천도 못 함
+                      aria-pressed={picking ? picking.has(it.shopId) : selected === it.shopId}
+                      className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left ${
+                        (picking ? picking.has(it.shopId) : selected === it.shopId) ? "bg-[#E8EEFA]" : ""
+                      }`}
+                    >
+                      {picking && (
+                        <span
+                          className={`flex h-6 w-6 flex-none items-center justify-center rounded-full border-2 ${
+                            picking.has(it.shopId) ? "border-[#2457C5] bg-[#2457C5] text-white" : "border-[#CFCCC2]"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {picking.has(it.shopId) && (
+                            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                              <path d="M5 12l5 5 9-10" />
+                            </svg>
+                          )}
+                        </span>
+                      )}
+                      {it.shop?.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- 핫페퍼 사진을 그대로 씀
+                        <img src={it.shop.photoUrl} alt="" loading="lazy" className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3] object-cover" />
+                      ) : (
+                        <div className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3]" />
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <p className="truncate text-base font-semibold">{it.name}</p>
+                        <p className="text-[13px] text-[#5F5E58]">
+                          {[
+                            it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
+                            it.shop ? priceLabel(it.shop, t) : null,
+                            t("zukan.date", monthDay(it.lastAt)),
+                            it.times > 1 ? t("zukan.times", { n: it.times }) : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleLike(it)}
+                      aria-pressed={isLiked(it)}
+                      aria-label={t("zukan.again")}
+                      className={`flex h-12 w-12 flex-none items-center justify-center ${isLiked(it) ? "" : "text-[#9C9A92]"}`}
+                    >
+                      <Heart filled={isLiked(it)} size={22} />
+                    </button>
+                  </div>
+                  {!picking && selected === it.shopId && it.shop && (
+                    <button
+                      type="button"
+                      onClick={() => recommend([it], "row")}
+                      className="mb-3 ml-2 flex h-11 items-center gap-1.5 rounded-xl bg-[#2457C5] px-4 text-[15px] font-semibold text-white"
+                    >
+                      <ShareIcon />
+                      {t("zukan.recommendOne")}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={() => setSharing(true)}
-              className="mt-4 h-[52px] flex-none rounded-[14px] border border-[#2457C5] text-base font-semibold text-[#1A3F91]"
-            >
-              {t("zukan.share")}
-            </button>
+            {note && (
+              <p className="pt-3 text-center text-sm font-semibold text-[#1A3F91]" aria-live="polite">
+                {note}
+              </p>
+            )}
+            {picking ? (
+              // 맛집 골라서 추천하기: 목록 아래에 붙는 바 (필터를 걸고 '모두 고르기'도 됨)
+              <div className="sticky bottom-0 -mx-5 mt-3 flex flex-col gap-2 border-t border-[#E2E0D8] bg-white px-5 pb-2 pt-3">
+                <div className="flex items-center justify-between text-[13px] text-[#5F5E58]">
+                  <span aria-live="polite">{t("zukan.pickCount", { n: picking.size, max: SHARE_MAX })}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPicking(new Set(shown.filter((it) => it.shop !== null).slice(0, SHARE_MAX).map((it) => it.shopId)))}
+                    className="-my-2 min-h-11 px-1 font-semibold text-[#1A3F91]"
+                  >
+                    {t("zukan.pickAll")}
+                  </button>
+                </div>
+                <div className="grid grid-cols-[1fr_2fr] gap-2">
+                  <button type="button" onClick={() => setPicking(null)} className="h-12 rounded-[14px] border border-[#CFCCC2] bg-white text-base">
+                    {t("zukan.pickCancel")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={picking.size === 0}
+                    onClick={() => recommend(items.filter((it) => picking.has(it.shopId)), "pick")}
+                    className="h-12 rounded-[14px] bg-[#2457C5] text-base font-semibold text-white disabled:opacity-50"
+                  >
+                    {t("zukan.pickSend", { n: picking.size })}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(null);
+                  setNote(null);
+                  setPicking(new Set());
+                }}
+                className="mt-4 flex h-[52px] flex-none items-center justify-center gap-1.5 rounded-[14px] border border-[#2457C5] text-base font-semibold text-[#1A3F91]"
+              >
+                <ShareIcon />
+                {t("zukan.pickStart")}
+              </button>
+            )}
             <p className="mt-3 text-[10px] text-[#5F5E58]">Powered by ホットペッパー グルメ Webサービス · 画像提供：ホットペッパー グルメ</p>
           </>
         )}
       </section>
 
-      {sharing && <ShareCard items={items} area={area} onClose={() => setSharing(false)} />}
     </>
   );
 }
@@ -266,3 +380,10 @@ function FilterSelect(props: { label: string; value: string; onChange: (v: strin
     </label>
   );
 }
+
+const ShareIcon = () => (
+  <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 3v12M7 8l5-5 5 5" />
+    <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+  </svg>
+);
