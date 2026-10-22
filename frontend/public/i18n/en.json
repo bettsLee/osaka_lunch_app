@@ -45,7 +45,7 @@
   "result.aiNoteTypical": "Typical lunch {typical} · AI read the restaurant's listing and judged lunch to be ¥{limit} or less",
   "result.menuLink": "See menu and photos on Hot Pepper",
   "result.go": "I'll go here",
-  "result.respin": "Pick a random place",
+  "result.respin": "See another place",
   "result.orderOpen": "Order helper",
   "result.directions": "Directions in Google Maps",
   "result.priceSource": "See the original price text",

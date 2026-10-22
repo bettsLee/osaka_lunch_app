@@ -45,7 +45,7 @@
   "result.aiNoteTypical": "대표 점심 메뉴 {typical} · 가게 글을 AI가 읽고 {limit}엔 이하로 판단했어요",
   "result.menuLink": "핫페퍼에서 메뉴 · 사진 보기",
   "result.go": "여기 갈래요",
-  "result.respin": "랜덤으로 가게 고르기",
+  "result.respin": "다른 가게 보기",
   "result.orderOpen": "주문 도우미",
   "result.directions": "구글 지도로 길찾기",
   "result.priceSource": "가격 원문 보기",
