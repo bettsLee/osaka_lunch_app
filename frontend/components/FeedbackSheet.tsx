@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { track, trackError } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
-import { canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
+import { addsToZukan, canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
 import { useT } from "./I18n";
 
 type Props = { visit: PendingVisit; onClose: () => void; onOpenZukan: () => void };
@@ -16,7 +16,7 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
   const start: Answers = arrived ? { ...EMPTY_ANSWERS, visited: true, openOk: visit.openOk ?? null } : EMPTY_ANSWERS;
   const [a, setA] = useState<Answers>(start);
   const [state, setState] = useState<"ask" | "sending" | "done" | "error">("ask");
-  const [added, setAdded] = useState(false); // '네, 다녀왔어요' → 도감에 한 곳 추가
+  const [added, setAdded] = useState(false); // '네, 다녀왔어요' (닫혀 있지 않았음) → 도감에 한 곳 추가
   const [again, setAgain] = useState(false); // 또 갈래요 ♥ (답하지 않아도 됨)
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), []);
@@ -28,8 +28,9 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
       const body = feedbackBody(a, again);
       await sendFeedback(visit.id, body);
       track("feedback_submit", { visited: body.visited, open_ok: body.openOk, price_ok: body.priceOk, again: body.again, price_limit: limit });
-      if (body.visited && !arrived) track("zukan_add"); // 도착했어요로 온 기록은 그때 이미 도감에 들어감
-      setAdded(body.visited && !arrived);
+      const zukan = addsToZukan(body, arrived);
+      if (zukan) track("zukan_add");
+      setAdded(zukan);
       setState("done");
     } catch (e) {
       trackError("feedback", e);

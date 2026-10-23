@@ -17,7 +17,7 @@ export type EventName =
   | "push_permission" // '알림 받기'를 누른 결과 (허용률 확인용)
   | "order_open" // 결과 카드에서 '주문 도우미' (실험 1: 주문 문장 A/B)
   | "zukan_open" // 도감 탭
-  | "zukan_add" // '네, 다녀왔어요'로 도감에 한 곳 추가
+  | "zukan_add" // 도감에 한 곳 추가 ('네, 다녀왔어요' 또는 도착). 도착 뒤 닫혀 있었다고 답하면(arrive_answer open_ok=false) 도감에서 빠짐
   | "share_create" // 맛집 추천 링크를 보냄 (10/22: 공유 카드 이미지 대신. from: row 한 곳 · pick 여러 곳, method: share · copy)
   | "share_open" // 추천 링크로 들어옴 (count: 받은 가게 수)
   | "list_item_click" // 목록에서 직접 고름 (룰렛 vs 목록)
