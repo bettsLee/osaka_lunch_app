@@ -32,9 +32,12 @@ class CardHoursTest(unittest.TestCase):
         out = {"lunch_window": {"mon": None, "tue": {"start": "11:30", "end": "14:30", "last_order": None}}}
         self.assertEqual(card_hours(out), (m("11:30"), m("14:30")))
 
-    def test_주말만_열면_없음(self):
-        out = {"lunch_window": {"sat": {"start": "11:00", "end": "14:00", "last_order": None}}}
-        self.assertIsNone(card_hours(out))
+    def test_주말만_열면_주말_시간(self):
+        out = {"lunch_window": {"mon": None, "sat": {"start": "12:00", "end": "15:00", "last_order": "14:30"}}}
+        self.assertEqual(card_hours(out), (m("12:00"), m("15:00")))
+
+    def test_점심_여는_날이_없으면_없음(self):
+        self.assertIsNone(card_hours({"lunch_window": {"mon": None, "sat": None}}))
 
 
 class HoursMatchTest(unittest.TestCase):

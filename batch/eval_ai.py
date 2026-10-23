@@ -74,8 +74,9 @@ def human_hours(value):
 
 
 def card_hours(out):
-    """AI 결과의 카드 점심 시간 → 평일 중 처음으로 점심을 여는 날의 (시작, 끝) 분. 사람 정답지가 평일 기준이라서"""
-    for d in ai_structure.DAYS[:5]:
+    """AI 결과의 카드 점심 시간 → 평일 중 처음으로 점심을 여는 날의 (시작, 끝) 분. 사람 정답지가 평일 기준이라서
+    평일에 점심을 안 하는 가게(주말만 점심)는 주말 시간으로 비교 (10/23 재측정 8번: 사람도 주말 시간을 적음)"""
+    for d in ai_structure.DAYS:
         w = (out.get("lunch_window") or {}).get(d)
         if w:
             start, end = ai_structure.minutes(w["start"]), ai_structure.minutes(w["end"])
