@@ -87,7 +87,7 @@ def card_hours(out):
 def hours_match(card, human):
     """완전 일치 · 규칙 A 일치. 규칙 A: 저녁까지 이어지는 가게는 '여는 시간(11시보다 이르면 11시) ~ 14시'로 잘라 보여줌
     → 사람이 실제 영업시간(예: 11:00~23:00)을 적었어도 카드가 규칙대로 잘랐으면 맞은 것으로 셈
-    어느 쪽을 공식 숫자로 쓸지는 상권이 정함 (10/23 아직 결정 전이라 두 줄 모두 출력)"""
+    공식 숫자는 규칙 A 포함 쪽 (10/23 결정 가). 완전 일치는 참고로 같이 출력"""
     if not card or not human:
         return False, False
     exact = card == human
@@ -165,8 +165,8 @@ def main():
     with_hours = [(p, h) for p, h in with_hours if h]
     matches = [hours_match(p["hours"], h) for p, h in with_hours]
     hours_score = {"exact": (sum(e for e, _ in matches), len(matches)), "rule_a": (sum(c for _, c in matches), len(matches))}
-    print(pad("점심 시간 완전 일치", 28) + pad("-", 18) + fmt(hours_score["exact"]))
-    print(pad("점심 시간 (규칙 A 자르기 포함)", 28) + pad("-", 18) + fmt(hours_score["rule_a"]))
+    print(pad("점심 시간 (규칙 A 포함, 공식)", 28) + pad("-", 18) + fmt(hours_score["rule_a"]))
+    print(pad("점심 시간 완전 일치 (참고)", 28) + pad("-", 18) + fmt(hours_score["exact"]))
 
     ok = [rec["ai"] for rec in raw if "error" not in rec["ai"]]
     if ok:  # 전체 가게 비용 계산용 (생각 토큰도 출력으로 과금)
