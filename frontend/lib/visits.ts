@@ -41,6 +41,11 @@ export function feedbackBody(a: Answers, again = false): FeedbackBody {
   return { visited: true, openOk: a.openOk, priceOk: open ? a.priceOk : null, again: open && again ? true : null };
 }
 
+// 이 답으로 도감에 새로 들어가는지: 다녀왔고 닫혀 있지 않았음 (10/23 결정). 도착했어요로 온 기록은 그때 이미 들어감
+export function addsToZukan(body: FeedbackBody, arrived: boolean): boolean {
+  return body.visited === true && body.openOk !== false && !arrived;
+}
+
 // 저장 대기열에 넣기: 같은 id는 한 번만, 3일 지난 것은 버림, 최근 것 위주로 OUTBOX_MAX개까지
 export function enqueue(queue: VisitDraft[], draft: VisitDraft, now: Date): VisitDraft[] {
   const fresh = queue.filter(
