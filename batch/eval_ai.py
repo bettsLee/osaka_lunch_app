@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-AI v1 평가: 사람 정답지와 정규식 · AI 결과를 같은 지표로 비교
+AI 평가: 사람 정답지와 정규식 · AI 결과를 같은 지표로 비교
+(10/23 v2) 카드에 보여주는 점심 시간(lunch_window, 규칙 A)도 정답지 lunch_hours와 비교
 
 사용법
   export GEMINI_API_KEY=발급받은키
@@ -59,6 +60,45 @@ def regex_predict(row):
     return {"days": ("O" if has_lunch else "X") * 7, "under_990": judgment}
 
 
+# ---------------------------------------------------------------- 점심 시간 (카드에 보여주는 시간)
+TIME = re.compile(r"([0-9]{1,2}):([0-9]{2})")
+
+
+def human_hours(value):
+    """정답지 lunch_hours → (시작, 끝) 분. 사람이 적은 표기가 조금씩 달라서 글에서 앞의 두 시각만 읽음"""
+    if not value:
+        return None
+    text = str(value).translate(str.maketrans("０１２３４５６７８９：", "0123456789:"))
+    times = [int(h) * 60 + int(m) for h, m in TIME.findall(text)]
+    return (times[0], times[1]) if len(times) >= 2 else None
+
+
+def card_hours(out):
+    """AI 결과의 카드 점심 시간 → 평일 중 처음으로 점심을 여는 날의 (시작, 끝) 분. 사람 정답지가 평일 기준이라서"""
+    for d in ai_structure.DAYS[:5]:
+        w = (out.get("lunch_window") or {}).get(d)
+        if w:
+            start, end = ai_structure.minutes(w["start"]), ai_structure.minutes(w["end"])
+            if start is not None and end is not None:
+                return (start, end)
+    return None
+
+
+def hours_match(card, human):
+    """완전 일치 · 규칙 A 일치. 규칙 A: 저녁까지 이어지는 가게는 '여는 시간(11시보다 이르면 11시) ~ 14시'로 잘라 보여줌
+    → 사람이 실제 영업시간(예: 11:00~23:00)을 적었어도 카드가 규칙대로 잘랐으면 맞은 것으로 셈 (10/23 결정 가)"""
+    if not card or not human:
+        return False, False
+    exact = card == human
+    cut = (human[1] > ai_structure.LUNCH_SLOT_END and card[1] == ai_structure.LUNCH_END
+           and card[0] == max(human[0], ai_structure.LUNCH_START))
+    return exact, exact or cut
+
+
+def fmt_hours(pair):
+    return f"{ai_structure.hhmm(pair[0])}~{ai_structure.hhmm(pair[1])}" if pair else "-"
+
+
 # ---------------------------------------------------------------- 채점
 def score(preds, shops):
     cells = all7 = judged = tp = said_yes = human_yes = 0
@@ -87,7 +127,7 @@ def pad(s, width):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="AI v1 평가")
+    ap = argparse.ArgumentParser(description="AI 평가 (요일 · 990엔 · 점심 시간)")
     ap.add_argument("eval_set", help="eval_set.json 경로 (저장소 밖)")
     ap.add_argument("--model", default=ai_structure.MODEL)
     args = ap.parse_args()
@@ -102,10 +142,11 @@ def main():
     for i, s in enumerate(shops, 1):
         try:
             out = ai_structure.structure(s, key, args.model)
-            ai.append({"days": "".join(out["lunch_days"][d] for d in ai_structure.DAYS), "under_990": out["under_990"]})
+            ai.append({"days": "".join(out["lunch_days"][d] for d in ai_structure.DAYS), "under_990": out["under_990"],
+                       "hours": card_hours(out)})
         except (RuntimeError, KeyError, ValueError) as e:  # 한 곳이 실패해도 나머지는 계속, 실패는 틀린 것으로 셈
             out = {"error": str(e)}
-            ai.append({"days": "", "under_990": "error"})
+            ai.append({"days": "", "under_990": "error", "hours": None})
         raw.append({"no": s["no"], "name": s["name"], "ai": out})
         print(f"\rAI {i}/{len(shops)}", end="", flush=True)
     print()
@@ -117,6 +158,14 @@ def main():
     print(pad("지표", 28) + pad("정규식", 18) + "AI")
     for label, k in rows:
         print(pad(label, 28) + pad(fmt(r[k]), 18) + fmt(a[k]))
+
+    # 점심 시간: 사람이 적은 가게만 (정규식은 시간을 만들지 않아서 AI만)
+    with_hours = [(p, human_hours(s["human"].get("lunch_hours"))) for p, s in zip(ai, shops)]
+    with_hours = [(p, h) for p, h in with_hours if h]
+    matches = [hours_match(p["hours"], h) for p, h in with_hours]
+    hours_score = {"exact": (sum(e for e, _ in matches), len(matches)), "rule_a": (sum(c for _, c in matches), len(matches))}
+    print(pad("점심 시간 완전 일치", 28) + pad("-", 18) + fmt(hours_score["exact"]))
+    print(pad("점심 시간 (규칙 A 자르기 포함)", 28) + pad("-", 18) + fmt(hours_score["rule_a"]))
 
     ok = [rec["ai"] for rec in raw if "error" not in rec["ai"]]
     if ok:  # 전체 가게 비용 계산용 (생각 토큰도 출력으로 과금)
@@ -134,12 +183,15 @@ def main():
             notes.append(f"요일 사람 {h['days']} / AI {p['days'] or '-'}")
         if p["under_990"] != h["under_990"] and "error" not in rec["ai"]:
             notes.append(f"990엔 사람 {h['under_990']} / AI {p['under_990']} (근거: {rec['ai'].get('price_evidence', '')})")
+        hh = human_hours(h.get("lunch_hours"))
+        if hh and "error" not in rec["ai"] and not hours_match(p["hours"], hh)[1]:
+            notes.append(f"점심 시간 사람 {fmt_hours(hh)} / 카드 {fmt_hours(p['hours'])}")
         if notes:
             print(f"  {s['no']:>2}. {s['name'][:20]} — " + " · ".join(notes))
 
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     out_path = os.path.join(os.path.dirname(os.path.abspath(args.eval_set)), f"ai_results_{stamp}.json")
-    json.dump({"model": args.model, "regex": r, "ai": a, "shops": raw}, open(out_path, "w", encoding="utf-8"),
+    json.dump({"model": args.model, "regex": r, "ai": a, "lunch_hours": hours_score, "shops": raw}, open(out_path, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
     print(f"\n자세한 결과: {out_path}")
 
