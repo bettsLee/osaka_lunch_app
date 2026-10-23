@@ -83,6 +83,13 @@ def work(shop, key):
         return shop, {"error": f"{type(e).__name__}: {e}"}
 
 
+def keep_previous(shop, out, done):
+    """AI가 실패했는데 예전 결과가 멀쩡하면 덮어쓰지 않음 (10/23: Gemini 크레딧이 떨어진 밤에 글이 바뀐 가게가
+    실패 줄로 덮여 앱에서 사라지지 않게). 글이 바뀐 상태는 그대로라 다음 실행에서 다시 처리됨"""
+    d = done.get(shop["id"])
+    return "error" in out and d is not None and d["error"] is None
+
+
 def to_row(shop, out):
     row = dict.fromkeys(COLUMNS)
     row.update(shop_id=shop["id"], text_hash=shop["text_hash"], model=ai_structure.MODEL,
@@ -127,7 +134,7 @@ def main():
     key = env("GEMINI_API_KEY")
     deadline = time.monotonic() + args.max_minutes * 60
     queue, pending, rows = iter(todo), set(), []
-    processed = failed = 0
+    processed = failed = kept = 0
     tokens = {"prompt": 0, "output": 0, "thinking": 0}
     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
         def submit_next():
@@ -146,7 +153,10 @@ def main():
                 failed += "error" in out
                 for k in tokens:
                     tokens[k] += (out.get("tokens") or {}).get(k, 0)
-                rows.append(to_row(shop, out))
+                if keep_previous(shop, out, done):
+                    kept += 1
+                else:
+                    rows.append(to_row(shop, out))
                 submit_next()
             if len(rows) >= CHUNK:
                 save(rows)
@@ -155,7 +165,7 @@ def main():
     save(rows)
 
     left = len(todo) - processed
-    summary = (f"처리 {processed}곳 · 실패 {failed}곳 · 시간이 다 돼서 남긴 곳 {left}곳 · "
+    summary = (f"처리 {processed}곳 · 실패 {failed}곳 (그중 예전 결과를 남긴 곳 {kept}곳) · 시간이 다 돼서 남긴 곳 {left}곳 · "
                f"토큰 입력 {tokens['prompt']:,} · 출력 {tokens['output']:,} · 생각 {tokens['thinking']:,}")
     stats = read_all("shop_ai", "under_990,error,days_hours_conflict", "shop_id")
     ok = [s for s in stats if s["error"] is None]
