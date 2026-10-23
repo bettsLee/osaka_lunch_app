@@ -1,6 +1,7 @@
 "use client";
 
 // 도착했어요 (10/22 결정: 버튼 + 앱을 열 때 가게 근처면 자동). 도감에는 이미 넣었고, 그 자리에서 영업 여부만 물음
+// 닫혀 있었다고 답하면 먹지 못했으니 도감에서 빠짐 (10/23 결정)
 // 가격은 먹고 나서: 1시간 반 뒤 알림 · 다음에 열 때 질문 카드가 가격만 물음
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
@@ -46,7 +47,7 @@ export default function ArriveSheet({ visitId, shopName, limit, by, onClose, onO
             <h1 ref={title} id="arrive-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
               {t("arrive.title")}
             </h1>
-            <p className="text-[15px] text-[#1A3F91]">{t("arrive.saved", { shop: shopName })}</p>
+            <p className="text-[15px] text-[#1A3F91]">{open === false ? shopName : t("arrive.saved", { shop: shopName })}</p>
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close")} className="-mr-2 -mt-2 flex h-11 w-11 flex-none items-center justify-center text-[#5F5E58]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">

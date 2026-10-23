@@ -1,7 +1,7 @@
 // 여기 갈래요 · 다녀왔어요? 규칙 테스트. 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { arriveSettled, arrivedNear, cancelSettled, distanceLabel, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
+import { addsToZukan, arriveSettled, arrivedNear, cancelSettled, distanceLabel, canSubmit, chosenLabel, clockTime, EMPTY_ANSWERS, enqueue, feedbackBody, OUTBOX_MAX, settled, stillGoing } from "./visits.ts";
 import ko from "../public/i18n/ko.json" with { type: "json" };
 import { translator } from "./i18n.ts";
 
@@ -91,4 +91,12 @@ test("또 갈래요는 눌렀을 때만 true, 닫혀 있었거나 안 갔으면 
   assert.equal(feedbackBody({ visited: true, openOk: true, priceOk: true }).again, null);
   assert.equal(feedbackBody({ visited: true, openOk: false, priceOk: null }, true).again, null);
   assert.equal(feedbackBody({ visited: false, openOk: null, priceOk: null }, true).again, null);
+});
+
+test("도감에는 다녀왔고 닫혀 있지 않았던 곳만 새로 들어감 (도착한 기록은 이미 들어가 있음)", () => {
+  assert.equal(addsToZukan({ visited: true, openOk: true, priceOk: false, again: null }, false), true);
+  assert.equal(addsToZukan({ visited: true, openOk: null, priceOk: null, again: null }, false), true);
+  assert.equal(addsToZukan({ visited: true, openOk: false, priceOk: null, again: null }, false), false);
+  assert.equal(addsToZukan({ visited: false, openOk: null, priceOk: null, again: null }, false), false);
+  assert.equal(addsToZukan({ visited: true, openOk: true, priceOk: true, again: null }, true), false);
 });

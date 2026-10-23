@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -105,10 +106,10 @@ public class VisitController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    /** 도감(S6): '네, 다녀왔어요'라고 답한 기록 (10/21 결정: 답한 곳만). 같은 가게를 여러 번 갔으면 화면이 하나로 합침 */
+    /** 도감(S6): 도착했거나 '네, 다녀왔어요'라고 답한 기록, 닫혀 있던 곳은 뺌 (10/21 · 10/23 결정). 같은 가게를 여러 번 갔으면 화면이 하나로 합침 */
     @GetMapping("/zukan")
     public List<VisitResponse> zukan(@AuthenticationPrincipal Jwt jwt) {
-        return visits.findTop200ByUserIdAndVisitedTrueOrderByChosenAtDesc(userId(jwt)).stream().map(VisitResponse::of).toList();
+        return visits.findZukan(userId(jwt), PageRequest.of(0, 200)).stream().map(VisitResponse::of).toList();
     }
 
     /** 다녀왔어요? 답. 다녀왔으면 영업 · 가격 두 질문이 다 필요 */

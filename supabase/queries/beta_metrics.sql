@@ -47,7 +47,7 @@ m(k, metric, n, d) as (
   union all select 11, '정했다가 취소한 비율 (다른 가게로 다시 정한 것 포함)', count(*) filter (where cancelled_at is not null), count(*) from v
   union all select 12, '도착했어요 비율 (취소하지 않은 것 중)', count(*) filter (where arrived_at is not null), count(*) filter (where cancelled_at is null) from v
   union all select 13, '자동으로 도착한 비율 (도착한 것 중, 나머지는 버튼)', count(*) filter (where arrived_by = 'auto'), count(*) filter (where arrived_at is not null) from v
-  union all select 14, '또 갈래요 비율 (다녀온 것 중)', count(*) filter (where again), count(*) filter (where visited) from v
+  union all select 14, '또 갈래요 비율 (도감에 들어간 것 중, 닫혀 있던 곳 제외)', count(*) filter (where again), count(*) filter (where visited and open_ok is not false) from v
   union all select 15, '답했거나 도착한 비율 (고른 지 1시간 지났고 취소하지 않은 것, 베타 기준 3)',
     count(*) filter (where (answered_at is not null or arrived_at is not null) and cancelled_at is null and chosen_at < now() - interval '1 hour'),
     count(*) filter (where cancelled_at is null and chosen_at < now() - interval '1 hour') from v

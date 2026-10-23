@@ -145,13 +145,16 @@ class VisitControllerTest {
     }
 
     @Test
-    void 도감은_다녀왔다고_답한_내_기록만_최근_것부터() throws Exception {
+    void 도감은_다녀왔다고_답한_내_기록만_최근_것부터_닫혀_있던_곳은_뺌() throws Exception {
         Visit older = saved(ALICE, Duration.ofDays(2));
         older.answer(true, true, true, Instant.now());
         visits.save(older);
         Visit newer = saved(ALICE, Duration.ofHours(3));
-        newer.answer(true, false, true, Instant.now());
+        newer.answer(true, true, false, Instant.now()); // 가격은 틀렸어도 먹은 곳
         visits.save(newer);
+        Visit closed = saved(ALICE, Duration.ofHours(1));
+        closed.answer(true, false, null, Instant.now()); // 갔는데 닫혀 있었음 (10/23 결정: 도감에서 뺌)
+        visits.save(closed);
         Visit notGone = saved(ALICE, Duration.ofHours(4));
         notGone.answer(false, null, null, Instant.now());
         visits.save(notGone);
@@ -210,6 +213,7 @@ class VisitControllerTest {
         assertThat(answered.getPriceOk()).isNull();
         assertThat(answered.getAnsweredAt()).isNotNull();
         mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(jsonPath("$.length()").value(0)); // 닫혀 있던 곳은 도감에 없음
         mvc.perform(as(ALICE, put("/api/visits/" + closed.getId() + "/arrive")).content("{\"by\":\"auto\"}"))
                 .andExpect(status().isConflict()); // 이미 답함
 
