@@ -96,14 +96,21 @@ public class VisitController {
         return ResponseEntity.status(HttpStatus.CREATED).body(VisitResponse.of(saved));
     }
 
-    /** 지금 물어볼 기록: 1시간 ~ 3일 전에 고르고 아직 답하지도 취소하지도 않은 가장 최근 것. 없으면 204 */
+    /** 지금 물어볼 기록: 3일 안에 가장 최근에 고른 것 하나만 (새로 고른 가게가 있으면 예전 기록은 묻지 않음, 10/24 결정).
+     *  아직 답하지도 취소하지도 않았고, 고른 지 1시간 (도착했으면 도착 45분)이 지났을 때. 없으면 204 */
     @GetMapping("/pending")
     public ResponseEntity<VisitResponse> pending(@AuthenticationPrincipal Jwt jwt) {
         Instant now = Instant.now();
-        return visits.findFirstByUserIdAndAnsweredAtIsNullAndCancelledAtIsNullAndChosenAtBetweenOrderByChosenAtDesc(
-                        userId(jwt), now.minus(ASK_WITHIN), now.minus(ASK_AFTER))
+        return visits.findFirstByUserIdAndChosenAtAfterOrderByChosenAtDesc(userId(jwt), now.minus(ASK_WITHIN))
+                .filter(v -> v.getAnsweredAt() == null && v.getCancelledAt() == null && askable(v, now))
                 .map(v -> ResponseEntity.ok(VisitResponse.of(v)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    static boolean askable(Visit v, Instant now) {
+        return v.getArrivedAt() != null
+                ? !v.getArrivedAt().isAfter(now.minus(Visit.ASK_AFTER_ARRIVAL))
+                : !v.getChosenAt().isAfter(now.minus(ASK_AFTER));
     }
 
     /** 도감(S6): 도착했거나 '네, 다녀왔어요'라고 답한 기록, 닫혀 있던 곳은 뺌 (10/21 · 10/23 결정). 같은 가게를 여러 번 갔으면 화면이 하나로 합침 */

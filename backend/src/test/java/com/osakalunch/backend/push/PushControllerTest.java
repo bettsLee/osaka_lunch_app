@@ -33,6 +33,9 @@ class PushControllerTest {
 
     static final UUID ALICE = UUID.fromString("11111111-1111-1111-1111-111111111111");
     static final UUID BOB = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    static final UUID CAROL = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    static final UUID DAVE = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    static final UUID ERIN = UUID.fromString("55555555-5555-5555-5555-555555555555");
     static final String FCM = "https://fcm.googleapis.com/fcm/send/test-endpoint";
     static final String P256DH = WebPushCryptoTest.UA_PUBLIC;
     static final String AUTH = WebPushCryptoTest.AUTH;
@@ -61,6 +64,10 @@ class PushControllerTest {
     Visit visit(UUID user, Duration ago) {
         return visits.save(new Visit(UUID.randomUUID(), user, "J000000001", "테스트 식당", "roulette", 0.4, 990,
                 Instant.now().minus(ago)));
+    }
+
+    void subscribe(UUID user) {
+        subscriptions.save(new PushSubscription(user, FCM + "-" + user, P256DH, AUTH, Instant.now()));
     }
 
     MockHttpServletRequestBuilder sendDue() {
@@ -95,15 +102,16 @@ class PushControllerTest {
 
     @Test
     void 한_시간_반이_지난_기록에_한_번만() throws Exception {
-        subscriptions.save(new PushSubscription(ALICE, FCM, P256DH, AUTH, Instant.now()));
+        // 사람마다 가장 최근에 고른 기록만 보므로 경우마다 사람을 나눔 (10/24)
+        for (UUID u : new UUID[] {ALICE, CAROL, DAVE, ERIN}) subscribe(u);
         Visit due = visit(ALICE, Duration.ofMinutes(100));
-        Visit tooEarly = visit(ALICE, Duration.ofMinutes(30));
-        Visit tooOld = visit(ALICE, Duration.ofHours(4));
-        Visit answered = visit(ALICE, Duration.ofMinutes(100));
+        Visit tooEarly = visit(CAROL, Duration.ofMinutes(30));
+        Visit tooOld = visit(DAVE, Duration.ofHours(4));
+        Visit answered = visit(ERIN, Duration.ofMinutes(100));
         answered.answer(true, true, true, Instant.now());
         visits.save(answered);
         Visit noSubscription = visit(BOB, Duration.ofMinutes(100));
-        Visit cancelled = visit(ALICE, Duration.ofMinutes(95)); // 정했다가 취소한 건 보내지 않음
+        Visit cancelled = visit(ERIN, Duration.ofMinutes(95)); // 정했다가 취소한 건 보내지 않음
         cancelled.cancel(Instant.now());
         visits.save(cancelled);
         when(sender.send(any(), any())).thenReturn(201);
@@ -119,6 +127,32 @@ class PushControllerTest {
         assertThat(visits.findById(tooOld.getId()).orElseThrow().getNotifiedAt()).isNull();
         assertThat(visits.findById(noSubscription.getId()).orElseThrow().getNotifiedAt()).isNull(); // 시간 안에 허용하면 보냄
         assertThat(visits.findById(cancelled.getId()).orElseThrow().getNotifiedAt()).isNull();
+    }
+
+    @Test
+    void 가장_최근에_고른_기록만_도착했으면_도착_45분_뒤() throws Exception {
+        for (UUID u : new UUID[] {ALICE, BOB, CAROL}) subscribe(u);
+        // 앨리스: 100분 전 기록이 있어도 30분 전에 새로 골랐으면 예전 건 보내지 않음
+        Visit old = visit(ALICE, Duration.ofMinutes(100));
+        Visit fresh = visit(ALICE, Duration.ofMinutes(30));
+        // 밥: 60분 전에 고르고 50분 전에 도착 → 고른 지 1시간 반 전이어도 도착 45분이 지나서 보냄
+        Visit ate = visit(BOB, Duration.ofMinutes(60));
+        ate.arrive("auto", true, Instant.now().minus(Duration.ofMinutes(50)));
+        visits.save(ate);
+        // 캐럴: 100분 전에 고르고 30분 전에 도착 → 아직 먹는 중일 수 있어서 안 보냄
+        Visit eating = visit(CAROL, Duration.ofMinutes(100));
+        eating.arrive("manual", true, Instant.now().minus(Duration.ofMinutes(30)));
+        visits.save(eating);
+        when(sender.send(any(), any())).thenReturn(201);
+
+        mvc.perform(sendDue()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.due").value(1))
+                .andExpect(jsonPath("$.sent").value(1));
+
+        assertThat(visits.findById(ate.getId()).orElseThrow().getNotifiedAt()).isNotNull();
+        assertThat(visits.findById(old.getId()).orElseThrow().getNotifiedAt()).isNull();
+        assertThat(visits.findById(fresh.getId()).orElseThrow().getNotifiedAt()).isNull();
+        assertThat(visits.findById(eating.getId()).orElseThrow().getNotifiedAt()).isNull();
     }
 
     @Test

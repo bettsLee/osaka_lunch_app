@@ -5,8 +5,8 @@
 // 처음에는 아무것도 고르지 않은 상태, 목록 줄이나 다녀온 곳 핀을 누르면 그 가게를 파랗게 (10/22 도그푸딩)
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { distanceKm, genreLabel, osakaNow, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
-import { lunchHours, SHARE_MAX, shareLink, shareMessage, shortLink } from "@/lib/share";
+import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
+import { SHARE_MAX, shareLink, shareMessage, shortLink } from "@/lib/share";
 import { createShareCode, fetchZukan, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
@@ -81,19 +81,8 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
   const recommend = async (chosen: ZukanItem[], from: "row" | "pick") => {
     const list = chosen.filter((it): it is ZukanItem & { shop: LunchShop } => it.shop !== null).slice(0, SHARE_MAX);
     if (!list.length) return;
-    const { day } = osakaNow(new Date());
-    const lines = list.map((it, i) => {
-      const hours = lunchHours(it.shop, day);
-      const parts = [
-        it.name,
-        it.shop.genre ? genreLabel(it.shop.genre, t) : null,
-        priceLabel(it.shop, t),
-        hours ? t("share.recHours", { hours }) : null,
-        it.shop.areaCode ? t(`area.${it.shop.areaCode}`) : null,
-      ].filter(Boolean);
-      return `${list.length > 1 ? `${i + 1}. ` : ""}${parts.join(" · ")}`;
-    });
-    const text = [t("share.recHeader", { n: list.length }), ...lines].join("\n");
+    // 글에는 제목만: 가게 이름 · 장르 같은 핫페퍼 정보를 앱 밖으로 내보내지 않음 (10/24 리크루트 답: 재배포 금지). 가게는 링크를 열면 그날 목록에서
+    const text = t("share.recHeader", { n: list.length });
     const ids = list.map((it) => it.shopId);
     // 짧은 링크 (10/22 결정). 서버가 잠들어 있거나 실패하면 긴 링크로 (받는 쪽은 둘 다 열림)
     let short = true;
@@ -295,7 +284,7 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
                         <div className="h-12 w-12 flex-none rounded-[10px] bg-[#ECEAE3]" />
                       )}
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <p className="truncate text-base font-semibold">{it.name}</p>
+                        <p className={`truncate text-base font-semibold ${it.name === null ? "text-[#5F5E58]" : ""}`}>{it.name ?? t("zukan.gone")}</p>
                         <p className="text-[13px] text-[#5F5E58]">
                           {[
                             it.shop?.genre ? genreLabel(it.shop.genre, t) : null,
@@ -377,7 +366,8 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
                 {t("zukan.pickStart")}
               </button>
             )}
-            <p className="mt-3 text-[10px] text-[#5F5E58]">Powered by ホットペッパー グルメ Webサービス · 画像提供：ホットペッパー グルメ</p>
+            <p className="mt-3 text-[10px] text-[#5F5E58]">{t("credit.shop")}: Powered by ホットペッパー グルメ Webサービス · 画像提供：ホットペッパー グルメ</p>
+            <p className="text-[10px] text-[#5F5E58]">{t("credit.ai")}</p>
           </>
         )}
       </section>

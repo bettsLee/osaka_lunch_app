@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -15,6 +16,10 @@ import java.util.UUID;
 @Table(name = "visits")
 public class Visit {
 
+    /** 도착한 기록은 먹고 나서 묻도록 도착 45분 뒤부터 질문 카드 · 알림 (10/24 결정: 도착 직후 '점심 어땠어요?'가 떴음) */
+    public static final Duration ASK_AFTER_ARRIVAL = Duration.ofMinutes(45);
+
+
     @Id
     private UUID id; // 화면이 만든 id. 저장을 다시 보내도 한 번만 남게
 
@@ -24,7 +29,8 @@ public class Visit {
     @Column(name = "shop_id", nullable = false)
     private String shopId;
 
-    @Column(name = "shop_name", nullable = false)
+    /** 알림 문구용. 24시간이 지나면 수집 배치가 비움 (10/24 리크루트 답: 핫페퍼 정보 캐시는 24시간 안 갱신) */
+    @Column(name = "shop_name")
     private String shopName;
 
     @Column(nullable = false)

@@ -11,11 +11,12 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // 읽기 전용 공개 키 (RLS로 읽기만 허용)
 
 const SELECT =
-  "shop_id,lunch_days,lunch_window,lunch_price_min,lunch_price_max,typical_lunch_price,price_evidence," +
-  "shops(name,genre_name,catch,genre_catch,lat,lng,photo_url,hotpepper_url,middle_area_code)";
+  "shop_id,text_hash,lunch_days,lunch_window,lunch_price_min,lunch_price_max,typical_lunch_price,price_evidence," +
+  "shops(name,genre_name,catch,genre_catch,lat,lng,photo_url,hotpepper_url,middle_area_code,text_hash)";
 
 type Row = {
   shop_id: string;
+  text_hash: string; // AI가 읽었을 때의 가게 글
   lunch_days: string | null;
   lunch_window: LunchShop["lunchWindow"] | null;
   lunch_price_min: number | null;
@@ -32,6 +33,7 @@ type Row = {
     photo_url: string | null;
     hotpepper_url: string | null;
     middle_area_code: string | null;
+    text_hash: string; // 오늘 받은 가게 글
   } | null;
 };
 
@@ -69,7 +71,8 @@ export async function fetchLunchShops(): Promise<LunchShop[]> {
         priceMin: r.lunch_price_min,
         priceMax: r.lunch_price_max,
         typicalPrice: r.typical_lunch_price,
-        priceEvidence: r.price_evidence || null,
+        // 가격 원문은 핫페퍼 글 그대로라 오늘 글일 때만. AI가 실패해 예전 결과가 남은 가게는 숨김 (10/24 리크루트 답: 늘 최신 정보)
+        priceEvidence: r.text_hash === s.text_hash ? r.price_evidence || null : null,
         catchText: s.catch?.trim() || s.genre_catch?.trim() || null,
       },
     ];

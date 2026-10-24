@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  areaName, directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
+  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
@@ -156,13 +156,6 @@ test("장르는 우리 말로, 모르는 장르는 그대로", () => {
   assert.equal(genreLabel("居酒屋", t), "이자카야");
   assert.equal(genreLabel("お好み焼き・もんじゃ", t), "오코노미야키");
   assert.equal(genreLabel("新ジャンル", t), "新ジャンル");
-});
-
-test("동네 이름은 가장 가까운 가게의 지역", () => {
-  const near = { ...shop(0.2, { areaCode: "Y315" }), km: 0.2, walk: 4 };
-  const far = { ...shop(0.9), km: 0.9, walk: 15 };
-  assert.equal(areaName([far, near], t), "난바");
-  assert.equal(areaName([], t), null);
 });
 
 test("동네 골라서 보기: 동네마다 가게들의 가운데, 가게 많은 순 (모르는 동네는 뺌)", () => {

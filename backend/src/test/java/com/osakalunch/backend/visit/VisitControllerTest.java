@@ -84,13 +84,9 @@ class VisitControllerTest {
     }
 
     @Test
-    void 다녀왔어요는_1시간_지나고_3일_안의_내_기록만() throws Exception {
-        saved(ALICE, Duration.ofMinutes(10)); // 아직 이름
-        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
-
-        Visit older = saved(ALICE, Duration.ofHours(5));
+    void 다녀왔어요는_가장_최근에_고른_내_기록만_1시간_지나고_3일_안() throws Exception {
+        saved(ALICE, Duration.ofHours(5));
         Visit recent = saved(ALICE, Duration.ofHours(2));
-        saved(ALICE, Duration.ofDays(4)); // 너무 옛날
         saved(BOB, Duration.ofHours(1).plusMinutes(30)); // 남의 기록
         mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(recent.getId().toString()))
@@ -98,8 +94,44 @@ class VisitControllerTest {
 
         mvc.perform(as(ALICE, put("/api/visits/" + recent.getId() + "/feedback")).content("{\"visited\":false}"))
                 .andExpect(status().isNoContent());
-        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(older.getId().toString())); // 답한 건 다시 묻지 않음
+        // 답한 건 다시 묻지 않고, 그보다 예전 기록(5시간 전)도 묻지 않음 (10/24 결정: 가장 최근에 고른 것만)
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+
+        saved(ALICE, Duration.ofMinutes(10)); // 새로 고름: 아직 1시간이 안 됨
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+
+        visits.deleteAll();
+        saved(ALICE, Duration.ofDays(4)); // 너무 옛날
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void 새로_고른_가게가_있으면_예전_기록은_묻지_않음() throws Exception {
+        saved(ALICE, Duration.ofDays(1)); // 어제 고르고 답하지 않은 기록
+        Visit today = saved(ALICE, Duration.ofMinutes(30)); // 오늘 새로 고름 (아직 1시간 전)
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+
+        today.cancel(Instant.now()); // 오늘 것을 취소해도 어제 기록을 다시 묻지 않음
+        visits.save(today);
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void 도착했으면_도착_45분_뒤부터_물음() throws Exception {
+        // 100분 전에 고르고 30분 전에 도착: 고른 지 1시간은 지났지만 아직 먹는 중일 수 있음
+        Visit eating = saved(ALICE, Duration.ofMinutes(100));
+        eating.arrive("auto", true, Instant.now().minus(Duration.ofMinutes(30)));
+        visits.save(eating);
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
+
+        // 60분 전에 고르고 50분 전에 도착: 도착 45분이 지났으니 가격만 물음
+        Visit ate = saved(BOB, Duration.ofMinutes(60));
+        ate.arrive("manual", true, Instant.now().minus(Duration.ofMinutes(50)));
+        visits.save(ate);
+        mvc.perform(as(BOB, get("/api/visits/pending"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ate.getId().toString()))
+                .andExpect(jsonPath("$.arrived").value(true))
+                .andExpect(jsonPath("$.openOk").value(true));
     }
 
     @Test
@@ -179,9 +211,7 @@ class VisitControllerTest {
         mvc.perform(as(ALICE, put(url)).content("{\"by\":\"auto\"}")).andExpect(status().isNoContent());
 
         mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(jsonPath("$.length()").value(1));
-        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.arrived").value(true))
-                .andExpect(jsonPath("$.openOk").isEmpty());
+        mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent()); // 도착 직후엔 묻지 않음 (도착 45분 뒤부터)
 
         // 그 자리에서 영업 여부를 답함: 처음 도착 방법은 그대로
         mvc.perform(as(ALICE, put(url)).content("{\"by\":\"manual\",\"openOk\":true}")).andExpect(status().isNoContent());

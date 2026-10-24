@@ -2,10 +2,11 @@
 """
 핫페퍼 점심 가게 수집 배치
 
-하루 한 번 GitHub Actions에서 돌아요.
+하루 두 번 GitHub Actions에서 돌아요 (10/24: 예약이 늦게 돌아도 24시간 안에 갱신되게).
   1. AREAS(핫페퍼 중지역 코드)마다 '점심 있음' 가게를 전부 받아요
   2. Supabase shops 테이블에 넣거나 갱신해요 (가게 id 기준)
   3. 이번에 안 보인 가게는 지워요 (핫페퍼 약관: 캐시는 24시간 안에 갱신)
+  4. '여기 갈래요' 기록(visits)에 저장한 가게 이름 중 24시간 지난 것을 비워요 (10/24 리크루트 답)
 
 환경 변수 (값은 저장소에 올리지 않기)
   HOTPEPPER_API_KEY            핫페퍼 API 키
@@ -37,6 +38,7 @@ AREAS = ["Y300", "Y301", "Y305", "Y310", "Y315", "Y866",
 CHUNK = 500            # Supabase에 한 번에 보내는 줄 수
 AI_COST_PER_SHOP = 0.006  # 가게 1곳 처음 AI 처리 비용 (달러, 10/19 전체 실행 기준 약 0.6센트)
 MIN_KEEP_RATIO = 0.5   # 이번에 받은 수가 기존의 절반도 안 되면 API 이상으로 보고 삭제하지 않음
+VISIT_NAME_KEEP = datetime.timedelta(hours=24)  # visits.shop_name을 남겨 두는 시간 (알림은 1시간 반 뒤라 충분)
 # AI가 읽을 글. 이 글이 바뀐 가게만 AI를 다시 돌리려고 해시를 저장함
 AI_TEXT_FIELDS = ["open_text", "close_text", "budget_name", "budget_average", "budget_memo",
                   "catch", "genre_catch", "shop_detail_memo", "other_memo"]
@@ -143,6 +145,12 @@ def supabase(method, path, body=None, prefer=""):
         sys.exit(f"Supabase {method} {path.split('?')[0]} 실패: {e.code} {e.read().decode('utf-8')[:300]}")
 
 
+def old_visit_names_path(now):
+    """24시간 지난 '여기 갈래요' 기록 중 가게 이름이 남은 것 (PATCH로 비울 대상)"""
+    cutoff = (now - VISIT_NAME_KEEP).replace(microsecond=0).isoformat()
+    return "visits?shop_name=not.is.null&chosen_at=lt." + urllib.parse.quote(cutoff)
+
+
 def count_shops():
     headers = supabase("GET", "shops?select=id&limit=1", prefer="count=exact")
     return int(headers.get("Content-Range", "*/0").split("/")[-1])
@@ -186,6 +194,9 @@ def main():
                  f"API 이상일 수 있어서 오래된 가게를 지우지 않고 멈춰요.")
     supabase("DELETE", "shops?fetched_at=lt." + urllib.parse.quote(run_start), prefer="return=minimal")
     print(f"저장 완료: {len(rows)}곳 (이전 {before}곳, 이번에 안 보인 가게는 삭제)")
+    supabase("PATCH", old_visit_names_path(datetime.datetime.now(datetime.timezone.utc)), {"shop_name": None},
+             prefer="return=minimal")
+    print("24시간 지난 '여기 갈래요' 기록의 가게 이름을 비웠어요")
 
 
 if __name__ == "__main__":
