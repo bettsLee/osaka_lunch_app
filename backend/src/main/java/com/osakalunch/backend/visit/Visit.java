@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -14,6 +15,10 @@ import java.util.UUID;
 @Entity
 @Table(name = "visits")
 public class Visit {
+
+    /** 도착한 기록은 먹고 나서 묻도록 도착 45분 뒤부터 질문 카드 · 알림 (10/24 결정: 도착 직후 '점심 어땠어요?'가 떴음) */
+    public static final Duration ASK_AFTER_ARRIVAL = Duration.ofMinutes(45);
+
 
     @Id
     private UUID id; // 화면이 만든 id. 저장을 다시 보내도 한 번만 남게
