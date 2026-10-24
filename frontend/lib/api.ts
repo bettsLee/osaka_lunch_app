@@ -237,25 +237,6 @@ export async function fetchZukan(): Promise<ZukanVisit[]> {
   return res.json();
 }
 
-// 결과 카드의 가게 소개 번역 (10/22 결정: AI 번역). 서버가 가게 × 언어마다 한 번 번역해 저장. 없으면 null
-// 다시 돌리기로 같은 가게가 나와도 다시 묻지 않게 이 화면에서 기억
-const catchCache = new Map<string, Promise<string | null>>();
-export function fetchShopCatch(shopId: string, lang: string): Promise<string | null> {
-  const key = `${shopId}:${lang}`;
-  let got = catchCache.get(key);
-  if (!got) {
-    got = call(`/api/shops/${encodeURIComponent(shopId)}/catch?lang=${encodeURIComponent(lang)}`).then(async (res) => {
-      if (res.status === 204) return null;
-      if (!res.ok) throw new Error(`가게 소개를 번역하지 못했어요 (${res.status})`);
-      const body: { text?: unknown } = await res.json();
-      return typeof body.text === "string" ? body.text : null;
-    });
-    got.catch(() => catchCache.delete(key)); // 실패하면 다음에 다시
-    catchCache.set(key, got);
-  }
-  return got;
-}
-
 // 한국어 · 영어가 아닌 휴대폰 언어의 문구. 서버가 처음 한 번 AI로 번역해 저장해 둔 것 (로그인 필요 없음)
 export async function fetchTranslation(lang: string): Promise<Record<string, string> | null> {
   if (!API_URL) return null;

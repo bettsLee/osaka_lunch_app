@@ -15,7 +15,7 @@ export type VisitDraft = {
 export type PendingVisit = {
   id: string;
   shopId: string;
-  shopName: string;
+  shopName: string | null; // 서버가 24시간 지나면 비움 (10/24 리크루트 답). 화면은 그날 가게 목록의 이름을 먼저 씀
   priceLimit: number | null;
   chosenAt: string;
   arrived?: boolean;

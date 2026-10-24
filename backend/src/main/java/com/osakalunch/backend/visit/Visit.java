@@ -24,7 +24,8 @@ public class Visit {
     @Column(name = "shop_id", nullable = false)
     private String shopId;
 
-    @Column(name = "shop_name", nullable = false)
+    /** 알림 문구용. 24시간이 지나면 수집 배치가 비움 (10/24 리크루트 답: 핫페퍼 정보 캐시는 24시간 안 갱신) */
+    @Column(name = "shop_name")
     private String shopName;
 
     @Column(nullable = false)

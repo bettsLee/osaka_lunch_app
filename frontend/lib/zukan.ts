@@ -1,10 +1,11 @@
 // S6 도감 규칙 (10/21 결정: '네, 다녀왔어요'라고 답한 곳만). 공유 카드(S7)는 10/22에 맛집 추천 링크로 바뀜 (lib/share.ts)
-// 서버에는 고른 기록만 있어서, 지도 · 장르 · 가격은 화면이 불러 둔 가게 목록에서 찾아 붙임
+// 서버에는 고른 기록만 있어서, 이름 · 지도 · 장르 · 가격은 화면이 불러 둔 그날 가게 목록에서 찾아 붙임
+// (10/24 리크루트 답: 핫페퍼 정보는 늘 최신으로. 서버에 저장한 이름은 24시간 뒤 비워짐) 목록에서 빠진 가게는 이름 없이 (null)
 import type { LunchShop } from "./lunch";
 
-export type ZukanVisit = { shopId: string; shopName: string; chosenAt: string; again?: boolean | null };
+export type ZukanVisit = { shopId: string; chosenAt: string; again?: boolean | null };
 // liked: 또 갈래요 ♥ (그 가게 기록 중 하나라도 켜져 있으면)
-export type ZukanItem = { shopId: string; name: string; lastAt: string; times: number; liked: boolean; shop: LunchShop | null };
+export type ZukanItem = { shopId: string; name: string | null; lastAt: string; times: number; liked: boolean; shop: LunchShop | null };
 
 // 같은 가게는 한 칸 (가장 최근에 간 날 · 몇 번 갔는지). 최근 것부터
 export function collect(visits: ZukanVisit[], shops: LunchShop[]): ZukanItem[] {
@@ -16,7 +17,8 @@ export function collect(visits: ZukanVisit[], shops: LunchShop[]): ZukanItem[] {
       seen.times += 1;
       seen.liked ||= v.again === true;
     } else {
-      items.set(v.shopId, { shopId: v.shopId, name: v.shopName, lastAt: v.chosenAt, times: 1, liked: v.again === true, shop: byId.get(v.shopId) ?? null });
+      const shop = byId.get(v.shopId) ?? null;
+      items.set(v.shopId, { shopId: v.shopId, name: shop?.name ?? null, lastAt: v.chosenAt, times: 1, liked: v.again === true, shop });
     }
   }
   return [...items.values()];

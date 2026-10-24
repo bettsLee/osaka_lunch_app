@@ -5,7 +5,6 @@
 import { useEffect, useRef, useState } from "react";
 import { directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
-import { fetchShopCatch } from "@/lib/api";
 import { clockTime } from "@/lib/visits";
 import { useT } from "./I18n";
 import { svg } from "./icons";
@@ -30,24 +29,11 @@ type Props = {
 
 export default function ResultCard(props: Props) {
   const { shop, day, minutes, limit, onGo, onRespin, canRespin, collapsed, onToggle, handle, goingAt = null, onCancelGoing, onArrive } = props;
-  const { t, lang } = useT();
+  const { t } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
   const [asking, setAsking] = useState(false); // 취소를 한 번 더 물어보는 중
-  // 가게 소개 AI 번역 (일본어 화면은 원문만). text가 null이면 번역하는 중
-  const [catchTr, setCatchTr] = useState<{ id: string; text: string | null } | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
-  useEffect(() => {
-    if (!shop.catchText || lang === "ja") return;
-    let live = true;
-    setCatchTr({ id: shop.id, text: null }); // 처음 번역하는 가게는 몇 초 걸려서 '번역하는 중'을 보여 줌 (10/22 도그푸딩)
-    fetchShopCatch(shop.id, lang)
-      .then((text) => live && setCatchTr(text ? { id: shop.id, text } : null))
-      .catch(() => live && setCatchTr(null)); // 번역이 없으면 원문만 (서버가 잠들어 있으면 다음에)
-    return () => {
-      live = false;
-    };
-  }, [shop.id, shop.catchText, lang]);
 
   const time = lunchTimeText(shop, day, minutes, t);
   const range = priceRange(shop, t);
@@ -80,10 +66,13 @@ export default function ResultCard(props: Props) {
         </button>
       ) : null}
       {collapsed ? (
-        // 접어도 출처 표기는 남김 (약관)
-        <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="text-[10px] text-[#5F5E58] underline">
-          Powered by ホットペッパー グルメ Webサービス
-        </a>
+        // 접어도 출처 표기는 남김 (약관). 핫페퍼가 준 부분만 밝힘 (10/24 리크루트 답)
+        <p className="text-[10px] text-[#5F5E58]">
+          {t("credit.shop")}:{" "}
+          <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
+            Powered by ホットペッパー グルメ Webサービス
+          </a>
+        </p>
       ) : (
       <>
       {shop.photoUrl && (
@@ -108,21 +97,8 @@ export default function ResultCard(props: Props) {
           <div className="flex flex-col gap-0.5">
             {/* 가게 소개는 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22 결정) */}
             <p className="text-[11px] text-[#5F5E58]">{t("result.catchLabel")}</p>
+            {/* 원문 그대로 (10/24 리크루트 답: 핫페퍼 정보의 번안 · 가공 금지 → AI 번역을 끔) */}
             <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>
-            {catchTr?.id === shop.id &&
-              (catchTr.text === null ? (
-                <p className="flex items-center gap-1.5 text-[12px] text-[#5F5E58]" aria-live="polite">
-                  <span
-                    className="h-3 w-3 flex-none rounded-full border-2 border-[#CFCCC2] border-t-[#2457C5] motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                  {t("result.catchTranslating")}
-                </p>
-              ) : (
-                <p className="text-[13px] leading-snug text-[#1F1F1C]">
-                  {catchTr.text} <span className="whitespace-nowrap text-[11px] text-[#5F5E58]">· {t("i18n.ai")}</span>
-                </p>
-              ))}
           </div>
         )}
         <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
@@ -149,6 +125,8 @@ export default function ResultCard(props: Props) {
           {typical && range !== typical ? t("result.aiNoteTypical", { typical, limit: limitYen }) : t("result.aiNote", { limit: limitYen })}
         </p>
       )}
+      {/* 점심 시간 · 가격은 AI가 만든 값이라 핫페퍼 정보로 착각하지 않게 (10/24 리크루트 답) */}
+      <p className="-mt-1 text-[12px] text-[#5F5E58]">{t("result.aiSource")}</p>
 
       {/* 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없어서(10/21 확인: 가격 근거에 메뉴가 있는 곳 7/250) 메뉴는 핫페퍼 페이지로 보냄 */}
       {shop.hotpepperUrl && (
@@ -257,9 +235,12 @@ export default function ResultCard(props: Props) {
             <p className="rounded-lg bg-[#F4F3EF] p-2 leading-relaxed">「{shop.priceEvidence}」</p>
           </details>
         )}
-        <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
-          Powered by ホットペッパー グルメ Webサービス
-        </a>
+        <p>
+          {t("credit.shop")}:{" "}
+          <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
+            Powered by ホットペッパー グルメ Webサービス
+          </a>
+        </p>
       </div>
       </>
       )}

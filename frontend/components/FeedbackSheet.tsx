@@ -49,7 +49,7 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <p className="text-[13px] text-[#5F5E58]">{t("feedback.chosen", { when: chosenLabel(visit.chosenAt, new Date(), t) })}</p>
-            <p className="text-[17px] font-semibold">{visit.shopName}</p>
+            <p className="text-[17px] font-semibold">{visit.shopName ?? t("zukan.gone")}</p>
           </div>
           <button type="button" onClick={onClose} aria-label={t("feedback.later")} className="-mr-2 -mt-2 flex h-11 w-11 items-center justify-center text-[#5F5E58]">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
