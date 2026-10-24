@@ -669,7 +669,7 @@ export default function HomeScreen() {
 
       {mode === "home" && ask && !priceOpen && !arrival && (
         <FeedbackSheet
-          visit={ask}
+          visit={{ ...ask, shopName: (data.status === "ok" ? data.shops.find((s) => s.id === ask.shopId)?.name : undefined) ?? ask.shopName }}
           onClose={() => {
             setAsk(null);
             void flushVisits();
@@ -803,13 +803,16 @@ export default function HomeScreen() {
                 ))}
               </ul>
             )}
+            {/* 핫페퍼가 준 부분과 AI가 만든 부분을 나눠서 밝힘 (10/24 리크루트 답) */}
             <p className="text-[10px] text-[#5F5E58]">
+              {t("credit.shop")}:{" "}
               <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
                 Powered by ホットペッパー グルメ Webサービス
               </a>
               {" · "}画像提供：ホットペッパー グルメ
               {machine && ` · ${t("i18n.ai")}`}
             </p>
+            <p className="-mt-1 text-[10px] text-[#5F5E58]">{t("credit.ai")}</p>
           </section>
 
           {tabs}

@@ -75,11 +75,12 @@ export default function SettingsScreen({ limit }: { limit: number }) {
 
         <div className="flex flex-col gap-1 px-1 text-xs leading-relaxed text-[#5F5E58]">
           <p>
-            {t("settings.sourceShops")}:{" "}
+            {t("credit.shop")}:{" "}
             <a href="https://webservice.recruit.co.jp/" target="_blank" rel="noreferrer" className="underline">
               Powered by ホットペッパー グルメ Webサービス
             </a>
           </p>
+          <p>{t("credit.ai")}</p>
           <p>
             {t("settings.sourceMap")}:{" "}
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">

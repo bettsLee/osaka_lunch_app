@@ -56,7 +56,11 @@ export default function SharedScreen({ shops, missing, loading, located, day, mi
         <button type="button" onClick={onClose} className="mt-1 h-[52px] flex-none rounded-[14px] border border-[#2457C5] bg-white text-base font-semibold text-[#1A3F91]">
           {t("shared.home")}
         </button>
-        <p className="text-[10px] text-[#5F5E58]">Powered by ホットペッパー グルメ Webサービス · 画像提供：ホットペッパー グルメ</p>
+        <p className="text-[10px] text-[#5F5E58]">
+          {t("credit.shop")}: Powered by ホットペッパー グルメ Webサービス · 画像提供：ホットペッパー グルメ
+          <br />
+          {t("credit.ai")}
+        </p>
       </section>
     </>
   );

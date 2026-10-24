@@ -102,13 +102,15 @@ v as (
   where chosen_at >= params.start_at and chosen_at < params.end_at
     and shop_id <> 'TEST' and user_id not in (select user_id from excluded)
 )
-select v.shop_name as "가게", v.shop_id,
+-- 가게 이름은 그날 가게 목록에서 (visits의 이름은 24시간 뒤 비워짐, 10/24 리크루트 답장)
+select coalesce(s.name, '(지금은 핫페퍼에 없음)') as "가게", v.shop_id,
        to_char(v.chosen_at at time zone 'Asia/Tokyo', 'MM-DD Dy HH24:MI') as "고른 때",
        v.open_ok as "영업 맞음", v.price_ok as "가격 맞음", v.price_limit as "상한",
        a.lunch_days as "점심 요일",
        a.lunch_window -> lower(to_char(v.chosen_at at time zone 'Asia/Tokyo', 'Dy')) as "그날 카드 점심 시간",
        a.typical_lunch_price as "대표 메뉴", a.lunch_price_max as "점심 최고가", a.price_evidence as "가격 근거"
 from v left join shop_ai a on a.shop_id = v.shop_id
+       left join shops s on s.id = v.shop_id
 where v.open_ok = false or v.price_ok = false
 order by v.chosen_at;
 

@@ -9,7 +9,7 @@ const shop = (id, over = {}) => ({
 });
 const visit = (shopId, chosenAt) => ({ shopId, shopName: `기록 ${shopId}`, chosenAt });
 
-test("같은 가게는 한 칸으로 합치고 최근 것부터, 가게 목록에 없으면 이름만", () => {
+test("같은 가게는 한 칸으로 합치고 최근 것부터, 이름은 그날 가게 목록에서 (목록에 없으면 이름 없음)", () => {
   const items = collect(
     [visit("a", "2026-10-18T03:00:00Z"), visit("b", "2026-10-20T03:00:00Z"), visit("a", "2026-10-21T03:00:00Z"), visit("gone", "2026-10-19T03:00:00Z")],
     [shop("a"), shop("b")],
@@ -19,8 +19,9 @@ test("같은 가게는 한 칸으로 합치고 최근 것부터, 가게 목록�
     ["b", 1, "2026-10-20T03:00:00Z"],
     ["gone", 1, "2026-10-19T03:00:00Z"],
   ]);
+  assert.equal(items[0].name, "가게 a"); // 서버에 저장한 이름(기록 a)이 아니라 지금 목록의 이름
   assert.equal(items[2].shop, null);
-  assert.equal(items[2].name, "기록 gone");
+  assert.equal(items[2].name, null); // 10/24 리크루트 답: 24시간 넘은 이름을 보여 주지 않음
 });
 
 test("주로 다닌 동네(절반 넘게)", () => {
