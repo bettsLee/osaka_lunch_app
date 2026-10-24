@@ -4,7 +4,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  areaCenters, areaName, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, nextLunch, pickNearby, pickShop, priceBadge, priceLabel,
+  areaCenters, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, nextLunch, pickNearby, pickShop, priceBadge, priceLabel,
   rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
@@ -231,7 +231,9 @@ export default function HomeScreen() {
   const pool = rouletteCandidates(visible, day, minutes);
   const allOrdersOver = near !== null && near.shops.length > 0 && rouletteCandidates(near.shops, day, minutes).length === 0;
   const next = allOrdersOver && near ? nextLunch(near.shops, day) : null;
-  const area = near ? areaName(near.shops, t) : null;
+  // 동네 이름은 '동네 골라서 보기'로 고른 때만. 내 위치일 때는 '지금 위치 근처' (10/24 결정: 핫페퍼 중지역이 넓어서
+  // 혼마치에서 꽤 떨어진 곳도 '혼마치 근처'로 나옴. 지도가 있으니 글자로 동네를 또 쓸 필요 없음)
+  const area = loc.status === "ok" && loc.area ? t(`area.${loc.area}`) : null;
   const rows = listOpen ? visible : []; // 목록은 '목록 보기'를 눌러야 보임 (10/22 도그푸딩: 처음엔 룰렛 버튼만)
   const goingNow = stillGoing(going, now);
   // 친구가 추천한 가게: 지금 가게 목록에서 찾고, 위치를 알면 걸어서 n분
