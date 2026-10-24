@@ -174,12 +174,6 @@ export function priceLabel(shop: LunchShop, t: T): string {
   return p ? t(p.from ? "price.from" : "price.yen", { n: yen(p.yen) }) : t("price.unknown");
 }
 
-// 가장 가까운 가게의 중지역으로 동네 이름을 정함
-export function areaName(shops: NearbyShop[], t: T): string | null {
-  const nearest = [...shops].sort((a, b) => a.km - b.km)[0];
-  return nearest?.areaCode && AREA_CODES.has(nearest.areaCode) ? t(`area.${nearest.areaCode}`) : null;
-}
-
 // 동네 골라서 보기 (10/22 결정: 위치를 못 쓰거나 근처에 가게가 없을 때). 동네마다 가게들의 가운데, 가게 많은 순
 export function areaCenters(shops: LunchShop[]): { code: string; point: Point; count: number }[] {
   const sums = new Map<string, { lat: number; lng: number; count: number }>();
