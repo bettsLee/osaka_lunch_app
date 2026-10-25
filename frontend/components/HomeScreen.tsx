@@ -78,6 +78,7 @@ export default function HomeScreen() {
   const skipTo = useRef<() => void>(() => {}); // '바로 보기'를 누르면 바로 보여줄 결과
   const openedAt = useRef(0); // 앱을 연(다시 돌아온) 시각. '여기 갈래요'까지 걸린 시간 지표 (구글맵과 비교)
   const checkArrival = useRef<() => void>(() => {}); // 앱을 열거나 돌아올 때 정한 가게 근처인지 (도착했어요 자동)
+  const choseAt = useRef(0); // 이 화면에서 마지막으로 '여기 갈래요'를 누른 시각 (그 전에 물어본 질문 카드는 버림)
   const lastCheck = useRef<{ distanceM: number; accuracyM: number } | null>(null); // 마지막으로 잰 거리 · GPS 오차 (80m 기준을 맞추는 지표)
 
   const locate = useCallback(() => {
@@ -182,8 +183,13 @@ export default function HomeScreen() {
     }
     wakeServer(); // 룰렛을 돌리는 동안 잠든 서버가 일어나게
     syncPush(); // 알림을 허용했던 휴대폰이면 구독을 다시 저장
+    const askedAt = Date.now();
     fetchPendingVisit() // 보관해 둔 '여기 갈래요'를 먼저 보내고, 물어볼 게 있으면 카드로
-      .then(setAsk)
+      // 서버가 깨어나는 사이에 새로 골랐으면 예전 기록 카드는 띄우지 않음 (10/25: 도착하고 홈에 오자 어제 기록 카드가 뜸.
+      // 10/24 결정 '가장 최근에 고른 가게만 물어요'를 화면에서도 지킴)
+      .then((v) => {
+        if (choseAt.current < askedAt) setAsk(v);
+      })
       .catch(() => {}); // 서버가 아직 안 일어났으면 다음에 열 때 물어봄
     const t = setInterval(() => setNow(new Date()), 60_000); // '지금 영업 중' · 마감까지 n분이 시간에 맞게
     return () => {
@@ -404,6 +410,8 @@ export default function HomeScreen() {
     if (!picked) return;
     const before = stillGoing(going, new Date());
     if (before) cancelGoing(before, "changed");
+    choseAt.current = Date.now();
+    setAsk(null); // 새로 골랐으니 예전 기록은 더 묻지 않음 (서버도 가장 최근 것만 물음)
     lastCheck.current = null;
     const distanceKm = Math.round(picked.km * 100) / 100;
     const id = crypto.randomUUID();
