@@ -4,10 +4,14 @@
 실행: python3 -m unittest batch/test_ai_structure.py
 """
 import os
+import socket
 import sys
 import unittest
+import urllib.error
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ai_structure  # noqa: E402
 from ai_structure import lunch_window  # noqa: E402
 
 
@@ -48,6 +52,42 @@ class LunchWindowTest(unittest.TestCase):
     def test_이상한_값이면_멈추지_않고_없음(self):
         self.assertIsNone(lunch_window("O", [iv("11時", "14:00")], None))
         self.assertIsNone(lunch_window("O", [{"open": None, "close": None}], "모름"))
+
+
+class CallGeminiRetryTest(unittest.TestCase):
+    """10/26: 시간 초과는 다시 시도하지 않고, 잠깐 몰림(503)은 지금처럼 다시 시도"""
+
+    def run_with(self, errors):
+        calls = []
+
+        def fake_urlopen(req, timeout):
+            calls.append(timeout)
+            raise errors[min(len(calls), len(errors)) - 1]
+
+        with mock.patch("urllib.request.urlopen", fake_urlopen), mock.patch("time.sleep"):
+            with self.assertRaises(RuntimeError) as cm:
+                ai_structure.call_gemini("prompt", "key", "model")
+        return calls, str(cm.exception)
+
+    def test_응답_시간_초과는_한_번만(self):
+        calls, msg = self.run_with([TimeoutError("The read operation timed out")])
+        self.assertEqual(len(calls), 1)
+        self.assertIn("초 안에 오지 않았어요", msg)
+
+    def test_연결할_때_시간_초과도_한_번만(self):
+        calls, _ = self.run_with([urllib.error.URLError(socket.timeout("timed out"))])
+        self.assertEqual(len(calls), 1)
+
+    def test_잠깐_몰리면_다섯_번까지(self):
+        err = urllib.error.HTTPError("u", 503, "busy", {}, None)
+        err.read = lambda: b"overloaded"
+        calls, msg = self.run_with([err])
+        self.assertEqual(len(calls), 5)
+        self.assertIn("503", msg)
+
+    def test_연결이_끊기면_다섯_번까지(self):
+        calls, _ = self.run_with([urllib.error.URLError(ConnectionResetError("reset"))])
+        self.assertEqual(len(calls), 5)
 
 
 if __name__ == "__main__":
