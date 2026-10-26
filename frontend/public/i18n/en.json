@@ -169,6 +169,7 @@
   "settings.sourceMap": "Map",
   "settings.check": "Prices and hours can change. Please check at the restaurant too.",
   "settings.version": "Version {version}",
+  "settings.device": "Device number {id}",
   "opinion.title": "Send feedback",
   "opinion.intro": "Tell us what was hard to use, what restaurant info was wrong, or what you'd like to have. There's no sign-up, so we can't reply.",
   "opinion.placeholder": "e.g. Pins overlap on the map and are hard to tap",

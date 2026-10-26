@@ -3,29 +3,30 @@
 --
 -- 쿼리마다 맨 위 두 줄만 고치면 돼요
 --   params   : 기간 (오사카 시간). 끝 날짜는 그 날 0시 = 그 전날까지
---   excluded : 뺄 사용자 = 상권 휴대폰 · 맥의 익명 ID. 아래 0번 쿼리로 찾음
---              (Amplitude 차트에서도 같은 ID로 "User ID is not …" 하면 같은 사람이 빠짐. 10/22 OL-42부터)
+--   excluded : 뺄 기기 = 상권 휴대폰 · 맥의 '기기 번호' (앱 설정 화면 맨 아래, 익명 ID 앞 8자리)
+--              10/26: 이번 주 같이 쓰는 지인 2명도 베타 참여자라 '베타 전 기록이 있는 기기'로는 뺄 수 없어서 직접 지정.
+--              기기마다(크롬 · 홈 화면 앱 · 맥 사파리 등) 번호가 다르니 모두 넣기. 0번 쿼리로 맞춰 봄
+--              (Amplitude 차트에서도 User ID "does not have prefix" 기기 번호로 하면 같은 기기가 빠짐)
 -- TEST 가게(콘솔로 만든 테스트 기록)는 항상 뺌
 -- 읽기만 해요 (아무것도 바꾸지 않음)
 
 
--- 0. 내 기기 익명 ID 찾기 (베타 전 기록은 모두 상권 기기 · 테스트라서, 베타 시작 전 기록의 user_id = 뺄 ID) ---------
-select user_id, count(*) as "여기 갈래요",
+-- 0. 기기 번호별 기록 (설정 화면의 기기 번호와 맞춰 보고, 상권 기기 번호를 아래 excluded에 넣기) ---------------
+select left(user_id::text, 8) as "기기 번호", count(*) as "여기 갈래요",
        to_char(min(chosen_at) at time zone 'Asia/Tokyo', 'MM-DD HH24:MI') as "처음",
        to_char(max(chosen_at) at time zone 'Asia/Tokyo', 'MM-DD HH24:MI') as "마지막"
 from visits
-where chosen_at < timestamptz '2026-11-09 00:00+09'
 group by user_id
 order by max(chosen_at) desc;
 
 
 -- 1. 한 표로 보기 -----------------------------------------------------------------------------------------
 with params as (select timestamptz '2026-11-09 00:00+09' as start_at, timestamptz '2026-11-16 00:00+09' as end_at),
-excluded(user_id) as (values ('00000000-0000-0000-0000-000000000000'::uuid)),
+excluded(prefix) as (values ('00000000')),  -- 상권 기기 번호를 ('abcd1234'), ('…') 처럼
 v as (
   select visits.* from visits, params
   where chosen_at >= params.start_at and chosen_at < params.end_at
-    and shop_id <> 'TEST' and user_id not in (select user_id from excluded)
+    and shop_id <> 'TEST' and left(user_id::text, 8) not in (select prefix from excluded)
 ),
 m(k, metric, n, d) as (
   select 1, '여기 갈래요 (건)', count(*), null::bigint from v
@@ -59,11 +60,11 @@ from m order by k;
 
 -- 2. 날짜별 ----------------------------------------------------------------------------------------------
 with params as (select timestamptz '2026-11-09 00:00+09' as start_at, timestamptz '2026-11-16 00:00+09' as end_at),
-excluded(user_id) as (values ('00000000-0000-0000-0000-000000000000'::uuid)),
+excluded(prefix) as (values ('00000000')),  -- 상권 기기 번호를 ('abcd1234'), ('…') 처럼
 v as (
   select visits.* from visits, params
   where chosen_at >= params.start_at and chosen_at < params.end_at
-    and shop_id <> 'TEST' and user_id not in (select user_id from excluded)
+    and shop_id <> 'TEST' and left(user_id::text, 8) not in (select prefix from excluded)
 )
 select (chosen_at at time zone 'Asia/Tokyo')::date as "날짜",
        count(*) as "여기 갈래요", count(distinct user_id) as "사람",
@@ -78,11 +79,11 @@ from v group by 1 order by 1;
 -- 3. 가격 정확도: '가격 확인' 배지 vs 'AI 판단' 배지 (가격 상한별) ---------------------------------------
 -- 배지는 화면과 같은 규칙 (점심 최고가가 상한 이하면 '가격 확인'). shop_ai는 매일 새로 쓰여서 '지금' 값 기준이에요
 with params as (select timestamptz '2026-11-09 00:00+09' as start_at, timestamptz '2026-11-16 00:00+09' as end_at),
-excluded(user_id) as (values ('00000000-0000-0000-0000-000000000000'::uuid)),
+excluded(prefix) as (values ('00000000')),  -- 상권 기기 번호를 ('abcd1234'), ('…') 처럼
 v as (
   select visits.* from visits, params
   where chosen_at >= params.start_at and chosen_at < params.end_at
-    and shop_id <> 'TEST' and user_id not in (select user_id from excluded)
+    and shop_id <> 'TEST' and left(user_id::text, 8) not in (select prefix from excluded)
 )
 select case when a.shop_id is null then '가게 정보 없음 (목록에서 빠짐)'
             when a.lunch_price_max is not null and a.lunch_price_max <= v.price_limit then '가격 확인' else 'AI 판단' end as "배지",
@@ -96,11 +97,11 @@ group by 1, 2 order by 1, 2;
 
 -- 4. 틀렸다고 답한 가게 (AI가 왜 틀렸는지 볼 목록) --------------------------------------------------------
 with params as (select timestamptz '2026-11-09 00:00+09' as start_at, timestamptz '2026-11-16 00:00+09' as end_at),
-excluded(user_id) as (values ('00000000-0000-0000-0000-000000000000'::uuid)),
+excluded(prefix) as (values ('00000000')),  -- 상권 기기 번호를 ('abcd1234'), ('…') 처럼
 v as (
   select visits.* from visits, params
   where chosen_at >= params.start_at and chosen_at < params.end_at
-    and shop_id <> 'TEST' and user_id not in (select user_id from excluded)
+    and shop_id <> 'TEST' and left(user_id::text, 8) not in (select prefix from excluded)
 )
 -- 가게 이름은 그날 가게 목록에서 (visits의 이름은 24시간 뒤 비워짐, 10/24 리크루트 답장)
 select coalesce(s.name, '(지금은 핫페퍼에 없음)') as "가게", v.shop_id,
@@ -117,9 +118,9 @@ order by v.chosen_at;
 
 -- 5. 받은 의견 --------------------------------------------------------------------------------------------
 with params as (select timestamptz '2026-11-09 00:00+09' as start_at, timestamptz '2026-11-16 00:00+09' as end_at),
-excluded(user_id) as (values ('00000000-0000-0000-0000-000000000000'::uuid))
+excluded(prefix) as (values ('00000000'))  -- 상권 기기 번호를 ('abcd1234'), ('…') 처럼
 select to_char(o.created_at at time zone 'Asia/Tokyo', 'MM-DD HH24:MI') as "보낸 때", o.lang as "언어", o.message as "의견"
 from opinions o, params
 where o.created_at >= params.start_at and o.created_at < params.end_at
-  and o.user_id not in (select user_id from excluded)
+  and left(o.user_id::text, 8) not in (select prefix from excluded)
 order by o.created_at;
