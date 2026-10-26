@@ -386,7 +386,7 @@ function FilterSelect(props: { label: string; value: string; onChange: (v: strin
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`h-9 appearance-none rounded-full border py-0 pl-3.5 pr-8 text-sm ${
+        className={`h-9 appearance-none rounded-full border py-0 pl-3.5 pr-8 text-base ${
           on ? "border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white text-[#1F1F1C]"
         }`}
       >

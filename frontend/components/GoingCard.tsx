@@ -105,12 +105,14 @@ export function GoingBar(props: Props & { onOpen: () => void; className?: string
   const distance = useDistanceText(going, distanceM);
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <button type="button" onClick={onOpen} aria-label={t("going.expand")} className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 text-left">
+      {/* 버튼 이름에 보이는 글자(가게 이름 · 거리)를 그대로 넣고 '펼치기'는 덧붙임 (10/26 접근성 점검: 음성 조작은 보이는 글자로 부름) */}
+      <button type="button" onClick={onOpen} className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 text-left">
         <span className="h-2.5 w-2.5 flex-none rounded-full bg-[#2457C5]" aria-hidden="true" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-[15px] font-semibold">{going.shopName}</span>
           <span className="text-[13px] text-[#5F5E58]">{distance}</span>
         </span>
+        <span className="sr-only">{t("going.expand")}</span>
       </button>
       <button
         type="button"
