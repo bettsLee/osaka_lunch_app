@@ -1,0 +1,72 @@
+name: Deploy Check
+
+# main에 들어간 커밋이 화면(Vercel) · 서버(Render)에 제대로 배포됐는지 확인. 틀리면 실패 메일 (10/26 결정)
+# 10/21 Vercel 서버 주소 설정 오류를 CI가 못 잡았고, 10/25 Render 배포 여부를 바로 확인하지 못했음
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # Actions 탭에서 지금 main을 손으로 확인
+
+permissions:
+  contents: read
+  deployments: read
+
+env:
+  APP_URL: https://osaka-lunch-app.vercel.app
+  API_URL: https://osaka-lunch-api.onrender.com
+  API_HOST: osaka-lunch-api.onrender.com
+  SHA: ${{ github.sha }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 화면(Vercel) 운영 배포가 이 커밋으로 끝났는지
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 40); do   # 15초씩 최대 10분
+            id=$(gh api "repos/${{ github.repository }}/deployments?sha=$SHA&environment=Production" --jq '.[0].id // empty' || true)
+            state=""
+            if [ -n "$id" ]; then
+              state=$(gh api "repos/${{ github.repository }}/deployments/$id/statuses" --jq '.[0].state // empty' || true)
+            fi
+            echo "Vercel 운영 배포: ${state:-아직 없음}"
+            case "$state" in
+              success) exit 0 ;;
+              failure|error) echo "::error title=화면 배포 실패::Vercel 운영 배포가 $state 예요"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error title=화면 배포 확인 실패::10분 안에 이 커밋의 Vercel 운영 배포가 끝나지 않았어요"
+          exit 1
+
+      - name: 화면이 운영 서버 주소를 쓰는지
+        run: |
+          curl -fsSL "$APP_URL/" -o page.html
+          chunks=$(grep -oE '/_next/static/[^"]+\.js' page.html | sort -u || true)
+          for c in $chunks; do
+            curl -fsSL "$APP_URL$c" -o chunk.js
+            if grep -q "$API_HOST" chunk.js; then
+              echo "화면이 $API_HOST 를 불러요 ($c)"
+              exit 0
+            fi
+          done
+          echo "::error title=서버 주소::화면 코드에 $API_HOST 가 없어요. Vercel의 NEXT_PUBLIC_API_URL을 확인해 주세요"
+          exit 1
+
+      - name: 서버(Render)가 이 커밋으로 떴는지
+        run: |
+          commit=""
+          for i in $(seq 1 30); do   # 30초씩 최대 15분 (Render 배포 3~4분 + 잠든 서버 깨우기)
+            commit=$(curl -fsS -m 90 "$API_URL/health" | jq -r '.commit // empty' || true)
+            echo "서버 커밋: ${commit:-응답 없음}"
+            if [ "$commit" = "$SHA" ]; then
+              echo "::notice title=배포 확인::화면 · 서버 모두 ${SHA:0:7}"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error title=서버 배포::15분이 지나도 서버가 ${SHA:0:7} 가 아니에요 (지금 ${commit:-응답 없음}). Render 대시보드 Events를 확인해 주세요"
+          exit 1
