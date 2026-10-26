@@ -2,9 +2,9 @@
 
 // S8 설정 (와이어프레임 v1 + 10/21 추가): 언어 · 알림 · 가격 상한 안내 · 개인정보 안내 · 이용 안내 · 의견 보내기 · 출처 · 버전
 // 알림은 '여기 갈래요' 뒤에서만 켤 수 있었어서(10/21 밤 테스트) 여기서도 켜고, 거절했으면 다시 켜는 방법을 알려 줌
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import pkg from "../package.json";
-import { currentPushState, enablePush, sendOpinion } from "@/lib/api";
+import { currentPushState, deviceNumber, enablePush, sendOpinion } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import { isIOS, type PushState } from "@/lib/push";
 import { ALLERGENS, hasDiet, loadDiet, saveDiet, STYLES, type Allergen, type Diet } from "@/lib/diet";
@@ -17,7 +17,7 @@ const SHA = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7); // Verce
 const VERSION = SHA ? `${pkg.version} (${SHA})` : pkg.version;
 const MAX_OPINION = 1000; // 서버와 같음 (OpinionController.MAX_LENGTH)
 
-// 개인정보 안내 · 이용 안내 (초안: 10/25 체크인에서 상권 검토)
+// 개인정보 안내 · 이용 안내 (10/26 체크인 검토: 보관 기간 그대로 · 지우기는 상권이 SQL로 · 책임 문장 분명하게)
 const PRIVACY = [
   "privacy.intro", "privacy.location", "privacy.diet", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions", "privacy.share",
   "privacy.events", "privacy.vendors", "privacy.delete", "privacy.keep", "privacy.updated",
@@ -28,6 +28,10 @@ export default function SettingsScreen({ limit }: { limit: number }) {
   const { t } = useT();
   const [view, setView] = useState<View>("main");
   const [diet, setDiet] = useState<Diet>(() => loadDiet()); // 이 휴대폰에만 저장
+  const [device, setDevice] = useState<string | null>(null); // 기기 번호 (문의 · 베타 지표에서 상권 기기 빼기용)
+  useEffect(() => {
+    deviceNumber().then(setDevice);
+  }, []);
   const back = () => setView("main");
 
   if (view === "privacy") return <Doc title={t("settings.privacy")} keys={PRIVACY} onBack={back} />;
@@ -89,6 +93,7 @@ export default function SettingsScreen({ limit }: { limit: number }) {
           </p>
           <p>{t("settings.check")}</p>
           <p>{t("settings.version", { version: VERSION })}</p>
+          {device && <p>{t("settings.device", { id: device })}</p>}
         </div>
       </section>
     </>

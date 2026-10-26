@@ -18,6 +18,7 @@ MODEL = "gemini-3.8-flash"
 # 프롬프트 · 결과 형식을 바꾸면 올리기. 배치가 이 값이 다른 가게를 전부 다시 처리하니 비용을 먼저 계산할 것
 PROMPT_VERSION = "2026-10-19"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+TIMEOUT = 120  # 초. 넘으면 그 가게는 이번 실행에서 실패로 (같은 글은 다시 보내도 또 넘을 가능성이 커서 다시 시도하지 않음)
 DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 # AI에게 보여줄 글 (collect.py의 AI_TEXT_FIELDS와 같은 항목)
 FIELDS = [("open_text", "OPEN"), ("close_text", "CLOSED_DAYS"), ("budget_average", "BUDGET"),
@@ -102,7 +103,7 @@ def call_gemini(prompt, key, model):
         req = urllib.request.Request(ENDPOINT.format(model=model), data=json.dumps(body).encode("utf-8"),
                                      method="POST", headers={"x-goog-api-key": key, "Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=120) as r:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 res = json.loads(r.read().decode("utf-8"))
             break
         except urllib.error.HTTPError as e:
@@ -115,6 +116,9 @@ def call_gemini(prompt, key, model):
                 continue
             raise RuntimeError(f"Gemini 오류 {e.code}: {msg}")
         except (urllib.error.URLError, TimeoutError) as e:
+            # 10/26: 한 가게가 매번 120초를 넘겨 5번 다시 시도(약 10분)하고 배치가 실패함 → 시간 초과는 바로 실패로
+            if isinstance(e, TimeoutError) or isinstance(getattr(e, "reason", None), TimeoutError):
+                raise RuntimeError(f"Gemini 응답이 {TIMEOUT}초 안에 오지 않았어요: {e}")
             if attempt < 4:
                 time.sleep(5)
                 continue

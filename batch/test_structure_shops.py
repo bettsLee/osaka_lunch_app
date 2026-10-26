@@ -8,7 +8,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from structure_shops import keep_previous  # noqa: E402
+from structure_shops import keep_previous, too_many_failures  # noqa: E402
 
 SHOP = {"id": "J001", "text_hash": "new"}
 FAIL = {"error": "RuntimeError: Gemini 오류 402"}
@@ -30,6 +30,18 @@ class KeepPreviousTest(unittest.TestCase):
     def test_예전에도_실패였으면_실패로_덮어씀(self):
         done = {"J001": {"shop_id": "J001", "text_hash": "old", "error": "timeout"}}
         self.assertFalse(keep_previous(SHOP, FAIL, done))
+
+
+class TooManyFailuresTest(unittest.TestCase):
+    def test_가게_몇_곳만_실패하면_계속(self):
+        self.assertFalse(too_many_failures(1, 1))  # 10/26: 계속 120초를 넘기는 가게 1곳뿐
+        self.assertFalse(too_many_failures(2, 2))
+        self.assertFalse(too_many_failures(2, 28))
+
+    def test_키_한도_문제처럼_대부분_실패하면_멈춤(self):
+        self.assertTrue(too_many_failures(10, 10))  # 10/25: 월 지출 한도 초과
+        self.assertTrue(too_many_failures(3, 5))
+        self.assertFalse(too_many_failures(3, 6))  # 절반은 넘지 않음
 
 
 if __name__ == "__main__":
