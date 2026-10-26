@@ -17,7 +17,7 @@ const SHA = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7); // Verce
 const VERSION = SHA ? `${pkg.version} (${SHA})` : pkg.version;
 const MAX_OPINION = 1000; // 서버와 같음 (OpinionController.MAX_LENGTH)
 
-// 개인정보 안내 · 이용 안내 (초안: 10/25 체크인에서 상권 검토)
+// 개인정보 안내 · 이용 안내 (10/26 체크인 검토: 보관 기간 그대로 · 지우기는 상권이 SQL로 · 책임 문장 분명하게)
 const PRIVACY = [
   "privacy.intro", "privacy.location", "privacy.diet", "privacy.visits", "privacy.answers", "privacy.push", "privacy.opinions", "privacy.share",
   "privacy.events", "privacy.vendors", "privacy.delete", "privacy.keep", "privacy.updated",
