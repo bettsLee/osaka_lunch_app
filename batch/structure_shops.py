@@ -31,7 +31,8 @@ import ai_structure  # noqa: E402
 
 PAGE = 1000            # Supabase에서 한 번에 읽는 줄 수 (Supabase 기본 최대값)
 CHUNK = 100            # 한 번에 저장하는 줄 수
-FAIL_STOP_RATIO = 0.5  # 처리한 가게 중 실패가 이 비율을 넘으면 키 · 모델 문제로 보고 실패로 끝냄
+FAIL_STOP_RATIO = 0.5  # 처리한 가게 중 실패가 이 비율을 넘으면 키 · 모델 · 한도 문제로 보고 실패로 끝냄
+FAIL_STOP_MIN = 3      # 단, 실패가 이보다 적으면 가게 몇 곳의 문제로 보고 계속 (10/26: 1곳 중 1곳 실패로 배치가 실패함)
 COLUMNS = ["shop_id", "text_hash", "model", "prompt_version", "lunch_days", "open_hours", "lunch_window",
            "lunch_price_min", "lunch_price_max", "typical_lunch_price", "under_990", "price_evidence",
            "evidence_ok", "days_hours_conflict", "error", "processed_at"]
@@ -88,6 +89,11 @@ def keep_previous(shop, out, done):
     실패 줄로 덮여 앱에서 사라지지 않게). 글이 바뀐 상태는 그대로라 다음 실행에서 다시 처리됨"""
     d = done.get(shop["id"])
     return "error" in out and d is not None and d["error"] is None
+
+
+def too_many_failures(failed, processed):
+    """키 · 모델 · 한도 문제처럼 대부분 실패할 때만 배치를 실패로 끝냄 (가게 몇 곳만 실패하면 다음 실행에 다시)"""
+    return failed >= FAIL_STOP_MIN and failed > processed * FAIL_STOP_RATIO
 
 
 def to_row(shop, out):
@@ -177,7 +183,7 @@ def main():
     if os.environ.get("GITHUB_ACTIONS"):  # Actions 화면의 알림으로도 남김
         print(f"::notice title=AI 구조화::{summary}")
         print(f"::notice title=AI 결과 전체::{overall}")
-    if failed > processed * FAIL_STOP_RATIO:
+    if too_many_failures(failed, processed):
         sys.exit(f"실패가 너무 많아요({failed}/{processed}). 키 · 모델 · 요금 상태를 확인해 주세요.")
 
 
