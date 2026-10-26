@@ -52,6 +52,17 @@ export async function linkAnalyticsUser(): Promise<void> {
   }
 }
 
+// 설정 화면의 '기기 번호' = 익명 ID 앞 8자리 (10/26 결정: 베타 지표 · Amplitude에서 상권 기기를 이 번호로 직접 지정해 뺌).
+// 아직 익명 로그인 전이면 null (만들지 않음)
+export async function deviceNumber(): Promise<string | null> {
+  try {
+    const { data } = await authClient().getSession();
+    return data.session ? data.session.user.id.slice(0, 8) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function call(path: string, init: RequestInit = {}): Promise<Response> {
   if (!API_URL) throw new Error("NEXT_PUBLIC_API_URL 이 없어요");
   const token = await accessToken();

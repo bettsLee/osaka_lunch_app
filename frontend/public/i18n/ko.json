@@ -169,6 +169,7 @@
   "settings.sourceMap": "지도",
   "settings.check": "가격과 영업시간은 바뀔 수 있어요. 가게에서 한 번 더 확인해 주세요.",
   "settings.version": "버전 {version}",
+  "settings.device": "기기 번호 {id}",
   "opinion.title": "의견 보내기",
   "opinion.intro": "불편한 점, 틀린 가게 정보, 있으면 좋겠는 기능을 알려 주세요. 가입 없이 쓰는 앱이라 답장은 드리지 못해요.",
   "opinion.placeholder": "예: 지도에서 가게 핀이 겹쳐서 누르기 어려워요",
