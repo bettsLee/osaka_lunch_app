@@ -240,12 +240,22 @@ export async function sendOpinion(message: string, lang: string): Promise<"sent"
   return "sent";
 }
 
-// 도감(S6): '네, 다녀왔어요'라고 답한 기록 (최근 것부터)
+// 도감(S6): Supabase에서 내 기록을 바로 읽음 (10/26 결정: Render 무료 서버가 잠들어 있으면 도감이 최대 1분 늦게 떠서).
+// 규칙은 서버(GET /api/visits/zukan)와 같음: 다녀온 기록(도착 또는 '네, 다녀왔어요') 중 닫혀 있던 곳은 빼고, 최근 것부터 200개.
+// 내 기록만 읽을 수 있음 (013 SQL의 RLS 정책). 보관해 둔 '여기 갈래요' · 도착은 기다리지 않음
+const ZUKAN_QUERY = "select=shop_id,chosen_at,again&visited=is.true&or=(open_ok.is.null,open_ok.is.true)&order=chosen_at.desc&limit=200";
 export async function fetchZukan(): Promise<ZukanVisit[]> {
-  await flushVisits();
-  const res = await call("/api/visits/zukan");
+  if (!SUPABASE_URL || !KEY) throw new Error("Supabase 설정이 없어요");
+  const token = await accessToken(); // Supabase 익명 로그인 (Render 서버를 거치지 않음)
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/visits?${ZUKAN_QUERY}`, { headers: { apikey: KEY, Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`도감을 불러오지 못했어요 (${res.status})`);
-  return res.json();
+  const rows: { shop_id: string; chosen_at: string; again: boolean | null }[] = await res.json();
+  return rows.map((r) => ({ shopId: r.shop_id, chosenAt: r.chosen_at, again: r.again }));
+}
+
+// 아직 서버에 못 보낸 '도착했어요'가 있는지 (보내지면 도감에 더해질 기록)
+export function hasQueuedArrivals(): boolean {
+  return readArrivals().length > 0;
 }
 
 // 한국어 · 영어가 아닌 휴대폰 언어의 문구. 서버가 처음 한 번 AI로 번역해 저장해 둔 것 (로그인 필요 없음)
