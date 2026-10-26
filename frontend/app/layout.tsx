@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// 두 손가락 확대를 막지 않음 (10/26 접근성 점검: 최대 배율 1이면 안드로이드에서 글자를 키울 수 없음).
+// 대신 입력칸 · 고르기 칸 글자를 16px 이상으로 둬서 아이폰이 입력할 때 화면을 확대하지 않게
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 // 카톡 · 라인 · X에 링크를 보냈을 때 뜨는 미리보기 (10/21 결정: 영어 + 일본어. 받는 사람마다 다르게는 못 함)
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   description: "오늘 점심 영업하는 990엔 이하 가게를 룰렛으로 골라 줘요",
   manifest: "/manifest.json",
   // 아이폰은 홈 화면에 추가한 앱에서만 알림을 받을 수 있어서, 홈 화면 아이콘 · 앱 모드 설정
-  icons: { apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" }, // icon: 브라우저 탭 아이콘 (없으면 favicon.ico 404)
   appleWebApp: { capable: true, title: "Osaka Lunch" },
   openGraph: {
     type: "website",

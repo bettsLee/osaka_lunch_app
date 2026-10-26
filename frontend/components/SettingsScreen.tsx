@@ -205,7 +205,8 @@ function Doc({ title, keys, onBack }: { title: string; keys: string[]; onBack: (
   return (
     <>
       <SubHeader title={title} onBack={onBack} />
-      <section className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-6 pt-4 text-[15px] leading-relaxed">
+      {/* 키보드로도 글을 내릴 수 있게 (10/26 접근성 점검) */}
+      <section tabIndex={0} aria-label={title} className="flex flex-1 flex-col gap-3.5 overflow-y-auto px-5 pb-6 pt-4 text-[15px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2457C5]">
         {keys.map((key, i) => (
           <p key={key} className={i === keys.length - 1 ? "text-[13px] text-[#5F5E58]" : ""}>
             {t(key)}
