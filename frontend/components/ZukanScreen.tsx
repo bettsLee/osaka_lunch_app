@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, genreLabel, priceLabel, walkMinutes, type LunchShop, type NearbyShop, type Point } from "@/lib/lunch";
 import { SHARE_MAX, shareLink, shareMessage, shortLink } from "@/lib/share";
-import { createShareCode, fetchZukan, setAgain } from "@/lib/api";
+import { createShareCode, fetchZukan, flushVisits, hasQueuedArrivals, setAgain } from "@/lib/api";
 import { track, trackError } from "@/lib/analytics";
 import {
   collect, FILTER_PERIODS, FILTER_PRICES, filterItems, filterOptions, isFiltering, monthDayTime, NO_FILTER, topArea,
@@ -41,7 +41,16 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
   const load = useCallback(() => {
     setState({ status: "loading" });
     fetchZukan()
-      .then((visits) => setState({ status: "ok", visits }))
+      .then((visits) => {
+        setState({ status: "ok", visits });
+        // 서버가 잠들어 있어 아직 못 보낸 도착이 있으면, 보내진 뒤 조용히 다시 읽음 (도감은 먼저 보여 줌)
+        if (hasQueuedArrivals()) {
+          flushVisits()
+            .then(fetchZukan)
+            .then((next) => setState({ status: "ok", visits: next }))
+            .catch(() => {});
+        }
+      })
       .catch((e: unknown) => {
         trackError("zukan", e);
         setState({ status: "error" });
@@ -386,7 +395,7 @@ function FilterSelect(props: { label: string; value: string; onChange: (v: strin
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`h-9 appearance-none rounded-full border py-0 pl-3.5 pr-8 text-sm ${
+        className={`h-9 appearance-none rounded-full border py-0 pl-3.5 pr-8 text-base ${
           on ? "border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white text-[#1F1F1C]"
         }`}
       >

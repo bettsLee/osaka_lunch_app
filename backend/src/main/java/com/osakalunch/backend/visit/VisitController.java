@@ -113,7 +113,8 @@ public class VisitController {
                 : !v.getChosenAt().isAfter(now.minus(ASK_AFTER));
     }
 
-    /** 도감(S6): 도착했거나 '네, 다녀왔어요'라고 답한 기록, 닫혀 있던 곳은 뺌 (10/21 · 10/23 결정). 같은 가게를 여러 번 갔으면 화면이 하나로 합침 */
+    /** 도감(S6): 도착했거나 '네, 다녀왔어요'라고 답한 기록, 닫혀 있던 곳은 뺌 (10/21 · 10/23 결정). 같은 가게를 여러 번 갔으면 화면이 하나로 합침.
+     *  10/26부터 화면은 Supabase에서 바로 읽음(OL-56, 같은 규칙). 예전 버전 앱이 남아 있을 수 있어 베타가 끝날 때까지 둠 */
     @GetMapping("/zukan")
     public List<VisitResponse> zukan(@AuthenticationPrincipal Jwt jwt) {
         return visits.findZukan(userId(jwt), PageRequest.of(0, 200)).stream().map(VisitResponse::of).toList();
