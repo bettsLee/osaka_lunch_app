@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 알림 허용한 브라우저 저장(화면이 부름)과 '보낼 알림 보내기'(GitHub Actions가 부름)
+ * 알림 허용한 브라우저 저장(화면이 부름)과 '보낼 알림 보내기'(Supabase 예약 · GitHub Actions가 부름)
  */
 @RestController
 public class PushController {
@@ -74,7 +74,7 @@ public class PushController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 보낼 알림 보내기. GitHub Actions만 아는 비밀 값(X-Cron-Secret)이 맞아야 함 */
+    /** 보낼 알림 보내기. Supabase 예약 · GitHub Actions만 아는 비밀 값(X-Cron-Secret)이 맞아야 함 */
     @PostMapping("/internal/push/send-due")
     public PushJob.Result sendDue(@RequestHeader(value = "X-Cron-Secret", required = false) String secret) {
         if (cronSecret.isBlank() || !sender.ready()) {
