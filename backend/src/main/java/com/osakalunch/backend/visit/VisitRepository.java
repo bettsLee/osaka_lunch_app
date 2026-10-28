@@ -1,7 +1,9 @@
 package com.osakalunch.backend.visit;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,7 +25,9 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
     List<Visit> findByUserIdAndShopIdAndVisitedTrue(UUID userId, String shopId);
 
     /** 알림 보낼 기록: 답도 알림도 취소도 아직이고, 도착 안 했으면 고른 시각 · 도착했으면 도착 시각이 기간 안.
-     *  그 사람이 가장 최근에 고른 기록만 (10/24 결정: 새로 고른 가게가 있으면 예전 기록은 묻지 않음) */
+     *  그 사람이 가장 최근에 고른 기록만 (10/24 결정: 새로 고른 가게가 있으면 예전 기록은 묻지 않음)
+     *  잠금: Supabase 예약과 GitHub 예비가 동시에 불러도 같은 기록에 알림을 두 번 보내지 않게 (OL-57) */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select v from Visit v
             where v.answeredAt is null and v.notifiedAt is null and v.cancelledAt is null
