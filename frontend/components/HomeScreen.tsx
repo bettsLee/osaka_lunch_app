@@ -693,10 +693,16 @@ export default function HomeScreen() {
 
       {mode === "home" && (
         <>
-          <section className="relative z-[600] -mt-4 flex flex-col gap-3 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-3.5 pt-0.5">
+          {/* 시트 어디서든 끌어서 접고 펼치기 (10/29 상권: 손잡이만 잡혀서 불편). 펼친 목록은 스크롤해야 해서 목록만 빼고 끌기 */}
+          <section
+            {...sheetSwipe.area}
+            style={{ touchAction: listOpen ? undefined : "none" }}
+            className="relative z-[600] -mt-4 flex flex-col gap-3 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-3.5 pt-0.5"
+          >
+            <div className="flex flex-col gap-3" style={{ touchAction: "none" }}>
             <button
               type="button"
-              {...sheetSwipe}
+              onClick={sheetSwipe.onClick}
               aria-expanded={!sheetHidden}
               aria-label={sheetHidden ? t("home.sheetShow") : t("home.sheetHide")}
               className="-mb-2 flex h-8 w-full items-center justify-center"
@@ -789,6 +795,7 @@ export default function HomeScreen() {
                 {t("home.spin")}
               </button>
             )}
+            </div>
             {!goingNow && !sheetHidden && rows.length > 0 && (
               <ul className={listOpen ? "max-h-[40dvh] overflow-y-auto" : ""}>
                 {rows.map((s, i) => (

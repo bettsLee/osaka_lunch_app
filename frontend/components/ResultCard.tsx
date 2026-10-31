@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
 import { clockTime } from "@/lib/visits";
+import { cardTouchAction } from "@/lib/swipe";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 import OrderSheet from "./OrderSheet";
@@ -21,7 +22,7 @@ type Props = {
   canRespin: boolean;
   collapsed: boolean; // 손잡이로 카드를 접고 지도를 크게 (10/22 도그푸딩: 홈 시트와 같게)
   onToggle: () => void;
-  handle?: ReturnType<typeof useSheetSwipe>; // 손잡이 스와이프 (없으면 누르기만)
+  handle?: ReturnType<typeof useSheetSwipe>; // 카드 스와이프 (없으면 손잡이 누르기만)
   goingAt?: string | null; // 이미 여기 갈래요로 정한 가게면 정한 시각: 여기 갈래요 · 랜덤 대신 길찾기 · 도착했어요 · 취소 (10/22 도그푸딩: 가는 중 배너 대신)
   onCancelGoing?: () => void;
   onArrive?: () => void; // 도착했어요 버튼 (GPS가 빌딩 사이에서 튀어 자동으로 못 알아챘을 때)
@@ -32,6 +33,9 @@ export default function ResultCard(props: Props) {
   const { t } = useT();
   const [orderOpen, setOrderOpen] = useState(false);
   const [asking, setAsking] = useState(false); // 취소를 한 번 더 물어보는 중
+  const [atTop, setAtTop] = useState(true); // 카드를 맨 위까지 올려 둔 상태 (아래로 끌면 접기)
+  const card = useRef<HTMLElement>(null);
+  useEffect(() => setAtTop((card.current?.scrollTop ?? 0) <= 0), [collapsed, shop.id]); // 접고 펼치거나 가게가 바뀌면 다시 잼
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
 
@@ -41,14 +45,20 @@ export default function ResultCard(props: Props) {
   const limitYen = limit.toLocaleString("ja-JP");
   const confirmed = priceBadge(shop, limit) === "confirmed";
 
+  // 카드 어디서든 끌어서 접고 펼치기 (10/29 상권: 손잡이만 잡혀서 불편). 주문 도우미가 떠 있으면 그쪽 손가락은 건드리지 않음
+  const swipeHere = handle && !orderOpen;
   return (
     <section
+      ref={card}
+      {...(swipeHere ? handle.area : {})}
+      onScroll={(e) => setAtTop(e.currentTarget.scrollTop <= 0)}
+      style={swipeHere ? { touchAction: cardTouchAction(collapsed, atTop) } : undefined}
       className={`relative z-[600] -mt-4 flex flex-col gap-2.5 overflow-y-auto rounded-t-[20px] bg-white px-5 pb-4 pt-0.5 ${collapsed ? "flex-none" : "flex-1"}`}
     >
       <button
         type="button"
-        onClick={onToggle}
-        {...handle}
+        onClick={handle ? handle.onClick : onToggle}
+        style={handle ? { touchAction: "none" } : undefined}
         aria-expanded={!collapsed}
         aria-label={collapsed ? t("home.sheetShow") : t("home.sheetHide")}
         className="-mb-2 flex h-8 w-full flex-none items-center justify-center"
