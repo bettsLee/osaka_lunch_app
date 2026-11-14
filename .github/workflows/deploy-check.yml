@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      # 서버 커밋과 이 커밋 사이에 backend 변경이 있는지 보려면 전체 기록이 필요함 (11/14)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 화면(Vercel) 운영 배포가 이 커밋으로 끝났는지
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,6 +69,13 @@ jobs:
             echo "서버 커밋: ${commit:-응답 없음}"
             if [ "$commit" = "$SHA" ]; then
               echo "::notice title=배포 확인::화면 · 서버 모두 ${SHA:0:7}"
+              exit 0
+            fi
+            # Render는 backend/가 바뀐 커밋만 다시 배포함 (11/14 확인: 10/31 · 11/14 화면 · README만 바뀐 날 실패)
+            # 서버 커밋과 이 커밋 사이에 backend 변경이 없으면 서버는 이미 최신 코드
+            if [ -n "$commit" ] && git cat-file -e "$commit^{commit}" 2>/dev/null \
+               && git diff --quiet "$commit" "$SHA" -- backend; then
+              echo "::notice title=배포 확인::화면 ${SHA:0:7} · 서버 ${commit:0:7} (그 뒤 backend 변경 없음)"
               exit 0
             fi
             sleep 30
