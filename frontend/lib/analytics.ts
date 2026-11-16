@@ -43,10 +43,11 @@ export function startAnalytics(): void {
   started = true;
   void import("@amplitude/analytics-browser").then((a) => {
     a.init(KEY, {
-      // 세션(재방문 계산용)만 자동으로 모으고, 나머지는 우리가 정한 이벤트만 보냄
+      // 세션(재방문 계산용)과 유입 경로만 자동으로 모으고, 나머지는 우리가 정한 이벤트만 보냄
       autocapture: {
         sessions: true,
-        attribution: false,
+        // 유입 경로 (11/16): 링크의 utm_source(올린 곳마다 다르게)와 들어온 사이트를 사용자 속성으로 남김. 11/25~28 SNS별 반응 비교용
+        attribution: true,
         pageViews: false,
         fileDownloads: false,
         formInteractions: false,
