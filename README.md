@@ -6,7 +6,7 @@
 
 **오사카에서 지금 점심 영업 중인 990엔 이하 가게를 근처에서 골라 주는 웹 앱**
 
-[앱 열어 보기](https://osaka-lunch-app.vercel.app)
+[앱 열어 보기](https://osaka-lunch-app.vercel.app) · [日本語](README.ja.md)
 
 [![Frontend CI](https://github.com/bettsLee/osaka_lunch_app/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/bettsLee/osaka_lunch_app/actions/workflows/frontend-ci.yml)
 [![Backend CI](https://github.com/bettsLee/osaka_lunch_app/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/bettsLee/osaka_lunch_app/actions/workflows/backend-ci.yml)
@@ -124,7 +124,7 @@ python3 -m unittest discover -s batch -p 'test_*.py'
 ## 진행 상황
 
 - [x] MVP, 가게 수집, AI 정리 (2026.10)
-- [ ] 지인 베타 → 출시 (2026.11)
+- [ ] 지인 베타 (2026.11) → 출시 (2026.12)
 - [ ] A/B 실험, 부하 테스트, 실패 처리 큐 (2026.12)
 
 ## 데이터 출처
