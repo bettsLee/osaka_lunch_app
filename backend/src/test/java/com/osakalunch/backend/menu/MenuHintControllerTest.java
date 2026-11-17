@@ -44,14 +44,16 @@ class MenuHintControllerTest {
 
     @Test
     void 로그인하면_대표_메뉴를_주고_저장하지_않게_함() throws Exception {
-        when(client.ask(any(), eq("ja"))).thenReturn(new MenuHint("ok", "open", List.of("オムライス"),
-                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1"))));
+        when(client.ask(any(), eq("ja"))).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
+                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
         mvc.perform(get("/api/shops/J1/menu-hint?lang=ja").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.menus[0]").value("オムライス"))
-                .andExpect(jsonPath("$.sources[0].uri").value("https://maps.google.com/?cid=1"));
+                .andExpect(jsonPath("$.sources[0].uri").value("https://maps.google.com/?cid=1"))
+                .andExpect(jsonPath("$.kind").value("lunch"))
+                .andExpect(jsonPath("$.placeId").value("ChIJ1234567890"));
     }
 
     @Test
