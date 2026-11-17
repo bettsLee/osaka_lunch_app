@@ -37,7 +37,19 @@ type Row = {
   } | null;
 };
 
-export async function fetchLunchShops(): Promise<LunchShop[]> {
+// 점심 가격을 모르는 가게 (핫페퍼 글에 점심 가격이 없음, 11/17 기준 시내 4,288곳 중 2,688곳).
+// '가격 모르는 가게도 보기'를 켰을 때만 따로 받음 (11/17 상권 "가게 수를 좀 더 늘리고 싶은데" → "알아서 해")
+const PRICE_UNKNOWN = "typical_lunch_price=is.null&lunch_price_max=is.null";
+
+export function fetchLunchShops(): Promise<LunchShop[]> {
+  return fetchShops(UNDER_MAX);
+}
+
+export function fetchUnknownPriceShops(): Promise<LunchShop[]> {
+  return fetchShops(PRICE_UNKNOWN);
+}
+
+async function fetchShops(filter: string): Promise<LunchShop[]> {
   if (!SUPABASE_URL || !KEY) throw new Error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 가 없어요");
   const headers: Record<string, string> = { apikey: KEY };
   if (KEY.startsWith("eyJ")) headers.Authorization = `Bearer ${KEY}`; // 예전 형식(JWT) 키
@@ -45,7 +57,7 @@ export async function fetchLunchShops(): Promise<LunchShop[]> {
   const rows: Row[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/shop_ai?select=${SELECT}&${UNDER_MAX}&error=is.null&order=shop_id&limit=${PAGE}&offset=${offset}`,
+      `${SUPABASE_URL}/rest/v1/shop_ai?select=${SELECT}&${filter}&error=is.null&order=shop_id&limit=${PAGE}&offset=${offset}`,
       { headers },
     );
     if (!res.ok) throw new Error(`가게를 불러오지 못했어요 (${res.status})`);
