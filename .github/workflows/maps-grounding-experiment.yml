@@ -27,6 +27,7 @@ jobs:
       - name: 10곳에 물어보기
         run: python batch/experiments/maps_grounding.py
         env:
+          SPEED: '1'   # 3차: 속도 비교 (11/17)
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

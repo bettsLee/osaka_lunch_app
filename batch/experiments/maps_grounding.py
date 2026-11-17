@@ -77,12 +77,14 @@ def pick_shops():
     return shops
 
 
-def ask(shop, model, key):
+def ask(shop, model, key, prompt=None, gen=None):
     body = {
-        "contents": [{"role": "user", "parts": [{"text": PROMPT.format(**shop)}]}],
+        "contents": [{"role": "user", "parts": [{"text": (prompt or PROMPT).format(**shop)}]}],
         "tools": [{"googleMaps": {}}],
         "toolConfig": {"retrievalConfig": {"latLng": {"latitude": shop["lat"], "longitude": shop["lng"]}}},
     }
+    if gen:
+        body["generationConfig"] = gen
     req = urllib.request.Request(ENDPOINT.format(model=model), data=json.dumps(body).encode("utf-8"), method="POST",
                                  headers={"x-goog-api-key": key, "Content-Type": "application/json"})
     started = time.time()
@@ -92,8 +94,73 @@ def ask(shop, model, key):
     text = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts", []))
     chunks = (cand.get("groundingMetadata") or {}).get("groundingChunks") or []
     sources = [c["maps"].get("title") for c in chunks if isinstance(c, dict) and c.get("maps")]
+    usage = res.get("usageMetadata") or {}
     return {"text": text, "sources": sources, "seconds": round(time.time() - started, 1),
-            "tokens": (res.get("usageMetadata") or {}).get("totalTokenCount")}
+            "tokens": usage.get("totalTokenCount"), "thinking": usage.get("thoughtsTokenCount")}
+
+
+# 3차 (11/17 상권: "시간을 줄일 수 없어?"): 2차는 평균 10.6초. 생각(thinking)을 줄이고, 메뉴 한 줄만 묻고,
+# 더 가벼운 모델(Flash-Lite)로 바꾸면 얼마나 빨라지는지 같은 10곳으로 비교
+MENU_PROMPT = """구글 지도에서 '{name}' (일본 오사카, 위도 {lat}, 경도 {lng} 근처) 가게를 찾아,
+이 가게의 대표 메뉴 2~3개를 한 줄로만 답해 주세요. 형식: 메뉴1(일본어 원문) · 메뉴2(일본어 원문)
+근거가 없으면 '모름'. 다른 말은 쓰지 마세요."""
+THINKING = [{"thinkingLevel": "minimal"}, {"thinkingLevel": "low"}, {"thinkingBudget": 0}]
+
+
+def list_models(key):
+    req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+                                 headers={"x-goog-api-key": key})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        models = json.loads(r.read().decode("utf-8")).get("models", [])
+    return [m["name"].split("/")[-1] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+
+
+def try_ask(shop, model, key, prompt, think, errors):
+    """생각 줄이기 설정은 모델마다 이름이 달라서 받아 주는 것을 차례로 써 봄 (think[0]에 기억)"""
+    options = [think[0]] if think[0] is not None else THINKING
+    for opt in options:
+        try:
+            out = ask(shop, model, key, prompt, {"thinkingConfig": opt, "maxOutputTokens": 300})
+            think[0] = opt
+            return out
+        except urllib.error.HTTPError as e:
+            errors.append(f"{model} {opt}: {e.code} {e.read().decode('utf-8')[:200]}")
+        except (urllib.error.URLError, TimeoutError) as e:
+            errors.append(f"{model} {opt}: {e}")
+    return None
+
+
+def speed_test():
+    key = env("GEMINI_API_KEY")
+    shops = pick_shops()
+    names = list_models(key)
+    lites = sorted([n for n in names if "flash-lite" in n and "preview" not in n and "tts" not in n])
+    lite = lites[-1] if lites else None
+    print("Flash-Lite 후보: " + ", ".join(lites[-4:]))
+    variants = [("4줄 + 생각 줄이기", ai_structure.MODEL, PROMPT), ("메뉴 한 줄 + 생각 줄이기", ai_structure.MODEL, MENU_PROMPT)]
+    if lite:
+        variants.append((f"메뉴 한 줄 + {lite}", lite, MENU_PROMPT))
+    report, results, errors = [], [], []
+    for label, model, prompt in variants:
+        think, outs = [None], []
+        for s in shops:
+            out = try_ask(s, model, key, prompt, think, errors)
+            outs.append(out)
+            results.append({"variant": label, "genre": s["genre_name"], "name": s["name"], "answer": out})
+        ok = [o for o in outs if o]
+        secs = sorted(o["seconds"] for o in ok)
+        if secs:
+            known = sum(1 for o in ok if not o["text"].strip().startswith("모름"))
+            report.append(f"- {label} (생각 설정 {think[0]}): 답 {len(ok)}/{len(shops)} · 메뉴 있음 {known} · "
+                          f"평균 {sum(secs) / len(secs):.1f}초 · 가운데 {secs[len(secs) // 2]}초 · 최대 {secs[-1]}초 · "
+                          f"생각 토큰 평균 {sum((o['thinking'] or 0) for o in ok) // len(ok)}")
+        else:
+            report.append(f"- {label}: 답 없음")
+    print("\n".join(report))
+    for e in errors[:6]:
+        print(f"오류: {e}")
+    with open("out.json", "w", encoding="utf-8") as f:
+        json.dump({"results": results, "errors": errors}, f, ensure_ascii=False, indent=1)
 
 
 def main():
@@ -144,4 +211,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    speed_test() if os.environ.get("SPEED") else main()
