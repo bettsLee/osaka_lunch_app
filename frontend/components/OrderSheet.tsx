@@ -4,14 +4,9 @@
 // 10/22 결정: 설정에서 고른 알레르기 · 식사 제한 문장을 맨 위에. 일본어는 우리가 쓴 그대로 두고 뜻만 번역함
 import { useEffect, useRef, useState } from "react";
 import { dietPhrases, loadDiet, type DietPhrase } from "@/lib/diet";
+import { ORDER_PHRASES } from "@/lib/order";
 import { useT } from "./I18n";
 import { svg } from "./icons";
-
-const PHRASES = [
-  { ja: "ランチをひとつお願いします。", meaning: "order.1" },
-  { ja: "おすすめのランチはどれですか？", meaning: "order.2" },
-  { ja: "カードは使えますか？", meaning: "order.3" },
-];
 
 export default function OrderSheet({ onClose }: { onClose: () => void }) {
   const { t, lang, machine } = useT();
@@ -61,7 +56,7 @@ export default function OrderSheet({ onClose }: { onClose: () => void }) {
           </section>
         )}
         <ul className="flex flex-col gap-2.5">
-          {PHRASES.map((p) => (
+          {ORDER_PHRASES.map((p) => (
             <li key={p.ja} className="flex flex-col gap-1 rounded-xl border border-[#D6D4CC] px-4 py-3.5">
               <p lang="ja" className="text-[20px] font-semibold leading-snug" style={jaStyle}>
                 {p.ja}
