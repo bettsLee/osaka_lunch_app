@@ -1,0 +1,41 @@
+name: Maps Grounding Experiment
+
+# 실험 (11/17, OL-63): Gemini 구글 지도 그라운딩으로 오사카 가게 10곳의 점심 메뉴 · 가격을 물어봄
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만.
+# 답 원문은 공개 기록에 남기지 않고, 저장소의 공개 키로 암호화한 것만 출력 (개인 키는 저장소에 없음)
+on:
+  push:
+    branches: [feature/OL-63-place-match]
+    paths:
+      - batch/experiments/maps_grounding.py
+      - .github/workflows/maps-grounding-experiment.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 10곳에 물어보기
+        run: python batch/experiments/maps_grounding.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: 답을 암호화해서 출력
+        run: |
+          openssl rand -hex 32 > k.txt
+          openssl pkeyutl -encrypt -pubin -inkey batch/experiments/result_key.pub.pem \
+            -pkeyopt rsa_padding_mode:oaep -in k.txt -out k.enc
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in out.json -out out.enc -pass file:k.txt
+          echo "=====KEY====="; base64 -w 76 k.enc; echo "=====DATA====="; base64 -w 76 out.enc; echo "=====END====="
+          rm -f k.txt out.json
