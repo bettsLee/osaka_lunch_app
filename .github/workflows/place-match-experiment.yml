@@ -1,0 +1,33 @@
+name: Place Match Experiment
+
+# 실험 (11/17, OL-63): 핫페퍼 가게에 Overture · OpenStreetMap 세부 종류가 얼마나 붙는지 비교
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만, 출력은 숫자 · 종류 이름만 (공개 저장소)
+on:
+  push:
+    branches: [feature/OL-63-place-match]
+    paths:
+      - batch/experiments/place_match.py
+      - .github/workflows/place-match-experiment.yml
+
+permissions:
+  contents: read
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 공개 장소 데이터 도구 설치
+        run: pip install overturemaps
+
+      - name: 짝 맞추기 비교
+        run: python batch/experiments/place_match.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
