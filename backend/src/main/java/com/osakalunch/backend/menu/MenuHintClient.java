@@ -45,10 +45,10 @@ public class MenuHintClient {
             Location: near latitude %s, longitude %s (Osaka, Japan)
 
             Answer in exactly these 5 lines and nothing else. Write the MENU, PRICE and BASIS values in %s.
-            STATUS: is it open for lunch on weekdays? Exactly one of these English words: OPEN, NO_LUNCH, CLOSED (permanently closed), UNKNOWN
+            STATUS: Exactly one of these English words. OPEN: serves lunch on weekdays. NO_LUNCH: in business but not for weekday lunch. PERMANENTLY_CLOSED: only if Google Maps marks the place as permanently closed. UNKNOWN. Ignore whether it is open right now or today.
             KIND: LUNCH if the dishes in MENU are known to be served at weekday lunch (lunch sets, lunch menu), otherwise ALL
-            MENU: 2-3 dishes, each followed by its Japanese name in parentheses, separated by " · ". Prefer dishes served at weekday lunch; if unknown, the restaurant's signature dishes. UNKNOWN if there is no basis
-            PRICE: lunch price range in yen. If there is no basis for lunch, the overall price range of the place. UNKNOWN if neither
+            MENU: 2-3 dishes separated by " · ". Each dish: its name, its Japanese name in parentheses, then its price in yen as digits only if known (for example: 라멘 (ラーメン) 900). Prefer dishes served at weekday lunch; if unknown, the restaurant's signature dishes. UNKNOWN if there is no basis
+            PRICE: LUNCH followed by the weekday lunch price range in yen as digits (for example: LUNCH 800-1200). If there is no basis for lunch, ALL followed by the overall price range (for example: ALL 1000-3000). UNKNOWN if neither
             BASIS: what you looked at (reviews, menu info, place info)
             Do not make anything up.
             """;
@@ -178,25 +178,42 @@ public class MenuHintClient {
     static MenuHint parse(String text, List<MenuHint.Source> sources, String placeId) {
         String[] l = lines(text);
         List<String> menus = sources.isEmpty() ? List.of() : menus(l[2]);
-        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place(l[0]), menus, kind(l[1]), sources, sources.isEmpty() ? null : placeId);
+        MenuHint.Price price = sources.isEmpty() ? null : price(l[3]);
+        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place(l[0]), menus, kind(l[1]), sources, sources.isEmpty() ? null : placeId, price);
     }
 
-    /** 구글 지도를 안 찾아보고 쓴 답: 메뉴가 있으면 'AI 추측'(guess). 지도로 확인한 게 아니라 영업 여부는 쓰지 않음 */
+    /** 구글 지도를 안 찾아보고 쓴 답: 메뉴가 있으면 'AI 추측'(guess). 지도로 확인한 게 아니라 영업 여부 · 가격은 쓰지 않음 */
     static MenuHint guess(String text) {
         String[] l = lines(text);
-        List<String> menus = menus(l[2]);
-        return new MenuHint(menus.isEmpty() ? "unknown" : "guess", "unknown", menus, kind(l[1]), List.of(), null);
+        List<String> menus = menus(l[2]).stream().map(m -> m.replaceFirst(DISH_PRICE, "")).filter(m -> !m.isBlank()).toList();
+        return new MenuHint(menus.isEmpty() ? "unknown" : "guess", "unknown", menus, kind(l[1]), List.of(), null, null);
     }
 
-    /** [STATUS, KIND, MENU] 값 */
+    /** 메뉴 끝의 가격 ('라멘 (ラーメン) 900', '… 900엔', '… ¥1,100') */
+    static final String DISH_PRICE = "\\s*[¥￥]?\\s*\\d[\\d,]{1,5}\\s*(엔|円|yen)?$";
+    private static final java.util.regex.Pattern PRICE_LINE = java.util.regex.Pattern.compile(
+            "^(LUNCH|ALL)\\s*[:：]?\\s*[¥￥]?\\s*(\\d[\\d,]*)\\s*(?:엔|円|YEN)?\\s*(?:[-~〜–]\\s*[¥￥]?\\s*(\\d[\\d,]*))?");
+
+    /** 'LUNCH 800-1200' · 'ALL 1000-3000' → 가격대. 이상한 숫자(100엔 미만 · 3만 엔 초과 · 거꾸로)면 null */
+    static MenuHint.Price price(String value) {
+        var m = PRICE_LINE.matcher(value.strip().toUpperCase(Locale.ROOT));
+        if (!m.find()) return null;
+        int min = Integer.parseInt(m.group(2).replace(",", ""));
+        int max = m.group(3) == null ? min : Integer.parseInt(m.group(3).replace(",", ""));
+        if (min < 100 || max > 30000 || min > max) return null;
+        return new MenuHint.Price(m.group(1).equals("LUNCH") ? "lunch" : "all", min, max);
+    }
+
+    /** [STATUS, KIND, MENU, PRICE] 값 */
     private static String[] lines(String text) {
-        String[] out = {"", "", ""};
+        String[] out = {"", "", "", ""};
         for (String raw : text.split("\\R")) {
             String line = raw.strip().replaceFirst("^[*\\-•\\s]+", "").replace("**", "");
             String head = line.toUpperCase(Locale.ROOT);
             if (head.startsWith("STATUS")) out[0] = value(line);
             else if (head.startsWith("KIND")) out[1] = value(line);
             else if (head.startsWith("MENU")) out[2] = value(line);
+            else if (head.startsWith("PRICE")) out[3] = value(line);
         }
         return out;
     }
@@ -205,9 +222,10 @@ public class MenuHintClient {
         return kind.toUpperCase(Locale.ROOT).startsWith("LUNCH") ? "lunch" : "signature"; // 모르면 '가게 대표 메뉴'로
     }
 
+    /** 폐업은 '영구 폐업'이라고 답했을 때만 (11/17: 점심 뒤 '지금 닫힘'을 CLOSED로 답해 폐업 안내가 잘못 뜸) */
     static String place(String status) {
         String s = status.toUpperCase(Locale.ROOT);
-        if (s.contains("CLOSED")) return "closed";
+        if (s.contains("PERMANENT")) return "closed";
         if (s.contains("NO_LUNCH") || s.contains("NO LUNCH")) return "no_lunch";
         if (s.startsWith("OPEN")) return "open";
         return "unknown";
@@ -216,8 +234,8 @@ public class MenuHintClient {
     static List<String> menus(String menu) {
         if (menu.isBlank() || menu.toUpperCase(Locale.ROOT).startsWith("UNKNOWN")) return List.of();
         List<String> out = new ArrayList<>();
-        // ' · ' 또는 쉼표로 나눔. 일본어 이름 안의 '・'는 나누지 않음
-        for (String item : menu.split("\\s*·\\s*|,\\s*|、")) {
+        // ' · ' 또는 쉼표로 나눔. 일본어 이름 안의 '・'와 가격 안의 쉼표(1,100)는 나누지 않음
+        for (String item : menu.split("\\s*·\\s*|,(?!\\d)\\s*|、")) {
             String m = item.strip().replaceAll("[.。]+$", "");
             if (!m.isEmpty() && m.length() <= 60 && out.size() < MAX_MENUS) out.add(m);
         }
