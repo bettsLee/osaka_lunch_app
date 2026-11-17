@@ -1,0 +1,32 @@
+name: Price and Shops Test
+
+# 실험 (11/17, OL-73): 옛 질문 vs 새 질문(폐업 · 메뉴별 가격 · 점심 가격대) 30곳 비교 + 가게 수 단계별 + 핫페퍼 지역별 가게 수
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만. 공개 기록이라 숫자 · 상태값 · 지역 이름만 출력
+on:
+  push:
+    branches: [feature/OL-73-price-shops-test]
+    paths:
+      - batch/experiments/price_and_shops.py
+      - .github/workflows/price-shops-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 가격 · 폐업 · 가게 수
+        run: python batch/experiments/price_and_shops.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HOTPEPPER_API_KEY: ${{ secrets.HOTPEPPER_API_KEY }}
