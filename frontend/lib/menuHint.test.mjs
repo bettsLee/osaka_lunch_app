@@ -1,7 +1,7 @@
 // 결과 카드 대표 메뉴 규칙 테스트 (11/17, OL-65). 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
+import { loadingKey, mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
 
 const SRC = { title: "Hokkyokusei - Google Maps", uri: "https://maps.google.com/?cid=1" };
 
@@ -61,4 +61,18 @@ test("룰렛 중 미리 물어본 답은 카드가 한 번만 가져가고, 없�
   await again.hint;
   assert.deepEqual(calls, ["ko|J1", "ko|J1"]);
   assert.equal(takeMenuHint("J1", "ja", fetcher).prefetched, false); // 언어가 다르면 다른 답
+});
+
+test("AI 추측: 출처 없이 메뉴만, 영업 안내 · 가게 ID는 버림", () => {
+  const g = readMenuHint({ status: "guess", place: "closed", menus: ["우동(うどん)"], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890" });
+  assert.deepEqual(g, { status: "guess", place: "unknown", menus: ["우동(うどん)"], kind: "lunch", sources: [], placeId: null });
+  assert.equal(readMenuHint({ status: "guess", menus: [] }).status, "unknown");
+});
+
+test("기다리는 문구는 시간에 따라 바뀜", () => {
+  assert.equal(loadingKey(0), "menu.loading");
+  assert.equal(loadingKey(3999), "menu.loading");
+  assert.equal(loadingKey(4000), "menu.loading2");
+  assert.equal(loadingKey(9000), "menu.loading3");
+  assert.equal(loadingKey(20000), "menu.loading4");
 });

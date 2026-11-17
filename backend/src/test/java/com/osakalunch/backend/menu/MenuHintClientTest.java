@@ -71,6 +71,83 @@ class MenuHintClientTest {
     }
 
     @Test
+    void 지도를_안_본_답은_AI_추측_영업_여부는_쓰지_않음() {
+        MenuHint g = MenuHintClient.guess("STATUS: CLOSED\nKIND: LUNCH\nMENU: 라멘(ラーメン) · 교자(餃子)");
+        assertThat(g).extracting(MenuHint::status, MenuHint::place, MenuHint::kind, MenuHint::placeId)
+                .containsExactly("guess", "unknown", "lunch", null);
+        assertThat(g.menus()).containsExactly("라멘(ラーメン)", "교자(餃子)");
+        assertThat(g.sources()).isEmpty();
+        assertThat(MenuHintClient.guess("STATUS: OPEN\nMENU: UNKNOWN").status()).isEqualTo("unknown");
+    }
+
+    static final String GROUNDED = """
+            {"candidates": [{"content": {"parts": [{"text": "STATUS: OPEN\\nMENU: 라멘(ラーメン)"}]},
+              "groundingMetadata": {"groundingChunks": [{"maps": {"uri": "https://maps.google.com/?cid=1", "title": "A"}}]}}]}""";
+    static final String UNGROUNDED = """
+            {"candidates": [{"content": {"parts": [{"text": "STATUS: OPEN\\nMENU: 우동(うどん)"}]}}]}""";
+    static final String UNGROUNDED_NO_MENU = """
+            {"candidates": [{"content": {"parts": [{"text": "STATUS: OPEN\\nMENU: UNKNOWN"}]}}]}""";
+
+    /** 정해 둔 답을 차례로 돌려주는 가짜 Gemini (문자열이면 답, 예외면 던짐) */
+    static MenuHintClient fake(List<Object> answers, List<java.time.Duration> asked) {
+        var it = answers.iterator();
+        return new MenuHintClient(new ObjectMapper(), "key", "m", 20) {
+            @Override
+            com.fasterxml.jackson.databind.JsonNode call(Shop shop, String lang, java.time.Duration timeout) throws java.io.IOException {
+                asked.add(timeout);
+                Object next = it.next();
+                if (next instanceof java.io.IOException e) throw e;
+                return new ObjectMapper().readTree((String) next);
+            }
+        };
+    }
+
+    static final Shop SHOP = new Shop("J1", "北極星", 34.65, 135.43);
+
+    @Test
+    void 지도를_안_보고_답하면_자동으로_한_번_더_물음() {
+        var asked = new java.util.ArrayList<java.time.Duration>();
+        MenuHint h = fake(List.of(UNGROUNDED, GROUNDED), asked).ask(SHOP, "ko", () -> true);
+        assertThat(h.status()).isEqualTo("ok");
+        assertThat(h.menus()).containsExactly("라멘(ラーメン)");
+        assertThat(asked).hasSize(2);
+        assertThat(asked.get(1)).isLessThanOrEqualTo(java.time.Duration.ofSeconds(20)); // 남은 시간 안에서만
+    }
+
+    @Test
+    void 다시_물어도_지도를_안_보면_메뉴가_있는_답을_AI_추측으로() {
+        var asked = new java.util.ArrayList<java.time.Duration>();
+        assertThat(fake(List.of(UNGROUNDED, UNGROUNDED_NO_MENU), asked).ask(SHOP, "ko", () -> true))
+                .extracting(MenuHint::status, MenuHint::menus).containsExactly("guess", List.of("우동(うどん)"));
+        // 하루 한도가 남지 않으면 다시 묻지 않고 첫 답으로
+        var once = new java.util.ArrayList<java.time.Duration>();
+        assertThat(fake(List.of(UNGROUNDED), once).ask(SHOP, "ko", () -> false).status()).isEqualTo("guess");
+        assertThat(once).hasSize(1);
+    }
+
+    @Test
+    void 지도에서_찾았는데_메뉴가_없으면_다시_묻지_않음() {
+        var asked = new java.util.ArrayList<java.time.Duration>();
+        String noMenu = GROUNDED.replace("MENU: 라멘(ラーメン)", "MENU: UNKNOWN");
+        assertThat(fake(List.of(noMenu), asked).ask(SHOP, "ko", () -> true).status()).isEqualTo("unknown");
+        assertThat(asked).hasSize(1);
+    }
+
+    @Test
+    void 오류면_다시_묻고_시간_초과면_그만() {
+        var asked = new java.util.ArrayList<java.time.Duration>();
+        assertThat(fake(List.of(new java.io.IOException("Gemini 오류 503"), GROUNDED), asked).ask(SHOP, "ko", () -> true).status())
+                .isEqualTo("ok");
+        var timedOut = new java.util.ArrayList<java.time.Duration>();
+        assertThat(fake(List.of(new java.net.http.HttpTimeoutException("느림")), timedOut).ask(SHOP, "ko", () -> true).status())
+                .isEqualTo("unavailable");
+        assertThat(timedOut).hasSize(1);
+        var bothFail = new java.util.ArrayList<java.time.Duration>();
+        assertThat(fake(List.of(new java.io.IOException("x"), new java.io.IOException("y")), bothFail).ask(SHOP, "ko", () -> true).status())
+                .isEqualTo("unavailable");
+    }
+
+    @Test
     void 질문은_사용자_언어로() {
         String p = MenuHintClient.prompt(new Shop("J1", "北極星", 34.65, 135.43), "ja");
         assertThat(p).contains("Name: 北極星").contains("latitude 34.65").contains("Japanese (ja)");

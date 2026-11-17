@@ -46,7 +46,7 @@ class MenuHintControllerTest {
 
     @Test
     void 로그인하면_대표_메뉴를_주고_저장하지_않게_함() throws Exception {
-        when(client.ask(any(), eq("ja"))).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
+        when(client.ask(any(), eq("ja"), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
                 List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
         mvc.perform(get("/api/shops/J1/menu-hint?lang=ja").with(jwt()))
                 .andExpect(status().isOk())
@@ -61,7 +61,7 @@ class MenuHintControllerTest {
     @Test
     void 사진_키가_없으면_가게_ID를_주지_않음() throws Exception {
         when(photos.ready()).thenReturn(false);
-        when(client.ask(any(), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
+        when(client.ask(any(), any(), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
                 List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
         mvc.perform(get("/api/shops/J1/menu-hint").with(jwt()))
                 .andExpect(status().isOk())
@@ -77,14 +77,14 @@ class MenuHintControllerTest {
         mvc.perform(get("/api/shops/J2/menu-hint").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("unavailable"));
-        verify(client, never()).ask(any(), any());
+        verify(client, never()).ask(any(), any(), any());
     }
 
     @Test
     void 이상한_언어는_한국어로() throws Exception {
-        when(client.ask(any(), any())).thenReturn(MenuHint.unavailable());
+        when(client.ask(any(), any(), any())).thenReturn(MenuHint.unavailable());
         mvc.perform(get("/api/shops/J1/menu-hint").param("lang", "<x>").with(jwt())).andExpect(status().isOk());
-        verify(client).ask(any(), eq("ko"));
+        verify(client).ask(any(), eq("ko"), any());
     }
 
     @Test
