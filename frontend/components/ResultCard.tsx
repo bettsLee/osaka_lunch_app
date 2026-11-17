@@ -1,14 +1,15 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
+// S3 결과 카드: 사진 · 장르 · 가격 + 배지 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 대표 메뉴(11/17) · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
 // 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
-import { directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
+import { directionsUrl, genreLabel, lunchTimeShort, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
 import { track } from "@/lib/analytics";
 import { clockTime } from "@/lib/visits";
 import { cardTouchAction } from "@/lib/swipe";
 import { useT } from "./I18n";
 import { svg } from "./icons";
+import MenuHintBlock from "./MenuHintBlock";
 import OrderSheet from "./OrderSheet";
 import type { useSheetSwipe } from "./useSheetSwipe";
 
@@ -39,10 +40,8 @@ export default function ResultCard(props: Props) {
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => title.current?.focus(), [shop.id]); // 결과가 나오면 화면 읽기 프로그램이 가게 이름부터 읽게
 
-  const time = lunchTimeText(shop, day, minutes, t);
+  const time = lunchTimeShort(shop, day, minutes, t); // 11/17: 카드는 짧게 (주문 마감이 영업 끝과 같으면 한 번만)
   const range = priceRange(shop, t);
-  const typical = shop.typicalPrice !== null ? t("price.yen", { n: shop.typicalPrice.toLocaleString("ja-JP") }) : null;
-  const limitYen = limit.toLocaleString("ja-JP");
   const confirmed = priceBadge(shop, limit) === "confirmed";
 
   // 카드 어디서든 끌어서 접고 펼치기 (10/29 상권: 손잡이만 잡혀서 불편). 주문 도우미가 떠 있으면 그쪽 손가락은 건드리지 않음
@@ -95,30 +94,12 @@ export default function ResultCard(props: Props) {
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
-        <h1 ref={title} tabIndex={-1} className="text-[22px] font-semibold leading-snug outline-none">
-          {shop.name}
-        </h1>
-        <p className="text-sm text-[#5F5E58]">
-          {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
-          <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
-        </p>
-        {shop.catchText && (
-          <div className="flex flex-col gap-0.5">
-            {/* 가게 소개는 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22 결정) */}
-            <p className="text-[11px] text-[#5F5E58]">{t("result.catchLabel")}</p>
-            {/* 원문 그대로 (10/24 리크루트 답: 핫페퍼 정보의 번안 · 가공 금지 → AI 번역을 끔) */}
-            <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>
-          </div>
-        )}
-        <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
-          {time.soon ? `${t("result.closingSoon")} · ` : ""}
-          {time.text}
-        </p>
-      </div>
-
+      {/* 11/17 결정 (OL-65): 카드를 열자마자 '무엇 · 얼마'가 보이게 장르 · 가격을 맨 위로 */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[22px] font-semibold">{range}</span>
+        <span className="text-[22px] font-semibold">
+          {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
+          {range}
+        </span>
         {confirmed ? (
           <span className="flex items-center gap-1 rounded-xl bg-[#E3F1E6] px-2.5 py-0.5 text-[13px] font-semibold text-[#1E6B35]">
             <svg {...svg} width={14} height={14} strokeWidth={2.5}>
@@ -130,31 +111,22 @@ export default function ResultCard(props: Props) {
           <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">{t("result.aiJudged")}</span>
         )}
       </div>
-      {!confirmed && (
-        <p className="-mt-1 text-[13px] text-[#5F5E58]">
-          {typical && range !== typical ? t("result.aiNoteTypical", { typical, limit: limitYen }) : t("result.aiNote", { limit: limitYen })}
+      <div className="-mt-1 flex flex-col gap-1">
+        <h1 ref={title} tabIndex={-1} className="text-[19px] font-semibold leading-snug outline-none">
+          {shop.name}
+        </h1>
+        <p className="text-sm text-[#5F5E58]">
+          <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
+          {" · "}
+          <span className={time.soon ? "font-semibold text-[#9A4A00]" : undefined}>
+            {time.soon ? `${t("result.closingSoon")} · ` : ""}
+            {time.text}
+          </span>
         </p>
-      )}
-      {/* 점심 시간 · 가격은 AI가 만든 값이라 핫페퍼 정보로 착각하지 않게 (10/24 리크루트 답) */}
-      <p className="-mt-1 text-[12px] text-[#5F5E58]">{t("result.aiSource")}</p>
+      </div>
 
-      {/* 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없어서(10/21 확인: 가격 근거에 메뉴가 있는 곳 7/250) 메뉴는 핫페퍼 페이지로 보냄 */}
-      {shop.hotpepperUrl && (
-        <a
-          href={shop.hotpepperUrl}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => track("menu_link_click")} // 메뉴 보기 비율 (10/21 결정 C)
-          className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#2457C5] text-[15px] font-semibold text-[#1A3F91]"
-        >
-          {t("result.menuLink")}
-          <svg {...svg} width={16} height={16}>
-            <path d="M14 4h6v6" />
-            <path d="M20 4l-9 9" />
-            <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-          </svg>
-        </a>
-      )}
+      {/* 대표 메뉴 (구글 지도 그라운딩). 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없음 (10/21 확인: 7/250) */}
+      <MenuHintBlock shopId={shop.id} shopName={shop.name} />
 
       {goingAt ? (
         // 이미 정한 가게: 정한 시각 + 길찾기 · 도착했어요 · 취소 (취소는 한 번 더 물어봄)
@@ -236,9 +208,36 @@ export default function ResultCard(props: Props) {
           </svg>
           {t("result.orderOpen")}
         </button>
+        {/* 11/17: 큰 버튼 → 작은 링크 (정보가 많다는 상권 의견). 메뉴 · 사진은 핫페퍼 페이지에도 있음 */}
+        {shop.hotpepperUrl && (
+          <a
+            href={shop.hotpepperUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => track("menu_link_click")} // 메뉴 보기 비율 (10/21 결정 C)
+            className="flex min-h-11 items-center gap-1 whitespace-nowrap text-[#1A3F91]"
+          >
+            {t("result.menuLinkShort")}
+            <svg {...svg} width={14} height={14}>
+              <path d="M14 4h6v6" />
+              <path d="M20 4l-9 9" />
+              <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+            </svg>
+          </a>
+        )}
       </div>
 
       <div className="flex flex-col gap-1 text-xs text-[#5F5E58]">
+        {shop.catchText && (
+          <details>
+            <summary className="min-h-8 cursor-pointer py-1">{t("result.catchShow")}</summary>
+            {/* 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22). 원문 그대로 (10/24 리크루트 답: 번안 · 가공 금지) */}
+            <p className="rounded-lg bg-[#F4F3EF] p-2 leading-relaxed">
+              {t("result.catchLabel")}
+              <br />「{shop.catchText}」
+            </p>
+          </details>
+        )}
         {shop.priceEvidence && (
           <details>
             <summary className="min-h-8 cursor-pointer py-1">{t("result.priceSource")}</summary>
@@ -251,6 +250,8 @@ export default function ResultCard(props: Props) {
             Powered by ホットペッパー グルメ Webサービス
           </a>
         </p>
+        {/* 점심 시간 · 가격은 AI가 만든 값이라 핫페퍼 정보로 착각하지 않게 (10/24 리크루트 답). 11/17: 맨 아래 출처 줄로 */}
+        <p>{t("result.aiSource")}</p>
       </div>
       </>
       )}

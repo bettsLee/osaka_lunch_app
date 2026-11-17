@@ -309,5 +309,17 @@
   "day.sat": "Saturday",
   "day.sun": "Sunday",
   "zukan.emptyHow": "Places show up here with ✓ when you arrive or answer 'Did you go?', and with ♥ when you'd go again.",
-  "zukan.goLunch": "Find lunch"
+  "zukan.goLunch": "Find lunch",
+  "menu.title": "Popular dishes",
+  "menu.loading": "Finding popular dishes…",
+  "menu.mapsLink": "See photos and reviews on Google Maps",
+  "menu.closed": "Google Maps says this place has permanently closed",
+  "menu.noLunch": "Google Maps says this place isn't open for weekday lunch",
+  "lunchShort.before": "Lunch from {start} (until {end})",
+  "lunchShort.until": "Lunch until {end} ({left} left)",
+  "lunchShort.untilOrder": "Lunch until {end} · last order {lastOrder} ({left} left)",
+  "lunchShort.over": "Lunch orders are over for today",
+  "menu.aiShort": "AI summary",
+  "result.catchShow": "Shop intro (from Hot Pepper)",
+  "result.menuLinkShort": "Menu on Hot Pepper"
 }

@@ -3,6 +3,7 @@
 import { GoTrueClient } from "@supabase/auth-js";
 import { setAnalyticsUser } from "./analytics";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
+import { readMenuHint, UNAVAILABLE_HINT, type MenuHint } from "./menuHint";
 import { arriveSettled, cancelSettled, enqueue, settled, type FeedbackBody, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
 
@@ -217,6 +218,25 @@ export async function createShareCode(shopIds: string[]): Promise<string> {
     const body: { code?: unknown } = await res.json();
     if (typeof body.code !== "string") throw new Error("짧은 링크 코드가 없어요");
     return body.code;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 결과 카드의 대표 메뉴 (11/17 결정, OL-65): 서버가 구글 지도 그라운딩으로 물어봄. 저장하지 않음 (구글 약관)
+// 서버가 잠들어 있거나 느리면 기다리지 않게 15초까지만 (못 받으면 화면이 구글맵 링크로)
+export async function fetchMenuHint(shopId: string, lang: string): Promise<MenuHint> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 15000);
+  try {
+    const res = await call(`/api/shops/${encodeURIComponent(shopId)}/menu-hint?lang=${encodeURIComponent(lang)}`, {
+      signal: stop.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) return UNAVAILABLE_HINT;
+    return readMenuHint(await res.json());
+  } catch {
+    return UNAVAILABLE_HINT;
   } finally {
     clearTimeout(timer);
   }
