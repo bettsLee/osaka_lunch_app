@@ -2,7 +2,8 @@
 // - 구글 약관상 답은 저장하지 않음: 로컬 저장소에 두지 않고, 미리 받아 둔 것도 카드에 한 번 보여 주면 버림
 // - 룰렛이 도는 동안(약 3초) 미리 물어봐서 카드가 열릴 때 기다리는 시간을 줄임 (11/17 실험: 한 번에 평균 3.6초)
 
-export type MenuHintStatus = "ok" | "unknown" | "unavailable"; // unavailable: 하루 한도 · 서버 오류 · 시간 초과
+// guess: AI가 구글 지도를 안 보고 쓴 메뉴 ('AI 추측', 출처 없음 · 11/17 상권 "(나)로 해줘") · unavailable: 하루 한도 · 서버 오류 · 시간 초과
+export type MenuHintStatus = "ok" | "guess" | "unknown" | "unavailable";
 export type MenuHintPlace = "open" | "no_lunch" | "closed" | "unknown"; // 구글 지도 기준 평일 점심 영업
 export type MenuHintSource = { title: string; uri: string };
 // kind: lunch = 평일 점심 메뉴로 알려진 것, signature = 가게 대표 메뉴(저녁일 수도) (11/17 상권: "대표메뉴가 점심메뉴가 맞아?")
@@ -33,7 +34,7 @@ export function readPlacePhotos(body: unknown): PlacePhoto[] {
     .slice(0, 3);
 }
 
-const STATUSES: readonly string[] = ["ok", "unknown", "unavailable"];
+const STATUSES: readonly string[] = ["ok", "guess", "unknown", "unavailable"];
 const PLACES: readonly string[] = ["open", "no_lunch", "closed", "unknown"];
 
 // 서버 응답을 믿지 않고 모양을 확인 (링크는 https만, 글자는 짧게)
@@ -55,6 +56,10 @@ export function readMenuHint(body: unknown): MenuHint {
     : [];
   const kind = b.kind === "lunch" ? "lunch" : "signature";
   const placeId = typeof b.placeId === "string" && /^[A-Za-z0-9_-]{10,300}$/.test(b.placeId) && sources.length > 0 ? b.placeId : null;
+  // AI 추측: 구글 지도를 안 본 답이라 출처 · 가게 ID · 영업 안내를 붙이지 않음
+  if (status === "guess") {
+    return { status: menus.length > 0 ? "guess" : "unknown", place: "unknown", menus, kind, sources: [], placeId: null };
+  }
   // 메뉴가 있어도 구글 지도 출처가 없으면 보여 주지 않음 (표시 규칙: 내용 바로 아래 출처)
   if (status === "ok" && (menus.length === 0 || sources.length === 0)) return { status: "unknown", place, menus: [], kind, sources, placeId };
   return { status, place, menus: status === "ok" ? menus : [], kind, sources, placeId };
@@ -66,6 +71,20 @@ export function splitDish(menu: string): { name: string; original: string | null
   const m = /^(.+?)\s*[（(]([^()（）]+)[)）]$/.exec(menu.trim());
   if (!m || m[1].trim() === m[2].trim()) return { name: menu.trim(), original: null };
   return { name: m[1].trim(), original: m[2].trim() };
+}
+
+// 기다리는 동안 문구 (11/17 상권: "기다릴 때 문구도 시간에 따라 바뀌게"). 서버는 20초까지 물어봄 (지도를 안 보면 자동으로 한 번 더)
+export const LOADING_STEPS: readonly (readonly [number, string])[] = [
+  [0, "menu.loading"],
+  [4000, "menu.loading2"],
+  [9000, "menu.loading3"],
+  [15000, "menu.loading4"],
+];
+
+export function loadingKey(waitedMs: number): string {
+  let key = LOADING_STEPS[0][1];
+  for (const [at, k] of LOADING_STEPS) if (waitedMs >= at) key = k;
+  return key;
 }
 
 // 메뉴를 못 받았을 때: 구글맵에서 가게 이름으로 찾기 (호출 없음 · 제한 없음). 출처가 있으면 그 장소로 바로

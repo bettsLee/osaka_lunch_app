@@ -53,7 +53,7 @@ public class MenuHintController {
         String language = lang.matches("[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?") ? lang : "ko";
         MenuHint hint = shop.getLat() == null || shop.getLng() == null || !client.ready() || !take()
                 ? MenuHint.unavailable()
-                : client.ask(shop, language);
+                : client.ask(shop, language, this::take); // 다시 물을 때도 하루 한도를 씀
         // 사진 키가 아직 없으면 가게 ID를 주지 않음 → 화면이 사진 회색 칸을 잠깐 보였다 지우지 않게
         if (!photos.ready() && hint.placeId() != null) {
             hint = new MenuHint(hint.status(), hint.place(), hint.menus(), hint.kind(), hint.sources(), null);
