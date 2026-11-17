@@ -37,12 +37,14 @@ class PlacePhotosControllerTest {
     void 로그인하면_사진_3장과_올린_사람을_주고_저장하지_않게_함() throws Exception {
         when(client.ready()).thenReturn(true);
         when(client.photos(eq("ChIJ1234567890"), eq(3))).thenReturn(List.of(
-                new PlacePhotosClient.Photo("https://lh3.googleusercontent.com/a", "Aiko", "https://maps.google.com/contrib/1")));
+                new PlacePhotosClient.Photo("https://lh3.googleusercontent.com/a", "Aiko", "https://maps.google.com/contrib/1",
+                        "https://www.google.com/maps/place//data=!3m4!1e2")));
         mvc.perform(get("/api/places/ChIJ1234567890/photos").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.photos[0].url").value("https://lh3.googleusercontent.com/a"))
-                .andExpect(jsonPath("$.photos[0].author").value("Aiko"));
+                .andExpect(jsonPath("$.photos[0].author").value("Aiko"))
+                .andExpect(jsonPath("$.photos[0].mapsUri").value("https://www.google.com/maps/place//data=!3m4!1e2"));
     }
 
     @Test

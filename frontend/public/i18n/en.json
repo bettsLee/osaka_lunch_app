@@ -329,6 +329,8 @@
   "result.catchShow": "Shop intro (from Hot Pepper)",
   "result.menuLinkShort": "Menu on Hot Pepper",
   "menu.lunchTitle": "Lunch menu",
+  "menu.photosTitle": "Customer photos",
+  "menu.photosHint": "tap to see the review on Google Maps",
   "menu.photosBy": "Photos:",
   "menu.photoAlt": "Customer photo {n}"
 }
