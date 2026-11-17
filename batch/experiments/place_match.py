@@ -59,6 +59,13 @@ GENERIC_OVERTURE = {
 }
 GENERIC_OSM = {"", "japanese", "regional", "asian", "international", "local", "fusion"}
 
+# 음식점이 아닌 장소 (1차 실행: 'ルクア大阪店'이 쇼핑몰 'ルクア大阪'과 짝이 됨). 짝 후보에서 뺌
+NON_FOOD_OVERTURE = {
+    "shopping_mall", "shopping_center", "department_store", "hotel", "train_station", "subway_station",
+    "bus_station", "office_building", "building", "commercial_building", "parking", "landmark_and_historical_building",
+    "party_and_event_planning", "event_space", "real_estate", "apartment_building", "supermarket", "convenience_store",
+}
+
 STRIP = re.compile(r"[\s　・･·\-‐－_~〜～.,、。!！?？'’\"“”()（）\[\]【】「」『』/／&＆+＋:：#＃*＊]")
 
 
@@ -202,7 +209,10 @@ def load_overture(bbox):
                 if geom.get("type") != "Point":
                     continue
                 lng, lat = geom["coordinates"][:2]
-                places.append({"lat": lat, "lng": lng, "names": overture_names(props), "cat": overture_category(props)})
+                cat = overture_category(props)
+                if cat in NON_FOOD_OVERTURE:
+                    continue
+                places.append({"lat": lat, "lng": lng, "names": overture_names(props), "cat": cat})
         return keys, places
 
 
@@ -291,6 +301,13 @@ def report(shops, results, lines):
             cells.append(f"{len(agree)} / {len(matched)} ({pct(len(agree), len(matched))})")
         lines.append(f"| {g} | {len(group)} | {cells[0]} | {cells[1]} |")
     lines.append("(일치 = 종류가 붙은 가게 중 핫페퍼 장르와 같은 계열. '일식당'처럼 넓은 종류가 붙으면 불일치로 셈)")
+    # 불일치가 짝을 잘못 맞춰서인지, 종류가 넓어서인지 구분하려고 장르별로 실제 붙은 종류를 봄
+    for g in CHECK:
+        group = [s for s in shops if s["genre_name"] == g]
+        for src, res in results.items():
+            counter = collections.Counter(res[s["id"]][2]["cat"] or "(없음)" for s in group if s["id"] in res)
+            if counter:
+                lines.append(f"- {g} → {src}: " + ", ".join(f"{c} {n}" for c, n in counter.most_common(6)))
 
     lines.append("")
     lines.append("## 5. 짝의 이름 유사도 · 거리")
@@ -305,13 +322,20 @@ def report(shops, results, lines):
 
 
 def main():
-    shops = read_shops()
-    lats = [s["lat"] for s in shops]
-    lngs = [s["lng"] for s in shops]
-    bbox = (min(lngs) - MARGIN, min(lats) - MARGIN, max(lngs) + MARGIN, max(lats) + MARGIN)
+    all_shops = read_shops()
+    # 1차 실행: 좌표가 도쿄인 가게가 섞여 범위가 오사카~도쿄로 커짐 → OpenStreetMap이 시간 초과.
+    # 가게들의 위아래 0.5%를 뺀 범위로 잡고, 범위 밖 가게는 수만 따로 셈
+    lats = sorted(s["lat"] for s in all_shops)
+    lngs = sorted(s["lng"] for s in all_shops)
+    k = max(1, len(all_shops) // 200)
+    bbox = (lngs[k] - MARGIN, lats[k] - MARGIN, lngs[-k - 1] + MARGIN, lats[-k - 1] + MARGIN)
+    shops = [s for s in all_shops if bbox[1] <= s["lat"] <= bbox[3] and bbox[0] <= s["lng"] <= bbox[2]]
+    outside = len(all_shops) - len(shops)
+    far = sum(1 for s in all_shops if not (34.2 <= s["lat"] <= 35.1 and 135.0 <= s["lng"] <= 135.8))
 
     lines = ["# 공개 장소 데이터 짝 맞추기 실험 (OL-63)", "",
              f"- 핫페퍼 가게 {len(shops)}곳 · 범위 {', '.join(f'{v:.3f}' for v in bbox)}",
+             f"- 범위 밖이라 뺀 가게 {outside}곳 (그중 오사카부 밖 좌표 {far}곳)",
              f"- 짝 기준: {MAX_DIST_M}m 안 + 이름 유사도 0.6 이상 (30m 안이면 0.5 이상)"]
 
     keys, overture = load_overture(bbox)
