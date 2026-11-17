@@ -1,7 +1,7 @@
 // 결과 카드 대표 메뉴 규칙 테스트 (11/17, OL-65). 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadingKey, mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
+import { loadingKey, loadingStep, mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
 
 const SRC = { title: "Hokkyokusei - Google Maps", uri: "https://maps.google.com/?cid=1" };
 
@@ -75,4 +75,5 @@ test("기다리는 문구는 시간에 따라 바뀜", () => {
   assert.equal(loadingKey(4000), "menu.loading2");
   assert.equal(loadingKey(9000), "menu.loading3");
   assert.equal(loadingKey(20000), "menu.loading4");
+  assert.deepEqual([0, 3999, 4000, 9000, 15000].map(loadingStep), [0, 0, 1, 2, 3]);
 });
