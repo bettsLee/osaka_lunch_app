@@ -5,10 +5,10 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   areaCenters, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, openNow, osakaNow, nextLunch, pickNearby, pickShop, priceBadge, priceLabel,
-  rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
+  priceUnknown, rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
-import { fetchLunchShops } from "@/lib/shops";
+import { fetchLunchShops, fetchUnknownPriceShops } from "@/lib/shops";
 import { arriveVisit, cancelVisit, fetchMenuHint, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, linkAnalyticsUser, saveVisit, syncPush, wakeServer } from "@/lib/api";
 import { prefetchMenuHint } from "@/lib/menuHint";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
@@ -44,6 +44,7 @@ const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴�
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
 const INSTALL_HINT_KEY = "osaka-lunch-install-hint-closed"; // 홈 화면 추가 안내를 닫음
 const GOING_KEY = "osaka-lunch-going"; // 여기 갈래요로 정한 가게 (지도의 파란 핀 · 결과 카드의 길찾기 · 취소)
+const UNKNOWN_KEY = "osaka-lunch-unknown-price"; // '가격 모르는 곳도' 켬 (11/17, 이 휴대폰에만 기억)
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
@@ -64,6 +65,9 @@ export default function HomeScreen() {
   const [flashId, setFlashId] = useState<string | null>(null);
   const [ask, setAsk] = useState<PendingVisit | null>(null); // 지금 물어볼 '다녀왔어요?'
   const [chosenLimit, setChosenLimit] = useState(DEFAULT_LIMIT); // 가격 상한 (S1b)
+  // 가격 모르는 곳도 (11/17 상권 "가게 수를 좀 더 늘리고 싶은데"): 핫페퍼에 점심 가격이 없는 가게. 켰을 때만 따로 받음
+  const [withUnknown, setWithUnknown] = useState(false);
+  const [unknownShops, setUnknownShops] = useState<LunchShop[] | null>(null); // null: 아직 안 받음
   const [priceOpen, setPriceOpen] = useState(false);
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
@@ -179,6 +183,7 @@ export default function HomeScreen() {
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
       if (saved) setChosenLimit(saved);
+      if (localStorage.getItem(UNKNOWN_KEY) === "1") setWithUnknown(true);
     } catch {
       // 저장소를 못 쓰면 기본 990엔
     }
@@ -199,6 +204,37 @@ export default function HomeScreen() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [locate, load]);
+
+  // 가격 모르는 곳도: 켰을 때 한 번만 받음 (못 받으면 끄고 지금 목록 그대로)
+  const needUnknown = withUnknown && unknownShops === null;
+  useEffect(() => {
+    if (!needUnknown) return;
+    let alive = true;
+    fetchUnknownPriceShops()
+      .then((list) => alive && setUnknownShops(list))
+      .catch((e: unknown) => {
+        trackError("unknown_price_shops", e);
+        if (alive) setWithUnknown(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [needUnknown]);
+  const toggleUnknown = () => {
+    const next = !withUnknown;
+    setWithUnknown(next);
+    track("unknown_price_toggle", { on: next });
+    try {
+      localStorage.setItem(UNKNOWN_KEY, next ? "1" : "0");
+    } catch {
+      // 기억 못 해도 이번에는 적용
+    }
+  };
+  // 가게 찾기용 전체 목록 (정한 가게 · 추천 가게 · 도감이 가격 모르는 가게일 수도 있어서, 받아 둔 건 늘 포함)
+  const known = useMemo(
+    () => (data.status === "ok" ? (unknownShops ? [...data.shops, ...unknownShops] : data.shops) : []),
+    [data, unknownShops],
+  );
 
   // 인터넷이 다시 연결되면 못 불러온 가게 목록을 다시 (10/22 화면 점검 08)
   const failed = data.status === "error";
@@ -223,9 +259,9 @@ export default function HomeScreen() {
   const near = useMemo(
     () =>
       loc.status === "ok" && data.status === "ok"
-        ? pickNearby(data.shops.filter((s) => underLimit(s, limit)), loc.point, day)
+        ? pickNearby(data.shops.filter((s) => underLimit(s, limit)), loc.point, day, withUnknown ? (unknownShops ?? []) : [])
         : null,
-    [loc, data, day, limit],
+    [loc, data, unknownShops, day, limit, withUnknown],
   );
   const nowKey = nowOnly ? minutes : -1; // '지금 영업 중'일 때만 1분마다 다시 거름 (아니면 핀이 매분 다시 그려짐)
   const visible = useMemo(() => {
@@ -235,6 +271,7 @@ export default function HomeScreen() {
     return [...list].sort((a, b) => (byDistance ? a.km - b.km : price(a) - price(b) || a.km - b.km));
   }, [near, nowOnly, byDistance, day, nowKey]);
 
+  const unknownVisible = withUnknown ? visible.filter(priceUnknown).length : 0; // 가격 모르는 곳은 '990엔 이하 n곳'에 세지 않고 따로
   const pool = rouletteCandidates(visible, day, minutes);
   const allOrdersOver = near !== null && near.shops.length > 0 && rouletteCandidates(near.shops, day, minutes).length === 0;
   const next = allOrdersOver && near ? nextLunch(near.shops, day) : null;
@@ -246,16 +283,16 @@ export default function HomeScreen() {
   // 친구가 추천한 가게: 지금 가게 목록에서 찾고, 위치를 알면 걸어서 n분
   const sharedShops = useMemo(() => {
     if (!shared.length || data.status !== "ok") return [];
-    const byId = new Map(data.shops.map((s) => [s.id, s]));
+    const byId = new Map(known.map((s) => [s.id, s]));
     return shared.flatMap((id) => {
       const s = byId.get(id);
       if (!s) return [];
       const km = loc.status === "ok" ? distanceKm(loc.point, s) : 0;
       return [{ ...s, km, walk: walkMinutes(km) }];
     });
-  }, [shared, data, loc]);
+  }, [shared, data, known, loc]);
   // 정한 가게 카드 (10/22 도그푸딩: 내비게이션처럼): 가격 · 남은 거리 (앱을 열 때 · 돌아올 때 잰 위치, 없으면 처음 위치)
-  const goingShop = goingNow && data.status === "ok" ? data.shops.find((s) => s.id === goingNow.shopId) : undefined;
+  const goingShop = goingNow && data.status === "ok" ? known.find((s) => s.id === goingNow.shopId) : undefined;
   const goingNearby = goingNow ? (near?.shops.find((s) => s.id === goingNow.shopId) ?? null) : null;
   const goingDistanceM = !goingNow
     ? null
@@ -503,7 +540,7 @@ export default function HomeScreen() {
     return (
       <main className={mainClass} style={mainFont}>
         <ZukanScreen
-          shops={data.status === "ok" ? data.shops : null}
+          shops={data.status === "ok" ? known : null}
           here={loc.status === "ok" ? loc.point : null}
           nearby={visible}
           onGoLunch={() => openTab("lunch")}
@@ -549,6 +586,7 @@ export default function HomeScreen() {
                 </svg>
               </button>
               <Chip on={nowOnly} onClick={() => setNowOnly((v) => !v)}>{t("home.openNow")}</Chip>
+              <Chip on={withUnknown} onClick={toggleUnknown}>{t("home.unknownPrice")}</Chip>
               <Chip on={byDistance} onClick={() => setByDistance((v) => !v)}>{t("home.byDistance")}</Chip>
             </div>
           )}
@@ -681,7 +719,7 @@ export default function HomeScreen() {
 
       {mode === "home" && ask && !priceOpen && !arrival && (
         <FeedbackSheet
-          visit={{ ...ask, shopName: (data.status === "ok" ? data.shops.find((s) => s.id === ask.shopId)?.name : undefined) ?? ask.shopName }}
+          visit={{ ...ask, shopName: (data.status === "ok" ? known.find((s) => s.id === ask.shopId)?.name : undefined) ?? ask.shopName }}
           onClose={() => {
             setAsk(null);
             void flushVisits();
@@ -734,7 +772,8 @@ export default function HomeScreen() {
               <div className="flex flex-col gap-1 text-sm text-[#5F5E58]">
                 <div className="flex items-center justify-between gap-2">
                   <p>
-                    {t(nowOnly ? "home.countOpenNow" : "home.count", { radius: near.radiusKm, limit: yen(limit), n: visible.length })}
+                    {t(nowOnly ? "home.countOpenNow" : "home.count", { radius: near.radiusKm, limit: yen(limit), n: visible.length - unknownVisible })}
+                    {unknownVisible > 0 && ` ${t("home.countUnknown", { n: unknownVisible })}`}
                   </p>
                   {visible.length > 0 && (
                     <button

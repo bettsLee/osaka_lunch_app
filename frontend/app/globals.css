@@ -76,6 +76,14 @@ body {
   font-size: 13px;
 }
 
+/* 가격 모르는 가게 (11/17 '가격 모르는 곳도'): 회색 점선 핀이라 가격이 확인된 가게와 구분 */
+.price-pin.is-unknown {
+  border-style: dashed;
+  border-color: #8d8b84;
+  color: #5f5e58;
+  font-weight: 500;
+}
+
 /* 도감 지도: 다녀온 곳은 채운 핀, 아직 안 간 곳은 점선 핀 */
 /* 10/22 도그푸딩: 처음부터 파랗게 채우면 '고른 것'처럼 보여서, 다녀온 곳은 ✓ 도장 + 진한 테두리 (파랗게 채움 = 목록에서 고른 가게) */
 .price-pin.is-visited {
