@@ -42,7 +42,7 @@ export default function ResultCard(props: Props) {
 
   const time = lunchTimeShort(shop, day, minutes, t); // 11/17: 카드는 짧게 (주문 마감이 영업 끝과 같으면 한 번만)
   const range = priceRange(shop, t);
-  const confirmed = priceBadge(shop, limit) === "confirmed";
+  const badge = priceBadge(shop, limit); // unknown: 핫페퍼에 점심 가격이 없는 가게 ('가격 모르는 곳도'를 켰을 때, 11/17)
 
   // 카드 어디서든 끌어서 접고 펼치기 (10/29 상권: 손잡이만 잡혀서 불편). 주문 도우미가 떠 있으면 그쪽 손가락은 건드리지 않음
   const swipeHere = handle && !orderOpen;
@@ -100,13 +100,15 @@ export default function ResultCard(props: Props) {
           {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
           {range}
         </span>
-        {confirmed ? (
+        {badge === "confirmed" ? (
           <span className="flex items-center gap-1 rounded-xl bg-[#E3F1E6] px-2.5 py-0.5 text-[13px] font-semibold text-[#1E6B35]">
             <svg {...svg} width={14} height={14} strokeWidth={2.5}>
               <path d="M5 12l5 5 9-10" />
             </svg>
             {t("result.priceConfirmed")}
           </span>
+        ) : badge === "unknown" ? (
+          <span className="rounded-xl bg-[#ECEAE3] px-2.5 py-0.5 text-[13px] font-semibold text-[#5F5E58]">{t("result.priceUnknownBadge")}</span>
         ) : (
           <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">{t("result.aiJudged")}</span>
         )}

@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeShort, lunchTimeText, openNow, osakaNow,
-  pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
+  pickNearby, pickShop, priceBadge, priceLabel, priceRange, priceUnknown, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
   nextLunch,
@@ -50,6 +50,11 @@ test("모자라면 1.5km, 그래도 모자라면 2km 안 전부", () => {
   const r = pickNearby([...many(3, 0.5), ...many(2, 1.9), ...many(4, 2.5)], HERE, "wed");
   assert.deepEqual([r.radiusKm, r.widened, r.shops.length], [2, true, 5]);
   assert.equal(pickNearby([], HERE, "wed").shops.length, 0);
+  // 가격 모르는 가게(extra)는 반경을 정할 때 세지 않음 → 켜도 1.5km 안 가격 확인된 가게가 그대로 (11/17)
+  const unknown = { priceMax: null };
+  const w = pickNearby([...many(10, 0.5), ...many(10, 1.4)], HERE, "wed", [...many(30, 0.5, unknown), ...many(3, 1.8, unknown)]);
+  assert.equal(w.radiusKm, 1.5);
+  assert.equal(w.shops.length, 50); // 가격 확인 20 + 반경 안 가격 모름 30 (1.8km 3곳은 빠짐)
 });
 
 test("오늘 점심 영업하지 않는 가게는 세지 않음", () => {
@@ -138,7 +143,8 @@ test("결과 카드 가격 · 배지 · 길찾기", () => {
   assert.equal(priceRange(shop(0, { priceMin: null, priceMax: null, typicalPrice: 1000 }), t), "1,000엔");
   assert.equal(priceBadge(shop(0, { priceMax: 950 })), "confirmed");
   assert.equal(priceBadge(shop(0, { priceMin: 800, priceMax: 1500, typicalPrice: 900 })), "ai"); // 대표 메뉴 단서로 판단
-  assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "ai");
+  assert.equal(priceBadge(shop(0, { priceMax: null, priceMin: 500 })), "unknown"); // '500円～'는 끝을 몰라서 가격 모름 (11/17)
+  assert.equal(priceBadge(shop(0, { priceMax: null })), "unknown");
   assert.equal(directionsUrl({ lat: 34.1, lng: 135.2 }),
     "https://www.google.com/maps/dir/?api=1&destination=34.1,135.2&travelmode=walking");
 });
@@ -149,6 +155,12 @@ test("가격 상한 이하: 대표 메뉴 가격 → 없으면 점심 최고가"
   assert.equal(underLimit(shop(0, { priceMax: 1190 }), 1190), true);
   assert.equal(underLimit(shop(0, { priceMax: 1190 }), 990), false);
   assert.equal(underLimit(shop(0, { priceMax: null, priceMin: 500 }), 1190), false); // '500円～'는 끝을 모름
+});
+
+test("가격 모르는 가게: 대표 메뉴 가격 · 점심 최고가가 둘 다 없을 때 (11/17)", () => {
+  assert.equal(priceUnknown(shop(0, { priceMax: null, typicalPrice: null })), true);
+  assert.equal(priceUnknown(shop(0, { priceMax: null, typicalPrice: 900 })), false);
+  assert.equal(priceUnknown(shop(0, { priceMax: 950 })), false);
 });
 
 test("가격 단계: 단계마다 반경을 다시 고르고, 2km 안 5곳 미만이면 잠금", () => {

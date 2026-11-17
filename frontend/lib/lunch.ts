@@ -40,6 +40,11 @@ export const MIN_TIER_SHOPS = 5;
 
 // 상한 이하인 가게: 대표 메뉴 가격이 있으면 그걸로, 없으면 적힌 점심 최고가로 (10/21 결정 A)
 // AI가 뽑은 가격 숫자로 계산하는 규칙. 990엔에서 AI 판정과 2,758곳 모두 같음을 확인
+// 점심 가격을 모르는 가게: 대표 메뉴 가격 · 점심 최고가가 둘 다 없음 (11/17, '가격 모르는 가게도 보기')
+export function priceUnknown(shop: LunchShop): boolean {
+  return shop.typicalPrice === null && shop.priceMax === null;
+}
+
 export function underLimit(shop: LunchShop, limit: number): boolean {
   if (shop.typicalPrice !== null) return shop.typicalPrice <= limit;
   return shop.priceMax !== null && shop.priceMax <= limit;
@@ -129,22 +134,28 @@ export function openNow(shop: LunchShop, day: Day, minutes: number): boolean {
 export type NearbyShop = LunchShop & { km: number; walk: number };
 
 // 오늘 점심 영업하는 가게를 가까운 반경부터 보고, 20곳이 되는 첫 반경을 고름. 2km에서도 모자라면 2km 안 전부
+// extra(가격 모르는 가게, 11/17)는 같은 반경 안이면 함께 보여 주되 반경을 정하는 20곳에는 세지 않음
+// → 스위치를 켜도 가격이 확인된 가게가 반경이 좁아져 빠지는 일이 없음
 export function pickNearby(
   shops: LunchShop[],
   here: Point,
   day: Day,
+  extra: LunchShop[] = [],
 ): { radiusKm: number; widened: boolean; shops: NearbyShop[] } {
-  const today = shops
-    .filter((s) => lunchOpenOn(s, day))
-    .map((s) => {
-      const km = distanceKm(here, s);
-      return { ...s, km, walk: walkMinutes(km) };
-    });
+  const near = (list: LunchShop[]) =>
+    list
+      .filter((s) => lunchOpenOn(s, day))
+      .map((s) => {
+        const km = distanceKm(here, s);
+        return { ...s, km, walk: walkMinutes(km) };
+      });
+  const today = near(shops);
+  const others = near(extra);
   for (const radiusKm of RADII_KM) {
     const inside = today.filter((s) => s.km <= radiusKm);
     const last = radiusKm === RADII_KM[RADII_KM.length - 1];
     if (inside.length >= MIN_SHOPS || last) {
-      return { radiusKm, widened: radiusKm !== RADII_KM[0], shops: inside };
+      return { radiusKm, widened: radiusKm !== RADII_KM[0], shops: [...inside, ...others.filter((s) => s.km <= radiusKm)] };
     }
   }
   return { radiusKm: RADII_KM[0], widened: false, shops: [] }; // 도달하지 않음 (타입용)
@@ -296,8 +307,9 @@ export function priceRange(shop: LunchShop, t: T): string {
   return t("price.unknown");
 }
 
-// 배지: 적힌 점심 가격이 전부 상한 이하면 '가격 확인됨', 대표 메뉴 단서로 AI가 판단했으면 'AI 판단'
-export function priceBadge(shop: LunchShop, limit = 990): "confirmed" | "ai" {
+// 배지: 적힌 점심 가격이 전부 상한 이하면 '가격 확인됨', 대표 메뉴 단서로 AI가 판단했으면 'AI 판단', 점심 가격이 없으면 'unknown'
+export function priceBadge(shop: LunchShop, limit = 990): "confirmed" | "ai" | "unknown" {
+  if (priceUnknown(shop)) return "unknown";
   return shop.priceMax !== null && shop.priceMax <= limit ? "confirmed" : "ai";
 }
 
