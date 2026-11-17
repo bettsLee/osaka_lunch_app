@@ -24,10 +24,22 @@ jobs:
           python-version: '3.12'
 
       - name: 공개 장소 데이터 도구 설치
-        run: pip install overturemaps
+        run: |
+          pip install overturemaps
+          sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
+
+      # 공용 Overpass 서버가 502 · 시간 초과라서 간사이 지역 파일을 받아 오사카 음식점만 거름 (© OpenStreetMap contributors)
+      - name: OpenStreetMap 간사이 파일에서 오사카 음식점 거르기
+        run: |
+          curl -fsSL -o kansai.osm.pbf https://download.geofabrik.de/asia/japan/kansai-latest.osm.pbf
+          osmium extract -b 135.40,34.57,135.60,34.84 kansai.osm.pbf -o osaka.osm.pbf
+          osmium tags-filter osaka.osm.pbf nwr/amenity=restaurant,fast_food,cafe,food_court,pub,bar -o food.osm.pbf
+          osmium export food.osm.pbf -f geojsonseq -o food.geojsonseq
+          wc -l food.geojsonseq
 
       - name: 짝 맞추기 비교
         run: python batch/experiments/place_match.py
         env:
+          OSM_FILE: food.geojsonseq
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

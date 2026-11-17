@@ -216,7 +216,43 @@ def load_overture(bbox):
         return keys, places
 
 
+def osm_place(lat, lng, tags):
+    names = [tags[k] for k in ("name", "name:ja", "name:en", "alt_name", "brand") if tags.get(k)]
+    cuisines = [c.strip().lower() for c in (tags.get("cuisine") or "").split(";") if c.strip()]
+    return {"lat": lat, "lng": lng, "names": names, "cat": ";".join(cuisines)}
+
+
+def center(geom):
+    """점이면 그대로, 건물 모양이면 꼭짓점 평균 (짝 맞추기에는 이 정도면 충분)"""
+    coords = geom.get("coordinates")
+    while isinstance(coords, list) and coords and isinstance(coords[0], list) and isinstance(coords[0][0], list):
+        coords = coords[0]
+    if geom.get("type") == "Point":
+        return coords[1], coords[0]
+    if isinstance(coords, list) and coords:
+        return sum(c[1] for c in coords) / len(coords), sum(c[0] for c in coords) / len(coords)
+    return None, None
+
+
+def load_osm_file(path):
+    """2차 실행: 공용 Overpass 서버가 두 번 다 502 · 시간 초과 → 간사이 지역 파일(Geofabrik)을 osmium으로 거른 결과를 읽음"""
+    places = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip().lstrip("\x1e")
+            if not line:
+                continue
+            feat = json.loads(line)
+            lat, lng = center(feat.get("geometry") or {})
+            if lat is not None:
+                places.append(osm_place(lat, lng, feat.get("properties") or {}))
+    return places
+
+
 def load_osm(bbox):
+    path = os.environ.get("OSM_FILE")
+    if path and os.path.exists(path):
+        return load_osm_file(path)
     w, s, e, n = bbox
     query = (f'[out:json][timeout:180];nwr["amenity"~"^(restaurant|fast_food|cafe|food_court|pub|bar)$"]'
              f"({s},{w},{n},{e});out center tags;")
@@ -238,9 +274,7 @@ def load_osm(bbox):
         tags = el.get("tags") or {}
         if lat is None or lng is None:
             continue
-        names = [tags[k] for k in ("name", "name:ja", "name:en", "alt_name", "brand") if tags.get(k)]
-        cuisines = [c.strip().lower() for c in (tags.get("cuisine") or "").split(";") if c.strip()]
-        places.append({"lat": lat, "lng": lng, "names": names, "cat": ";".join(cuisines)})
+        places.append(osm_place(lat, lng, tags))
     return places
 
 
