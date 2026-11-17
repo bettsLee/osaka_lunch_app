@@ -26,20 +26,22 @@ public class MenuHintController {
 
     private final ShopRepository shops;
     private final MenuHintClient client;
+    private final PlacePhotosClient photos;
     private final int dailyLimit;
     private final Clock clock;
     private LocalDate day;
     private int used;
 
     @Autowired
-    public MenuHintController(ShopRepository shops, MenuHintClient client,
+    public MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos,
                               @Value("${menu-hint.daily-limit:150}") int dailyLimit) {
-        this(shops, client, dailyLimit, Clock.system(OSAKA));
+        this(shops, client, photos, dailyLimit, Clock.system(OSAKA));
     }
 
-    MenuHintController(ShopRepository shops, MenuHintClient client, int dailyLimit, Clock clock) {
+    MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos, int dailyLimit, Clock clock) {
         this.shops = shops;
         this.client = client;
+        this.photos = photos;
         this.dailyLimit = dailyLimit;
         this.clock = clock;
     }
@@ -52,6 +54,10 @@ public class MenuHintController {
         MenuHint hint = shop.getLat() == null || shop.getLng() == null || !client.ready() || !take()
                 ? MenuHint.unavailable()
                 : client.ask(shop, language);
+        // 사진 키가 아직 없으면 가게 ID를 주지 않음 → 화면이 사진 회색 칸을 잠깐 보였다 지우지 않게
+        if (!photos.ready() && hint.placeId() != null) {
+            hint = new MenuHint(hint.status(), hint.place(), hint.menus(), hint.kind(), hint.sources(), null);
+        }
         // 구글 지도 기반 답은 저장하면 안 돼서 브라우저 · 중간 서버도 보관하지 않게
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(hint);
     }
