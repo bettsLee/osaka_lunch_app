@@ -1,0 +1,32 @@
+name: Menu Hit Test
+
+# 실험 (11/17, OL-68): 실제 서버에 가게 30곳의 대표 메뉴를 물어서 뜨는 비율 · 안 뜨는 이유를 셈
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만 (익명 로그인 한 번)
+# 공개 기록이라 숫자만 출력 (가게 ID · 이름 · 메뉴 글 없음)
+on:
+  push:
+    branches: [feature/OL-68-menu-hit-test]
+    paths:
+      - batch/experiments/menu_hit_test.py
+      - .github/workflows/menu-hit-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 30곳에 물어보기
+        run: python batch/experiments/menu_hit_test.py
+        env:
+          API_URL: https://osaka-lunch-api.onrender.com
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
