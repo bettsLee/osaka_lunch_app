@@ -45,8 +45,12 @@ class MenuHintClientTest {
 
     @Test
     void 모름_폐업_출처없음() {
-        assertThat(MenuHintClient.parse("STATUS: CLOSED\nMENU: UNKNOWN", SRC, null))
+        assertThat(MenuHintClient.parse("STATUS: PERMANENTLY_CLOSED\nMENU: UNKNOWN", SRC, null))
                 .extracting(MenuHint::status, MenuHint::place).containsExactly("unknown", "closed");
+        // '지금 닫힘'으로 CLOSED라고만 답하면 폐업으로 보지 않음 (11/17: 점심 뒤 폐업 안내가 잘못 뜸)
+        assertThat(MenuHintClient.parse("STATUS: CLOSED\nMENU: UNKNOWN", SRC, null).place()).isEqualTo("unknown");
+        assertThat(MenuHintClient.place("CLOSED_NOW")).isEqualTo("unknown");
+        assertThat(MenuHintClient.place("NO_LUNCH")).isEqualTo("no_lunch");
         // 구글 지도 출처가 하나도 없으면 지도에서 찾은 답이 아니라서 메뉴를 쓰지 않음
         assertThat(MenuHintClient.parse("STATUS: OPEN\nMENU: 라멘(ラーメン)", List.of(), "ChIJabcdefghij").status()).isEqualTo("unknown");
         assertThat(MenuHintClient.parse("엉뚱한 답", SRC, null).place()).isEqualTo("unknown");
@@ -71,6 +75,25 @@ class MenuHintClientTest {
     }
 
     @Test
+    void 메뉴별_가격과_가격대를_읽음() {
+        MenuHint h = MenuHintClient.parse("""
+                STATUS: OPEN
+                KIND: LUNCH
+                MENU: 라멘 (ラーメン) 900 · 카레 (カレー) ¥1,100 · 교자(餃子)
+                PRICE: LUNCH 800-1,200엔
+                """, SRC, null);
+        assertThat(h.menus()).containsExactly("라멘 (ラーメン) 900", "카레 (カレー) ¥1,100", "교자(餃子)");
+        assertThat(h.price()).isEqualTo(new MenuHint.Price("lunch", 800, 1200));
+        assertThat(MenuHintClient.price("ALL 1000-3000")).isEqualTo(new MenuHint.Price("all", 1000, 3000));
+        assertThat(MenuHintClient.price("LUNCH 950")).isEqualTo(new MenuHint.Price("lunch", 950, 950));
+        assertThat(MenuHintClient.price("UNKNOWN")).isNull();
+        assertThat(MenuHintClient.price("LUNCH 1200-800")).isNull(); // 거꾸로
+        assertThat(MenuHintClient.price("LUNCH 50")).isNull();
+        // 구글 지도 출처가 없으면 가격도 쓰지 않음
+        assertThat(MenuHintClient.parse("MENU: 라멘 (ラーメン) 900\nPRICE: LUNCH 800-1200", List.of(), null).price()).isNull();
+    }
+
+    @Test
     void 지도를_안_본_답은_AI_추측_영업_여부는_쓰지_않음() {
         MenuHint g = MenuHintClient.guess("STATUS: CLOSED\nKIND: LUNCH\nMENU: 라멘(ラーメン) · 교자(餃子)");
         assertThat(g).extracting(MenuHint::status, MenuHint::place, MenuHint::kind, MenuHint::placeId)
@@ -78,6 +101,10 @@ class MenuHintClientTest {
         assertThat(g.menus()).containsExactly("라멘(ラーメン)", "교자(餃子)");
         assertThat(g.sources()).isEmpty();
         assertThat(MenuHintClient.guess("STATUS: OPEN\nMENU: UNKNOWN").status()).isEqualTo("unknown");
+        // AI 추측에는 가격을 붙이지 않음 (구글 지도에서 확인된 가격만)
+        MenuHint priced = MenuHintClient.guess("MENU: 라멘 (ラーメン) 900 · 카레 (カレー) ¥1,100엔\nPRICE: LUNCH 800-1200");
+        assertThat(priced.menus()).containsExactly("라멘 (ラーメン)", "카레 (カレー)");
+        assertThat(priced.price()).isNull();
     }
 
     static final String GROUNDED = """

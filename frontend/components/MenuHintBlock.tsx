@@ -11,15 +11,16 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchMenuHint, fetchPlacePhotos } from "@/lib/api";
 import { track } from "@/lib/analytics";
-import { LOADING_STEPS, loadingStep, mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
+import { LOADING_STEPS, loadingStep, mapsLink, priceRange, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
 import { orderTip, type OrderPhrase } from "@/lib/order";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 
 const ATTRIBUTION_STYLE = { fontFamily: "Roboto, Arial, Helvetica, sans-serif", fontWeight: 400, color: "#5E5E5E", fontSize: 12 } as const;
 
-// 메뉴 칸: 이름은 크게, 일본어 이름은 아래 작게 (주문할 때 보여 주기). AI 추측은 점선으로 구분
+// 메뉴 칸: 이름은 크게, 일본어 이름 · 가격은 아래 (주문할 때 보여 주기). AI 추측은 점선으로 구분 (가격 없음)
 function Dishes({ menus, guess }: { menus: string[]; guess: boolean }) {
+  const { t } = useT();
   return (
     <ul className="flex flex-wrap gap-2">
       {menus.map((m) => {
@@ -30,9 +31,13 @@ function Dishes({ menus, guess }: { menus: string[]; guess: boolean }) {
             className={`flex flex-col rounded-xl px-3 py-2 ${guess ? "border border-dashed border-[#B9B6AC] bg-white" : "bg-[#F4F2EC]"}`}
           >
             <span className={`text-[16px] font-semibold leading-tight ${guess ? "text-[#4A4944]" : "text-[#1F1F1C]"}`}>{dish.name}</span>
-            {dish.original && (
-              <span lang="ja" className="text-[12px] leading-tight text-[#5F5E58]">
-                {dish.original}
+            {(dish.original || dish.price !== null) && (
+              <span className="text-[12px] leading-tight text-[#5F5E58]">
+                {dish.original && <span lang="ja">{dish.original}</span>}
+                {dish.original && dish.price !== null && " · "}
+                {dish.price !== null && (
+                  <span className="text-[13px] font-semibold text-[#1F1F1C]">{t("menu.dishPrice", { p: dish.price.toLocaleString("ja-JP") })}</span>
+                )}
               </span>
             )}
           </li>
@@ -232,7 +237,9 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
       </div>
     ) : null;
 
-  const shown = hint.status === "ok" || hint.status === "guess";
+  // 구글 지도 가격대 (11/17 상권 "대략적인 가격이라도 가시적으로"): 메뉴가 없어도 지도에서 찾은 가게면 보여 줌
+  const price = grounded && hint.price ? hint.price : null;
+  const shown = hint.status === "ok" || hint.status === "guess" || price !== null;
   if (!shown && !warning) {
     return frame(
       <div className="flex flex-col gap-1">
@@ -245,11 +252,19 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
   return frame(
     <div className="flex flex-col gap-1.5" aria-live="polite">
       {warning && <p className="text-sm font-semibold text-[#9A4A00]">{warning}</p>}
-      {hint.status === "ok" && (
+      {(hint.status === "ok" || price) && (
         <div className="flex flex-col gap-1.5">
-          <p className="text-[13px] font-semibold text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}</p>
+          {hint.status === "ok" && (
+            <p className="text-[13px] font-semibold text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}</p>
+          )}
+          {/* 11/17 30곳 테스트: 점심 가격대는 27곳 중 3곳만, 대부분 가게 전체 가격대(저녁 포함) → 점심만 크게, 전체는 작게 */}
+          {price && (
+            <p className={price.kind === "lunch" ? "text-[16px] font-semibold text-[#1F1F1C]" : "text-[13px] text-[#5F5E58]"}>
+              {t(price.kind === "lunch" ? "menu.priceLunch" : "menu.priceAll", { range: priceRange(price) })}
+            </p>
+          )}
           {/* 11/17 상권 "눈에 안 들어와" → 메뉴마다 칸 (가안) */}
-          <Dishes menus={hint.menus} guess={false} />
+          {hint.status === "ok" && <Dishes menus={hint.menus} guess={false} />}
           {/* 출처: 내용 바로 아래 (표시 규칙) */}
           <div className="flex flex-wrap items-center gap-x-2 text-[12px]">
             {hint.sources.map((s) => (

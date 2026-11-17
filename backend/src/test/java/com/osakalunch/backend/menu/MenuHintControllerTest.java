@@ -47,7 +47,7 @@ class MenuHintControllerTest {
     @Test
     void 로그인하면_대표_메뉴를_주고_저장하지_않게_함() throws Exception {
         when(client.ask(any(), eq("ja"), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
-                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
+                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890", null));
         mvc.perform(get("/api/shops/J1/menu-hint?lang=ja").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
@@ -62,7 +62,7 @@ class MenuHintControllerTest {
     void 사진_키가_없으면_가게_ID를_주지_않음() throws Exception {
         when(photos.ready()).thenReturn(false);
         when(client.ask(any(), any(), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
-                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
+                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890", null));
         mvc.perform(get("/api/shops/J1/menu-hint").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.menus[0]").value("オムライス"))

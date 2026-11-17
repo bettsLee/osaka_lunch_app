@@ -8,6 +8,8 @@ export type MenuHintPlace = "open" | "no_lunch" | "closed" | "unknown"; // 구�
 export type MenuHintSource = { title: string; uri: string };
 // kind: lunch = 평일 점심 메뉴로 알려진 것, signature = 가게 대표 메뉴(저녁일 수도) (11/17 상권: "대표메뉴가 점심메뉴가 맞아?")
 // placeId: 구글 가게 ID (손님 사진을 받을 때 씀)
+// price: 구글 지도 기준 가격대 (11/17 상권 "대략적인 가격이라도 가시적으로"). lunch = 평일 점심, all = 가게 전체 (점심 근거 없음)
+export type MenuHintPrice = { kind: "lunch" | "all"; min: number; max: number };
 export type MenuHint = {
   status: MenuHintStatus;
   place: MenuHintPlace;
@@ -15,9 +17,35 @@ export type MenuHint = {
   kind: "lunch" | "signature";
   sources: MenuHintSource[];
   placeId: string | null;
+  price: MenuHintPrice | null;
 };
 
-export const UNAVAILABLE_HINT: MenuHint = { status: "unavailable", place: "unknown", menus: [], kind: "signature", sources: [], placeId: null };
+export const UNAVAILABLE_HINT: MenuHint = {
+  status: "unavailable",
+  place: "unknown",
+  menus: [],
+  kind: "signature",
+  sources: [],
+  placeId: null,
+  price: null,
+};
+
+const yen = (n: number) => n.toLocaleString("ja-JP");
+
+// 가격 숫자는 100엔~3만 엔만 믿음
+function readPrice(v: unknown): MenuHintPrice | null {
+  const o = v as Record<string, unknown> | null;
+  if (!o || (o.kind !== "lunch" && o.kind !== "all")) return null;
+  const { min, max } = o;
+  if (typeof min !== "number" || typeof max !== "number" || !Number.isInteger(min) || !Number.isInteger(max)) return null;
+  if (min < 100 || max > 30000 || min > max) return null;
+  return { kind: o.kind, min, max };
+}
+
+// '800~1,200' (같으면 '900')
+export function priceRange(p: MenuHintPrice): string {
+  return p.min === p.max ? yen(p.min) : `${yen(p.min)}~${yen(p.max)}`;
+}
 
 // 결과 카드의 손님 사진 (11/17 상권: "메뉴사진도 같이 넣을 수 없어?"). 구글 장소 API, 저장하지 않음, 올린 사람 표시
 // mapsUri: 구글 지도에서 그 사진을 여는 링크 (올린 사람의 리뷰에서 무슨 메뉴인지 확인. 11/17 상권 "사진만 있으니까 메뉴 이름을 잘 모르겠는데")
@@ -65,21 +93,37 @@ export function readMenuHint(body: unknown): MenuHint {
     : [];
   const kind = b.kind === "lunch" ? "lunch" : "signature";
   const placeId = typeof b.placeId === "string" && /^[A-Za-z0-9_-]{10,300}$/.test(b.placeId) && sources.length > 0 ? b.placeId : null;
-  // AI 추측: 구글 지도를 안 본 답이라 출처 · 가게 ID · 영업 안내를 붙이지 않음
+  // AI 추측: 구글 지도를 안 본 답이라 출처 · 가게 ID · 영업 안내 · 가격을 붙이지 않음 (메뉴 끝 가격도 뗌)
   if (status === "guess") {
-    return { status: menus.length > 0 ? "guess" : "unknown", place: "unknown", menus, kind, sources: [], placeId: null };
+    const plain = menus.map((m) => splitDish(m)).map((d) => (d.original ? `${d.name}(${d.original})` : d.name));
+    return { status: plain.length > 0 ? "guess" : "unknown", place: "unknown", menus: plain, kind, sources: [], placeId: null, price: null };
   }
+  // 가격대는 구글 지도에서 찾은 답일 때만
+  const price = sources.length > 0 ? readPrice(b.price) : null;
   // 메뉴가 있어도 구글 지도 출처가 없으면 보여 주지 않음 (표시 규칙: 내용 바로 아래 출처)
-  if (status === "ok" && (menus.length === 0 || sources.length === 0)) return { status: "unknown", place, menus: [], kind, sources, placeId };
-  return { status, place, menus: status === "ok" ? menus : [], kind, sources, placeId };
+  if (status === "ok" && (menus.length === 0 || sources.length === 0)) return { status: "unknown", place, menus: [], kind, sources, placeId, price };
+  return { status, place, menus: status === "ok" ? menus : [], kind, sources, placeId, price };
 }
 
 // 메뉴 칸 (11/17 상권: "대표메뉴 문자가 너무 눈에 안 들어와"): '교자(自家製餃子)' → 큰 글자 '교자' + 작은 글자 '自家製餃子'
 // 괄호가 없거나(일본어 화면) 앞뒤가 같으면 그대로 한 줄
-export function splitDish(menu: string): { name: string; original: string | null } {
-  const m = /^(.+?)\s*[（(]([^()（）]+)[)）]$/.exec(menu.trim());
-  if (!m || m[1].trim() === m[2].trim()) return { name: menu.trim(), original: null };
-  return { name: m[1].trim(), original: m[2].trim() };
+// 끝의 가격('라멘 (ラーメン) 900', '… ¥1,100엔')은 따로 (11/17 상권 "메뉴 칸마다 가격"). 50엔~3만 엔만
+export function splitDish(menu: string): { name: string; original: string | null; price: number | null } {
+  let rest = menu.trim();
+  let price: number | null = null;
+  const p = /\s*[¥￥]?\s*(\d[\d,]{1,5})\s*(?:엔|円|yen)?$/i.exec(rest);
+  // 숫자 앞이 띄어쓰기 · ¥ · 닫는 괄호일 때만 가격 ('세트10' 같은 이름은 그대로)
+  const separated = p !== null && p.index > 0 && (/^[\s¥￥]/.test(p[0]) || /[)）]$/.test(rest.slice(0, p.index)));
+  if (p && separated) {
+    const n = Number(p[1].replace(/,/g, ""));
+    if (n >= 50 && n <= 30000) {
+      price = n;
+      rest = rest.slice(0, p.index).trim();
+    }
+  }
+  const m = /^(.+?)\s*[（(]([^()（）]+)[)）]$/.exec(rest);
+  if (!m || m[1].trim() === m[2].trim()) return { name: rest, original: null, price };
+  return { name: m[1].trim(), original: m[2].trim(), price };
 }
 
 // 기다리는 동안 문구 (11/17 상권: "기다릴 때 문구도 시간에 따라 바뀌게"). 서버는 20초까지 물어봄 (지도를 안 보면 자동으로 한 번 더)
