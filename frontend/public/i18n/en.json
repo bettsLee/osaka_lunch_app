@@ -315,6 +315,7 @@
   "menu.loading2": "Looking up this place on Google Maps…",
   "menu.loading3": "Checking the menu…",
   "menu.loading4": "Almost there. If nothing turns up, we'll show a Google Maps link",
+  "menu.tipTitle": "Ordering tip while you wait",
   "menu.mapsLink": "See photos and reviews on Google Maps",
   "menu.closed": "Google Maps says this place has permanently closed",
   "menu.noLunch": "Google Maps says this place isn't open for weekday lunch",

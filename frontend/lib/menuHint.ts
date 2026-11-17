@@ -81,10 +81,16 @@ export const LOADING_STEPS: readonly (readonly [number, string])[] = [
   [15000, "menu.loading4"],
 ];
 
+export function loadingStep(waitedMs: number): number {
+  let step = 0;
+  LOADING_STEPS.forEach(([at], i) => {
+    if (waitedMs >= at) step = i;
+  });
+  return step;
+}
+
 export function loadingKey(waitedMs: number): string {
-  let key = LOADING_STEPS[0][1];
-  for (const [at, k] of LOADING_STEPS) if (waitedMs >= at) key = k;
-  return key;
+  return LOADING_STEPS[loadingStep(waitedMs)][1];
 }
 
 // 메뉴를 못 받았을 때: 구글맵에서 가게 이름으로 찾기 (호출 없음 · 제한 없음). 출처가 있으면 그 장소로 바로

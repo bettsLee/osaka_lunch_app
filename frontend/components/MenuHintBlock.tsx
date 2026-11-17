@@ -5,11 +5,14 @@
 // - 점심 메뉴 / 가게 대표 메뉴 (구글 지도 그라운딩): 점심 메뉴로 알려진 것만 '점심 메뉴', 아니면 '가게 대표 메뉴'
 // - AI 추측 (11/17 상권 "(나)로 해줘"): 구글 지도를 안 보고 쓴 메뉴. 점선 칸 + 'AI 추측 · 구글 지도에서 확인 못 함', 출처 · Google Maps 표시 없음
 // - 기다리는 동안 문구가 시간에 따라 바뀜 (11/17 상권 "기다릴 때 문구도 시간에 따라 바뀌게")
+// - 기다리는 동안: 메뉴 칸 모양(회색) + 시간에 맞춰 차는 막대 + 주문 팁 한 문장 (11/17 상권 "가 나 둘다도 가능한가?")
+//   답이 오면 잠깐(1.2초) 높이를 유지했다가 부드럽게 줄임 → 버튼이 갑자기 올라가 '다른 가게 보기'를 잘못 누르지 않게
 // 표시 규칙: 그라운딩 출처는 내용 바로 아래에 제목 + 링크, 'Google Maps' 글자는 바꾸거나 번역하지 않음 (굵기 400 · #5E5E5E · 12px)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchMenuHint, fetchPlacePhotos } from "@/lib/api";
 import { track } from "@/lib/analytics";
-import { LOADING_STEPS, loadingKey, mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
+import { LOADING_STEPS, loadingStep, mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
+import { orderTip, type OrderPhrase } from "@/lib/order";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 
@@ -39,6 +42,53 @@ function Dishes({ menus, guess }: { menus: string[]; guess: boolean }) {
   );
 }
 
+// 기다리는 동안 메뉴 칸 자리 (회색)
+function DishesSkeleton() {
+  return (
+    <ul className="flex gap-2" aria-hidden="true">
+      {[92, 76, 112].map((w) => (
+        <li key={w} className="flex h-[52px] animate-pulse flex-col justify-center gap-1.5 rounded-xl bg-[#F4F2EC] px-3" style={{ width: w }}>
+          <span className="h-3.5 w-4/5 rounded bg-[#E2DFD6]" />
+          <span className="h-2.5 w-3/5 rounded bg-[#E9E6DE]" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// 시간에 맞춰 차는 막대 (실제 진행이 아님): 5초쯤 70%, 그 뒤로 천천히 95%까지 (서버는 20초까지 물어봄)
+function WaitBar() {
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setGo(true), 30);
+    return () => clearTimeout(id);
+  }, []);
+  return (
+    <div className="h-1 w-full overflow-hidden rounded-full bg-[#ECEAE3]" aria-hidden="true">
+      <div
+        className="h-full rounded-full bg-[#2457C5] transition-[width] duration-[20000ms] ease-[cubic-bezier(0.15,0.75,0.3,1)] motion-reduce:transition-none"
+        style={{ width: go ? "95%" : "4%" }}
+      />
+    </div>
+  );
+}
+
+// 기다리는 동안 주문 팁 (주문 도우미 문장 + 읽는 법 + 뜻)
+function OrderTip({ tip }: { tip: OrderPhrase }) {
+  const { t, lang } = useT();
+  return (
+    <div className="mt-1 rounded-xl bg-[#EEF3FC] px-3 py-2.5">
+      <p className="text-[12px] font-semibold text-[#1A3F91]">{t("menu.tipTitle")}</p>
+      <p lang="ja" className="text-[15px] font-semibold text-[#1F1F1C]">
+        {tip.ja}
+      </p>
+      <p className="text-[13px] text-[#5F5E58]">
+        {lang === "ko" ? tip.say.ko : tip.say.latin} · {t(tip.meaning)}
+      </p>
+    </div>
+  );
+}
+
 function GoogleMaps() {
   return (
     <span translate="no" className="notranslate" style={ATTRIBUTION_STYLE}>
@@ -52,17 +102,23 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
   const [hint, setHint] = useState<MenuHint | null>(null); // null: 물어보는 중
   const [photos, setPhotos] = useState<PlacePhoto[] | null>(null); // null: 받는 중 (가게 ID가 있을 때만)
   const [waited, setWaited] = useState(0); // 기다린 시간 (문구 단계용, ms)
+  const box = useRef<HTMLDivElement>(null);
+  const [hold, setHold] = useState<number | null>(null); // 답이 온 직후 유지할 높이 (px)
 
   useEffect(() => {
     let alive = true;
     setHint(null);
     setPhotos(null);
     setWaited(0);
+    setHold(null);
     const steps = LOADING_STEPS.slice(1).map(([at]) => setTimeout(() => alive && setWaited(at), at));
+    let release: ReturnType<typeof setTimeout> | undefined;
     const started = performance.now();
     const { hint: answer, prefetched } = takeMenuHint(shopId, lang, fetchMenuHint);
     void answer.then((h) => {
       if (!alive) return;
+      setHold(box.current?.offsetHeight ?? null);
+      release = setTimeout(() => alive && setHold(null), 1200);
       setHint(h);
       // 대표 메뉴가 보인 비율 · 기다린 시간 (미리 물어봤는지에 따라)
       track("menu_hint", { status: h.status, place: h.place, kind: h.kind, ms: Math.round(performance.now() - started), prefetched });
@@ -76,14 +132,32 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
     return () => {
       alive = false;
       steps.forEach(clearTimeout);
+      clearTimeout(release);
     };
   }, [shopId, lang]);
 
+  // 높이를 잠깐 유지하는 틀 (줄일 때만 부드럽게). 카드가 짧아도 줄어들어 겹치지 않게 flex-none
+  const frame = (body: React.ReactNode) => (
+    <div
+      ref={box}
+      style={{ minHeight: hold ?? 0 }}
+      className={`flex-none ${hold === null ? "transition-[min-height] duration-300 ease-out motion-reduce:transition-none" : ""}`}
+    >
+      {body}
+    </div>
+  );
+
   if (hint === null) {
-    return (
-      <p className="animate-pulse text-[15px] text-[#5F5E58]" aria-live="polite">
-        {t(loadingKey(waited))}
-      </p>
+    const step = loadingStep(waited);
+    return frame(
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[13px] font-semibold text-[#5F5E58]" aria-live="polite">
+          {t(LOADING_STEPS[step][1])}
+        </p>
+        <DishesSkeleton />
+        <WaitBar />
+        {lang !== "ja" && <OrderTip tip={orderTip(shopId, step)} />}
+      </div>,
     );
   }
 
@@ -156,15 +230,15 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
 
   const shown = hint.status === "ok" || hint.status === "guess";
   if (!shown && !warning) {
-    return (
+    return frame(
       <div className="flex flex-col gap-1">
         {photoRow}
         <div className="-my-1">{link}</div>
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return frame(
     <div className="flex flex-col gap-1.5" aria-live="polite">
       {photoRow}
       {warning && <p className="text-sm font-semibold text-[#9A4A00]">{warning}</p>}
@@ -194,6 +268,6 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
         </div>
       )}
       {hint.status !== "ok" && link}
-    </div>
+    </div>,
   );
 }
