@@ -1,10 +1,12 @@
 "use client";
 
-// 홈 지도: 오픈스트리트맵 위에 가격 핀 · 내 위치 · 반경 원 (10/21 결정: 키 · 결제 없이 쓰는 오픈스트리트맵)
+// 홈 지도: 지도 바탕 위에 가격 핀 · 내 위치 · 반경 원 (10/21 결정: 키 · 결제 없이 쓰는 오픈스트리트맵 데이터)
 // 룰렛 중에는 깜빡이는 핀(flashId)을, 결과에서는 고른 핀(pickedId)을 강조하고 그 가게와 내 위치가 보이게 맞춤
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { maplibreGL } from "@maplibre/maplibre-gl-leaflet";
 import { priceLabel, type NearbyShop, type Point } from "@/lib/lunch";
 import { useT } from "./I18n";
 
@@ -38,10 +40,15 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
   // 지도는 한 번만 만듦. 지도 칸 크기가 바뀌면(결과 화면 등) 다시 잼
   useEffect(() => {
     if (!box.current) return;
-    const m = L.map(box.current, { zoomControl: false, zoomSnap: 0.25 }); // 반경 원이 화면에 꽉 차게
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    const m = L.map(box.current, { zoomControl: false, zoomSnap: 0.25, maxZoom: 19 }); // 반경 원이 화면에 꽉 차게 (최대 확대는 예전 지도와 같게)
+    // 지도 바탕 (11/17 상권: "UI가 제일 깔끔한 걸로, 간단한 걸로"): 길 · 글자가 빽빽한 기본 지도 대신
+    // OpenFreeMap의 연회색 Positron. 무료 · 호출 제한 없음 · 키 없음 · 상업 이용 가능. 가격 핀이 더 잘 보임
+    maplibreGL({
+      style: "https://tiles.openfreemap.org/styles/positron",
+      attributionControl: {
+        customAttribution:
+          '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+      },
     }).addTo(m);
     pins.current = L.layerGroup().addTo(m);
     me.current = L.layerGroup().addTo(m);
