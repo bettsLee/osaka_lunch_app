@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { fetchMenuHint, fetchPlacePhotos } from "@/lib/api";
 import { track } from "@/lib/analytics";
-import { mapsLink, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
+import { mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 
@@ -138,11 +138,24 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
       {photoRow}
       {warning && <p className="text-sm font-semibold text-[#9A4A00]">{warning}</p>}
       {hint.status === "ok" && (
-        <div className="flex flex-col gap-0.5">
-          <p className="text-[15px] leading-snug text-[#1F1F1C]">
-            <span className="text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}: </span>
-            <span className="font-semibold">{hint.menus.join(" · ")}</span>
-          </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[13px] font-semibold text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}</p>
+          {/* 11/17 상권 "눈에 안 들어와" → 메뉴마다 칸 (가안): 이름은 크게, 일본어 이름은 아래 작게 (주문할 때 보여 주기) */}
+          <ul className="flex flex-wrap gap-2">
+            {hint.menus.map((m) => {
+              const dish = splitDish(m);
+              return (
+                <li key={m} className="flex flex-col rounded-xl bg-[#F4F2EC] px-3 py-2">
+                  <span className="text-[16px] font-semibold leading-tight text-[#1F1F1C]">{dish.name}</span>
+                  {dish.original && (
+                    <span lang="ja" className="text-[12px] leading-tight text-[#5F5E58]">
+                      {dish.original}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
           {/* 출처: 내용 바로 아래 (표시 규칙) */}
           <div className="flex flex-wrap items-center gap-x-2 text-[12px]">
             {hint.sources.map((s) => (

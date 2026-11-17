@@ -1,7 +1,7 @@
 // 결과 카드 대표 메뉴 규칙 테스트 (11/17, OL-65). 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
+import { mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
 
 const SRC = { title: "Hokkyokusei - Google Maps", uri: "https://maps.google.com/?cid=1" };
 
@@ -29,6 +29,15 @@ test("손님 사진: https 주소만, 3장까지, 올린 사람 링크도 https�
   ]);
   assert.equal(readPlacePhotos({ photos: [ok, ok, ok, ok] }).length, 3);
   assert.deepEqual(readPlacePhotos(null), []);
+});
+
+test("메뉴 칸: 괄호 속 일본어 이름은 작은 글자로 나눔, 없으면 그대로", () => {
+  assert.deepEqual(splitDish("교자(自家製餃子)"), { name: "교자", original: "自家製餃子" });
+  assert.deepEqual(splitDish("Gyoza (自家製餃子)"), { name: "Gyoza", original: "自家製餃子" });
+  assert.deepEqual(splitDish("마파두부 정식（麻婆豆腐定食）"), { name: "마파두부 정식", original: "麻婆豆腐定食" });
+  assert.deepEqual(splitDish("自家製餃子"), { name: "自家製餃子", original: null });
+  assert.deepEqual(splitDish("餃子(餃子)"), { name: "餃子(餃子)", original: null });
+  assert.deepEqual(splitDish("(餃子)"), { name: "(餃子)", original: null });
 });
 
 test("메뉴가 없을 때 구글맵 링크: 출처 장소가 있으면 그곳, 없으면 이름으로 검색", () => {

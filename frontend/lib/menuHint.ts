@@ -60,6 +60,14 @@ export function readMenuHint(body: unknown): MenuHint {
   return { status, place, menus: status === "ok" ? menus : [], kind, sources, placeId };
 }
 
+// 메뉴 칸 (11/17 상권: "대표메뉴 문자가 너무 눈에 안 들어와"): '교자(自家製餃子)' → 큰 글자 '교자' + 작은 글자 '自家製餃子'
+// 괄호가 없거나(일본어 화면) 앞뒤가 같으면 그대로 한 줄
+export function splitDish(menu: string): { name: string; original: string | null } {
+  const m = /^(.+?)\s*[（(]([^()（）]+)[)）]$/.exec(menu.trim());
+  if (!m || m[1].trim() === m[2].trim()) return { name: menu.trim(), original: null };
+  return { name: m[1].trim(), original: m[2].trim() };
+}
+
 // 메뉴를 못 받았을 때: 구글맵에서 가게 이름으로 찾기 (호출 없음 · 제한 없음). 출처가 있으면 그 장소로 바로
 export function mapsLink(hint: MenuHint | null, shopName: string): string {
   const place = hint?.sources[0]?.uri;
