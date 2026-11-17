@@ -3,15 +3,41 @@
 // 결과 카드의 메뉴 칸 (11/17, OL-65 · OL-66)
 // - 손님 사진 3장 (구글 장소 API): 상권 "메뉴사진도 같이 넣을 수 없어? 이게 제일 중요한 거 같은데" → 맨 위에. 사진마다 올린 사람 표시
 // - 점심 메뉴 / 가게 대표 메뉴 (구글 지도 그라운딩): 점심 메뉴로 알려진 것만 '점심 메뉴', 아니면 '가게 대표 메뉴'
+// - AI 추측 (11/17 상권 "(나)로 해줘"): 구글 지도를 안 보고 쓴 메뉴. 점선 칸 + 'AI 추측 · 구글 지도에서 확인 못 함', 출처 · Google Maps 표시 없음
+// - 기다리는 동안 문구가 시간에 따라 바뀜 (11/17 상권 "기다릴 때 문구도 시간에 따라 바뀌게")
 // 표시 규칙: 그라운딩 출처는 내용 바로 아래에 제목 + 링크, 'Google Maps' 글자는 바꾸거나 번역하지 않음 (굵기 400 · #5E5E5E · 12px)
 import { useEffect, useState } from "react";
 import { fetchMenuHint, fetchPlacePhotos } from "@/lib/api";
 import { track } from "@/lib/analytics";
-import { mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
+import { LOADING_STEPS, loadingKey, mapsLink, splitDish, takeMenuHint, type MenuHint, type PlacePhoto } from "@/lib/menuHint";
 import { useT } from "./I18n";
 import { svg } from "./icons";
 
 const ATTRIBUTION_STYLE = { fontFamily: "Roboto, Arial, Helvetica, sans-serif", fontWeight: 400, color: "#5E5E5E", fontSize: 12 } as const;
+
+// 메뉴 칸: 이름은 크게, 일본어 이름은 아래 작게 (주문할 때 보여 주기). AI 추측은 점선으로 구분
+function Dishes({ menus, guess }: { menus: string[]; guess: boolean }) {
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {menus.map((m) => {
+        const dish = splitDish(m);
+        return (
+          <li
+            key={m}
+            className={`flex flex-col rounded-xl px-3 py-2 ${guess ? "border border-dashed border-[#B9B6AC] bg-white" : "bg-[#F4F2EC]"}`}
+          >
+            <span className={`text-[16px] font-semibold leading-tight ${guess ? "text-[#4A4944]" : "text-[#1F1F1C]"}`}>{dish.name}</span>
+            {dish.original && (
+              <span lang="ja" className="text-[12px] leading-tight text-[#5F5E58]">
+                {dish.original}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function GoogleMaps() {
   return (
@@ -25,11 +51,14 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
   const { t, lang } = useT();
   const [hint, setHint] = useState<MenuHint | null>(null); // null: 물어보는 중
   const [photos, setPhotos] = useState<PlacePhoto[] | null>(null); // null: 받는 중 (가게 ID가 있을 때만)
+  const [waited, setWaited] = useState(0); // 기다린 시간 (문구 단계용, ms)
 
   useEffect(() => {
     let alive = true;
     setHint(null);
     setPhotos(null);
+    setWaited(0);
+    const steps = LOADING_STEPS.slice(1).map(([at]) => setTimeout(() => alive && setWaited(at), at));
     const started = performance.now();
     const { hint: answer, prefetched } = takeMenuHint(shopId, lang, fetchMenuHint);
     void answer.then((h) => {
@@ -46,13 +75,14 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
     });
     return () => {
       alive = false;
+      steps.forEach(clearTimeout);
     };
   }, [shopId, lang]);
 
   if (hint === null) {
     return (
       <p className="animate-pulse text-[15px] text-[#5F5E58]" aria-live="polite">
-        {t("menu.loading")}
+        {t(loadingKey(waited))}
       </p>
     );
   }
@@ -124,7 +154,8 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
       </div>
     ) : null;
 
-  if (hint.status !== "ok" && !warning) {
+  const shown = hint.status === "ok" || hint.status === "guess";
+  if (!shown && !warning) {
     return (
       <div className="flex flex-col gap-1">
         {photoRow}
@@ -140,22 +171,8 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
       {hint.status === "ok" && (
         <div className="flex flex-col gap-1.5">
           <p className="text-[13px] font-semibold text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}</p>
-          {/* 11/17 상권 "눈에 안 들어와" → 메뉴마다 칸 (가안): 이름은 크게, 일본어 이름은 아래 작게 (주문할 때 보여 주기) */}
-          <ul className="flex flex-wrap gap-2">
-            {hint.menus.map((m) => {
-              const dish = splitDish(m);
-              return (
-                <li key={m} className="flex flex-col rounded-xl bg-[#F4F2EC] px-3 py-2">
-                  <span className="text-[16px] font-semibold leading-tight text-[#1F1F1C]">{dish.name}</span>
-                  {dish.original && (
-                    <span lang="ja" className="text-[12px] leading-tight text-[#5F5E58]">
-                      {dish.original}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          {/* 11/17 상권 "눈에 안 들어와" → 메뉴마다 칸 (가안) */}
+          <Dishes menus={hint.menus} guess={false} />
           {/* 출처: 내용 바로 아래 (표시 규칙) */}
           <div className="flex flex-wrap items-center gap-x-2 text-[12px]">
             {hint.sources.map((s) => (
@@ -166,6 +183,14 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
             <GoogleMaps />
             <span className="text-[#5F5E58]">· {t("menu.aiShort")}</span>
           </div>
+        </div>
+      )}
+      {hint.status === "guess" && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[13px] font-semibold text-[#9A4A00]">
+            {t("menu.guess")} <span className="font-normal text-[#5F5E58]">· {t("menu.guessNote")}</span>
+          </p>
+          <Dishes menus={hint.menus} guess />
         </div>
       )}
       {hint.status !== "ok" && link}

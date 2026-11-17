@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * Gemini의 '구글 지도 그라운딩'으로 가게의 대표 메뉴 · 평일 점심 영업 여부를 물음 (11/17 결정, OL-65)
@@ -35,6 +36,7 @@ public class MenuHintClient {
     static final String ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
     static final int MAX_MENUS = 3;
     static final int MAX_SOURCES = 3;
+    static final Duration MIN_RETRY = Duration.ofSeconds(4); // 다시 물을 시간이 이보다 적게 남으면 그만 (11/17 진단: 다시 묻기 3~4초)
 
     /** 줄 이름은 영어로 고정해 읽기 쉽게, 값은 사용자 언어로. 가격 · 근거 줄은 화면에 안 쓰지만 이 형식이라야 메뉴를 더 꼼꼼히 찾음 (11/17 실험) */
     static final String PROMPT = """
@@ -72,31 +74,51 @@ public class MenuHintClient {
         return !apiKey.isBlank();
     }
 
-    /** 묻지 못하면(시간 초과 · 오류) unavailable. 화면은 그때 구글맵 링크를 보여 줌 */
-    public MenuHint ask(Shop shop, String lang) {
+    /**
+     * 묻지 못하면(시간 초과 · 오류) unavailable. 화면은 그때 구글맵 링크를 보여 줌
+     * 11/17 진단: AI가 구글 지도를 아예 안 찾아보고 답하는 때가 있음(30곳 중 6곳) → 자동으로 한 번 더 물으면 6곳 중 4곳이 출처와 함께 살아남.
+     * 그래도 지도를 안 본 답이면 그 메뉴를 'AI 추측'으로 보여 줌 (상권: "(나)로 해줘")
+     * 다시 묻기는 전체 시간(timeout) 안에서만, 하루 한도(mayRetry)를 한 번 더 써서
+     */
+    public MenuHint ask(Shop shop, String lang, BooleanSupplier mayRetry) {
         long started = System.nanoTime();
-        try {
-            JsonNode res = call(shop, lang);
-            JsonNode cand = res.path("candidates").path(0);
-            StringBuilder text = new StringBuilder();
-            for (JsonNode part : cand.path("content").path("parts")) {
-                if (!part.path("thought").asBoolean(false)) text.append(part.path("text").asText(""));
+        MenuHint fallback = MenuHint.unavailable();
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            Duration left = timeout.minusNanos(System.nanoTime() - started);
+            if (attempt == 2 && (left.compareTo(MIN_RETRY) < 0 || !mayRetry.getAsBoolean())) break;
+            try {
+                JsonNode cand = call(shop, lang, left).path("candidates").path(0);
+                StringBuilder text = new StringBuilder();
+                for (JsonNode part : cand.path("content").path("parts")) {
+                    if (!part.path("thought").asBoolean(false)) text.append(part.path("text").asText(""));
+                }
+                JsonNode meta = cand.path("groundingMetadata");
+                if (!meta.path("groundingChunks").isEmpty()) { // 구글 지도에서 찾은 답
+                    MenuHint hint = parse(text.toString(), sources(meta), placeId(meta));
+                    log.info("대표 메뉴 {} {} {}ms {}번째", shop.getId(), hint.status(), elapsedMs(started), attempt);
+                    return hint;
+                }
+                MenuHint guess = guess(text.toString());
+                if (!guess.menus().isEmpty() || fallback.menus().isEmpty()) fallback = guess;
+            } catch (HttpTimeoutException e) {
+                log.warn("대표 메뉴 시간 초과 {} {}ms {}번째", shop.getId(), elapsedMs(started), attempt);
+                break; // 시간을 다 씀
+            } catch (IOException e) {
+                log.warn("대표 메뉴 실패 {} {}번째: {}", shop.getId(), attempt, e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             }
-            JsonNode meta = cand.path("groundingMetadata");
-            MenuHint hint = parse(text.toString(), sources(meta), placeId(meta));
-            log.info("대표 메뉴 {} {} {}ms", shop.getId(), hint.status(), (System.nanoTime() - started) / 1_000_000);
-            return hint;
-        } catch (HttpTimeoutException e) {
-            log.warn("대표 메뉴 시간 초과 {} {}ms", shop.getId(), (System.nanoTime() - started) / 1_000_000);
-        } catch (IOException e) {
-            log.warn("대표 메뉴 실패 {}: {}", shop.getId(), e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
-        return MenuHint.unavailable();
+        log.info("대표 메뉴 {} {} {}ms (지도 없이)", shop.getId(), fallback.status(), elapsedMs(started));
+        return fallback;
     }
 
-    private JsonNode call(Shop shop, String lang) throws IOException, InterruptedException {
+    private static long elapsedMs(long started) {
+        return (System.nanoTime() - started) / 1_000_000;
+    }
+
+    JsonNode call(Shop shop, String lang, Duration timeout) throws IOException, InterruptedException {
         for (int attempt = 0; attempt < 2; attempt++) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt(shop, lang))))));
@@ -154,20 +176,33 @@ public class MenuHintClient {
 
     /** 'STATUS: …' · 'KIND: …' · 'MENU: …' 줄을 읽음. 출처가 없으면 구글 지도에서 찾은 답이 아니라서 메뉴를 쓰지 않음 */
     static MenuHint parse(String text, List<MenuHint.Source> sources, String placeId) {
-        String status = "";
-        String kind = "";
-        String menu = "";
+        String[] l = lines(text);
+        List<String> menus = sources.isEmpty() ? List.of() : menus(l[2]);
+        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place(l[0]), menus, kind(l[1]), sources, sources.isEmpty() ? null : placeId);
+    }
+
+    /** 구글 지도를 안 찾아보고 쓴 답: 메뉴가 있으면 'AI 추측'(guess). 지도로 확인한 게 아니라 영업 여부는 쓰지 않음 */
+    static MenuHint guess(String text) {
+        String[] l = lines(text);
+        List<String> menus = menus(l[2]);
+        return new MenuHint(menus.isEmpty() ? "unknown" : "guess", "unknown", menus, kind(l[1]), List.of(), null);
+    }
+
+    /** [STATUS, KIND, MENU] 값 */
+    private static String[] lines(String text) {
+        String[] out = {"", "", ""};
         for (String raw : text.split("\\R")) {
             String line = raw.strip().replaceFirst("^[*\\-•\\s]+", "").replace("**", "");
             String head = line.toUpperCase(Locale.ROOT);
-            if (head.startsWith("STATUS")) status = value(line);
-            else if (head.startsWith("KIND")) kind = value(line);
-            else if (head.startsWith("MENU")) menu = value(line);
+            if (head.startsWith("STATUS")) out[0] = value(line);
+            else if (head.startsWith("KIND")) out[1] = value(line);
+            else if (head.startsWith("MENU")) out[2] = value(line);
         }
-        String place = place(status);
-        List<String> menus = sources.isEmpty() ? List.of() : menus(menu);
-        String menuKind = kind.toUpperCase(Locale.ROOT).startsWith("LUNCH") ? "lunch" : "signature"; // 모르면 '가게 대표 메뉴'로
-        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place, menus, menuKind, sources, sources.isEmpty() ? null : placeId);
+        return out;
+    }
+
+    private static String kind(String kind) {
+        return kind.toUpperCase(Locale.ROOT).startsWith("LUNCH") ? "lunch" : "signature"; // 모르면 '가게 대표 메뉴'로
     }
 
     static String place(String status) {
