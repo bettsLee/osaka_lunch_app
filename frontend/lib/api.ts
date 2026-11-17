@@ -224,10 +224,11 @@ export async function createShareCode(shopIds: string[]): Promise<string> {
 }
 
 // 결과 카드의 대표 메뉴 (11/17 결정, OL-65): 서버가 구글 지도 그라운딩으로 물어봄. 저장하지 않음 (구글 약관)
-// 서버가 잠들어 있거나 느리면 기다리지 않게 15초까지만 (못 받으면 화면이 구글맵 링크로)
+// 서버가 잠들어 있거나 느리면 기다리지 않게 25초까지만 (못 받으면 화면이 구글맵 링크로)
+// 11/17: 서버의 Gemini 대기를 12초 → 20초로 늘려서 화면도 그보다 조금 더 기다림 (상권 "가 나 둘다해줘")
 export async function fetchMenuHint(shopId: string, lang: string): Promise<MenuHint> {
   const stop = new AbortController();
-  const timer = setTimeout(() => stop.abort(), 15000);
+  const timer = setTimeout(() => stop.abort(), 25000);
   try {
     const res = await call(`/api/shops/${encodeURIComponent(shopId)}/menu-hint?lang=${encodeURIComponent(lang)}`, {
       signal: stop.signal,
