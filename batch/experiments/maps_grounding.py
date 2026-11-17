@@ -31,16 +31,19 @@ MODELS = [ai_structure.MODEL, "gemini-2.5-flash"]  # 지금 배치 모델이 지
 # 넓은 장르 위주 + 비교용으로 이미 구체적인 장르 2곳
 PICK = [("居酒屋", 4), ("和食", 2), ("洋食", 1), ("ダイニングバー・バル", 1), ("ラーメン", 1), ("お好み焼き・もんじゃ", 1)]
 
+# 2차 (11/17): 1차는 "점심 전용" 메뉴 · 가격만 물어서 10곳 중 6곳이 모름, 평균 15초.
+# 점심 한정을 풀고(대표 메뉴 · 가게 전체 가격대도 허용) 4줄 형식으로 짧게 받아 답하는 곳과 속도를 봄
 PROMPT = """구글 지도에서 아래 가게를 찾아 주세요.
 가게 이름: {name}
 위치: 위도 {lat}, 경도 {lng} 근처 (일본 오사카)
 
-이 가게의 평일 점심에 대해 한국어로 답해 주세요.
-1. 점심 대표 메뉴 2~3개 (메뉴 이름은 일본어 원문도 같이)
-2. 점심 가격대 (엔)
-3. 근거: 리뷰, 사진 설명, 가게 정보 중 무엇을 보고 판단했는지
+아래 4줄 형식으로만, 한국어로 짧게 답해 주세요. 다른 설명은 붙이지 마세요.
+영업: 평일 점심 영업 여부 (함 / 안 함 / 폐업 / 모름)
+메뉴: 이 가게의 대표 메뉴 2~3개, 일본어 원문을 괄호로 (점심 한정이 아니어도 됨. 근거가 없으면 모름)
+가격: 점심 가격대 (엔). 점심 근거가 없으면 '전체 1,000~2,000엔'처럼 가게 전체 가격대. 둘 다 없으면 모름
+근거: 리뷰 / 메뉴 정보 / 가게 정보 중 무엇을 봤는지
 
-구글 지도에서 이 가게를 찾지 못했거나 점심 메뉴 · 가격에 대한 근거가 없으면 지어내지 말고 '모름'이라고 답해 주세요."""
+지어내지 마세요."""
 
 
 def env(name):
@@ -113,11 +116,24 @@ def main():
         results.append({"genre": s["genre_name"], "name": s["name"], "our_price": s["our_price"], "answer": out})
 
     answered = [r for r in results if r["answer"]]
-    unknown = [r for r in answered if "모름" in r["answer"]["text"][:200]]
+    def line(r, head):  # '메뉴: …' 줄의 값
+        for ln in r["answer"]["text"].splitlines():
+            ln = ln.strip().lstrip("*-• ").replace("**", "")
+            if ln.startswith(head):
+                return ln[len(head):].strip(" :：")
+        return ""
+    unknown = [r for r in answered if line(r, "메뉴").startswith("모름") or not line(r, "메뉴")]
     with_src = [r for r in answered if r["answer"]["sources"]]
+    price_lunch = [r for r in answered if line(r, "가격") and not line(r, "가격").startswith(("모름", "전체"))]
+    price_all = [r for r in answered if line(r, "가격").startswith("전체")]
+    status = {}
+    for r in answered:
+        k = line(r, "영업")[:4] or "(없음)"
+        status[k] = status.get(k, 0) + 1
     # 숫자만 공개 기록에 (오류 문구에는 가게 정보가 없음)
     print(f"모델: {model}")
-    print(f"물어본 가게 {len(shops)}곳 · 답이 온 곳 {len(answered)} · 그중 '모름' {len(unknown)} · 구글 지도 출처가 붙은 답 {len(with_src)}")
+    print(f"물어본 가게 {len(shops)}곳 · 답이 온 곳 {len(answered)} · 메뉴 '모름' {len(unknown)} · 구글 지도 출처가 붙은 답 {len(with_src)}")
+    print(f"가격: 점심 가격 {len(price_lunch)}곳 · 전체 가격대만 {len(price_all)}곳 · 영업: {status}")
     if answered:
         print(f"평균 응답 {sum(r['answer']['seconds'] for r in answered) / len(answered):.1f}초 · "
               f"평균 토큰 {sum((r['answer']['tokens'] or 0) for r in answered) // len(answered)}")
