@@ -11,13 +11,18 @@ import java.util.List;
  * @param kind    lunch: 평일 점심에 나오는 메뉴로 알려진 것 · signature: 가게 대표 메뉴(저녁일 수도) (11/17 상권: "대표메뉴가 점심메뉴가 맞아?")
  * @param sources 근거가 된 구글 지도 장소 (표시 규칙: 내용 바로 아래에 제목 + 링크)
  * @param placeId 구글 가게 ID (사진을 받을 때 씀. 그라운딩 약관상 저장 가능한 값)
+ * @param price   구글 지도 기준 가격대 (11/17 상권 "대략적인 가격이라도 가시적으로"). 지도에서 찾은 답일 때만, 없으면 null
  */
-public record MenuHint(String status, String place, List<String> menus, String kind, List<Source> sources, String placeId) {
+public record MenuHint(String status, String place, List<String> menus, String kind, List<Source> sources, String placeId, Price price) {
 
     public record Source(String title, String uri) {
     }
 
+    /** kind: lunch = 평일 점심 가격대 · all = 가게 전체 가격대 (점심 근거가 없을 때) */
+    public record Price(String kind, int min, int max) {
+    }
+
     public static MenuHint unavailable() {
-        return new MenuHint("unavailable", "unknown", List.of(), "signature", List.of(), null);
+        return new MenuHint("unavailable", "unknown", List.of(), "signature", List.of(), null, null);
     }
 }

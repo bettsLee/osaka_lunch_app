@@ -1,13 +1,13 @@
 // 결과 카드 대표 메뉴 규칙 테스트 (11/17, OL-65). 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadingKey, loadingStep, mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
+import { loadingKey, loadingStep, mapsLink, prefetchMenuHint, priceRange, readMenuHint, readPlacePhotos, splitDish, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
 
 const SRC = { title: "Hokkyokusei - Google Maps", uri: "https://maps.google.com/?cid=1" };
 
 test("서버 답을 그대로 믿지 않고 모양을 확인함", () => {
   assert.deepEqual(readMenuHint({ status: "ok", place: "open", menus: ["オムライス", 3, ""], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890" }), {
-    status: "ok", place: "open", menus: ["オムライス"], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890",
+    status: "ok", place: "open", menus: ["オムライス"], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890", price: null,
   });
   // 점심 메뉴인지 모르면 '가게 대표 메뉴', 이상한 가게 ID는 버림
   const odd = readMenuHint({ status: "ok", menus: ["A"], kind: "dinner", sources: [SRC], placeId: "../../x" });
@@ -34,12 +34,12 @@ test("손님 사진: https 주소만, 3장까지, 올린 사람 · 사진 링크
 });
 
 test("메뉴 칸: 괄호 속 일본어 이름은 작은 글자로 나눔, 없으면 그대로", () => {
-  assert.deepEqual(splitDish("교자(自家製餃子)"), { name: "교자", original: "自家製餃子" });
-  assert.deepEqual(splitDish("Gyoza (自家製餃子)"), { name: "Gyoza", original: "自家製餃子" });
-  assert.deepEqual(splitDish("마파두부 정식（麻婆豆腐定食）"), { name: "마파두부 정식", original: "麻婆豆腐定食" });
-  assert.deepEqual(splitDish("自家製餃子"), { name: "自家製餃子", original: null });
-  assert.deepEqual(splitDish("餃子(餃子)"), { name: "餃子(餃子)", original: null });
-  assert.deepEqual(splitDish("(餃子)"), { name: "(餃子)", original: null });
+  assert.deepEqual(splitDish("교자(自家製餃子)"), { name: "교자", original: "自家製餃子", price: null });
+  assert.deepEqual(splitDish("Gyoza (自家製餃子)"), { name: "Gyoza", original: "自家製餃子", price: null });
+  assert.deepEqual(splitDish("마파두부 정식（麻婆豆腐定食）"), { name: "마파두부 정식", original: "麻婆豆腐定食", price: null });
+  assert.deepEqual(splitDish("自家製餃子"), { name: "自家製餃子", original: null, price: null });
+  assert.deepEqual(splitDish("餃子(餃子)"), { name: "餃子(餃子)", original: null, price: null });
+  assert.deepEqual(splitDish("(餃子)"), { name: "(餃子)", original: null, price: null });
 });
 
 test("메뉴가 없을 때 구글맵 링크: 출처 장소가 있으면 그곳, 없으면 이름으로 검색", () => {
@@ -67,7 +67,10 @@ test("룰렛 중 미리 물어본 답은 카드가 한 번만 가져가고, 없�
 
 test("AI 추측: 출처 없이 메뉴만, 영업 안내 · 가게 ID는 버림", () => {
   const g = readMenuHint({ status: "guess", place: "closed", menus: ["우동(うどん)"], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890" });
-  assert.deepEqual(g, { status: "guess", place: "unknown", menus: ["우동(うどん)"], kind: "lunch", sources: [], placeId: null });
+  assert.deepEqual(g, { status: "guess", place: "unknown", menus: ["우동(うどん)"], kind: "lunch", sources: [], placeId: null, price: null });
+  // AI 추측은 가격을 떼고, 가격대도 버림 (구글 지도에서 확인된 가격만)
+  const gp = readMenuHint({ status: "guess", menus: ["라멘 (ラーメン) 900"], sources: [], price: { kind: "lunch", min: 800, max: 1200 } });
+  assert.deepEqual([gp.menus, gp.price], [["라멘(ラーメン)"], null]);
   assert.equal(readMenuHint({ status: "guess", menus: [] }).status, "unknown");
 });
 
@@ -78,4 +81,22 @@ test("기다리는 문구는 시간에 따라 바뀜", () => {
   assert.equal(loadingKey(9000), "menu.loading3");
   assert.equal(loadingKey(20000), "menu.loading4");
   assert.deepEqual([0, 3999, 4000, 9000, 15000].map(loadingStep), [0, 0, 1, 2, 3]);
+});
+
+test("메뉴별 가격 · 가격대: 구글 지도에서 찾은 답일 때만, 이상한 숫자는 버림", () => {
+  assert.deepEqual(splitDish("라멘 (ラーメン) 900"), { name: "라멘", original: "ラーメン", price: 900 });
+  assert.deepEqual(splitDish("카레 (カレー) ¥1,100"), { name: "카레", original: "カレー", price: 1100 });
+  assert.deepEqual(splitDish("교자(餃子)450엔"), { name: "교자", original: "餃子", price: 450 });
+  assert.deepEqual(splitDish("ランチ 980"), { name: "ランチ", original: null, price: 980 });
+  assert.deepEqual(splitDish("セット10"), { name: "セット10", original: null, price: null }); // 띄어쓰기 없는 숫자는 이름
+  assert.deepEqual(splitDish("특선 (特選) 99999"), { name: "특선 (特選) 99999", original: null, price: null }); // 3만 엔 넘으면 가격으로 안 봄
+  const ok = readMenuHint({ status: "ok", menus: ["라멘 (ラーメン) 900"], sources: [SRC], price: { kind: "lunch", min: 800, max: 1200 } });
+  assert.deepEqual(ok.price, { kind: "lunch", min: 800, max: 1200 });
+  assert.equal(priceRange(ok.price), "800~1,200");
+  assert.equal(priceRange({ kind: "all", min: 900, max: 900 }), "900");
+  assert.equal(readMenuHint({ status: "ok", menus: ["A"], sources: [SRC], price: { kind: "lunch", min: 1200, max: 800 } }).price, null);
+  assert.equal(readMenuHint({ status: "ok", menus: ["A"], sources: [SRC], price: { kind: "dinner", min: 800, max: 900 } }).price, null);
+  assert.equal(readMenuHint({ status: "ok", menus: ["A"], sources: [], price: { kind: "lunch", min: 800, max: 900 } }).price, null);
+  // 메뉴는 없어도 지도에서 찾은 가게면 가격대는 남김
+  assert.deepEqual(readMenuHint({ status: "unknown", menus: [], sources: [SRC], price: { kind: "all", min: 1000, max: 3000 } }).price, { kind: "all", min: 1000, max: 3000 });
 });

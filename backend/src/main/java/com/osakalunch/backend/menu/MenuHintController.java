@@ -56,7 +56,7 @@ public class MenuHintController {
                 : client.ask(shop, language, this::take); // 다시 물을 때도 하루 한도를 씀
         // 사진 키가 아직 없으면 가게 ID를 주지 않음 → 화면이 사진 회색 칸을 잠깐 보였다 지우지 않게
         if (!photos.ready() && hint.placeId() != null) {
-            hint = new MenuHint(hint.status(), hint.place(), hint.menus(), hint.kind(), hint.sources(), null);
+            hint = new MenuHint(hint.status(), hint.place(), hint.menus(), hint.kind(), hint.sources(), null, hint.price());
         }
         // 구글 지도 기반 답은 저장하면 안 돼서 브라우저 · 중간 서버도 보관하지 않게
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(hint);
