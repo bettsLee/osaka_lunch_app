@@ -33,6 +33,7 @@ class MenuHintControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ShopRepository shops;
     @MockitoBean MenuHintClient client;
+    @MockitoBean PlacePhotosClient photos;
 
     @BeforeEach
     void setUp() {
@@ -40,6 +41,7 @@ class MenuHintControllerTest {
         shops.save(new Shop("J1", "北極星", 34.65, 135.43));
         shops.save(new Shop("J2", "좌표 없음", null, null));
         when(client.ready()).thenReturn(true);
+        when(photos.ready()).thenReturn(true);
     }
 
     @Test
@@ -54,6 +56,17 @@ class MenuHintControllerTest {
                 .andExpect(jsonPath("$.sources[0].uri").value("https://maps.google.com/?cid=1"))
                 .andExpect(jsonPath("$.kind").value("lunch"))
                 .andExpect(jsonPath("$.placeId").value("ChIJ1234567890"));
+    }
+
+    @Test
+    void 사진_키가_없으면_가게_ID를_주지_않음() throws Exception {
+        when(photos.ready()).thenReturn(false);
+        when(client.ask(any(), any())).thenReturn(new MenuHint("ok", "open", List.of("オムライス"), "lunch",
+                List.of(new MenuHint.Source("Hokkyokusei - Google Maps", "https://maps.google.com/?cid=1")), "ChIJ1234567890"));
+        mvc.perform(get("/api/shops/J1/menu-hint").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.menus[0]").value("オムライス"))
+                .andExpect(jsonPath("$.placeId").doesNotExist());
     }
 
     @Test
@@ -77,7 +90,7 @@ class MenuHintControllerTest {
     @Test
     void 하루_한도를_넘으면_묻지_않고_다음_날_다시() {
         Clock[] now = {Clock.fixed(Instant.parse("2026-11-17T03:00:00Z"), ZoneId.of("Asia/Tokyo"))};
-        MenuHintController c = new MenuHintController(shops, client, 2, new Clock() {
+        MenuHintController c = new MenuHintController(shops, client, photos, 2, new Clock() {
             @Override public ZoneId getZone() { return now[0].getZone(); }
             @Override public Clock withZone(ZoneId zone) { return this; }
             @Override public Instant instant() { return now[0].instant(); }
