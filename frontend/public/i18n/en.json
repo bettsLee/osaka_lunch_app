@@ -312,8 +312,14 @@
   "zukan.goLunch": "Find lunch",
   "menu.title": "Popular dishes",
   "menu.loading": "Finding popular dishes…",
-  "menu.aiNote": "Summarized by AI from Google Maps · may not be lunch items",
   "menu.mapsLink": "See photos and reviews on Google Maps",
   "menu.closed": "Google Maps says this place has permanently closed",
-  "menu.noLunch": "Google Maps says this place isn't open for weekday lunch"
+  "menu.noLunch": "Google Maps says this place isn't open for weekday lunch",
+  "lunchShort.before": "Lunch from {start} (until {end})",
+  "lunchShort.until": "Lunch until {end} ({left} left)",
+  "lunchShort.untilOrder": "Lunch until {end} · last order {lastOrder} ({left} left)",
+  "lunchShort.over": "Lunch orders are over for today",
+  "menu.aiShort": "AI summary",
+  "result.catchShow": "Shop intro (from Hot Pepper)",
+  "result.menuLinkShort": "Menu on Hot Pepper"
 }

@@ -312,8 +312,14 @@
   "zukan.goLunch": "점심 고르러 가기",
   "menu.title": "대표 메뉴",
   "menu.loading": "대표 메뉴 찾는 중…",
-  "menu.aiNote": "구글 지도 정보를 AI가 정리했어요 · 점심 메뉴가 아닐 수도 있어요",
   "menu.mapsLink": "구글맵에서 사진 · 리뷰 보기",
   "menu.closed": "구글 지도에는 폐업했다고 나와요",
-  "menu.noLunch": "구글 지도에는 평일 점심 영업을 안 한다고 나와요"
+  "menu.noLunch": "구글 지도에는 평일 점심 영업을 안 한다고 나와요",
+  "lunchShort.before": "점심 {start}부터 ({end}까지)",
+  "lunchShort.until": "점심 {end}까지 ({left} 남음)",
+  "lunchShort.untilOrder": "점심 {end}까지 · 주문 {lastOrder}까지 ({left} 남음)",
+  "lunchShort.over": "오늘 점심 주문은 끝났어요",
+  "menu.aiShort": "AI 정리",
+  "result.catchShow": "가게 소개 (핫페퍼 원문)",
+  "result.menuLinkShort": "핫페퍼에서 메뉴 보기"
 }

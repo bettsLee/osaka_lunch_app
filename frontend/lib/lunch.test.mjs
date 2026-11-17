@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeText, openNow, osakaNow,
+  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeShort, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
@@ -119,6 +119,17 @@ test("결과 카드의 점심 시간 문구", () => {
   assert.equal(lunchTimeText(shop(0.3, { lunchWindow: win("11:00", "14:00") }), "wed", 13 * 60, t).text, "오늘 점심 11:00~14:00 · 마감까지 1시간");
   assert.equal(lunchTimeText(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60, t).text, "오늘 점심 영업 (시간은 핫페퍼에서 확인)");
   assert.equal(formatDuration(45, t), "45분");
+});
+
+test("결과 카드용 짧은 점심 시간 (11/17: 주문 마감이 영업 끝과 같으면 한 번만)", () => {
+  const s = shop(0.3, { lunchWindow: win("11:30", "14:30", "14:00") });
+  assert.deepEqual(lunchTimeShort(s, "wed", 10 * 60, t), { text: "점심 11:30부터 (14:30까지)", soon: false });
+  assert.deepEqual(lunchTimeShort(s, "wed", 12 * 60 + 40, t), { text: "점심 14:30까지 · 주문 14:00까지 (1시간 20분 남음)", soon: false });
+  assert.equal(lunchTimeShort(s, "wed", 13 * 60 + 40, t).soon, true);
+  assert.equal(lunchTimeShort(s, "wed", 14 * 60 + 5, t).text, "오늘 점심 주문은 끝났어요");
+  const same = shop(0.3, { lunchWindow: win("11:00", "15:00", "15:00") }); // 미리보기에서 본 가게 모양
+  assert.equal(lunchTimeShort(same, "wed", 14 * 60, t).text, "점심 15:00까지 (1시간 남음)");
+  assert.equal(lunchTimeShort(shop(0.3, { lunchWindow: {} }), "wed", 12 * 60, t).text, "오늘 점심 영업 (시간은 핫페퍼에서 확인)");
 });
 
 test("결과 카드 가격 · 배지 · 길찾기", () => {

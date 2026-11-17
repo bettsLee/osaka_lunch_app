@@ -34,10 +34,9 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
 
   if (hint === null) {
     return (
-      <div className="flex flex-col gap-1 rounded-xl bg-[#F4F3EF] px-3 py-2.5" aria-live="polite">
-        <p className="text-[12px] text-[#5F5E58]">{t("menu.title")}</p>
-        <p className="animate-pulse text-sm text-[#5F5E58]">{t("menu.loading")}</p>
-      </div>
+      <p className="animate-pulse text-[15px] text-[#5F5E58]" aria-live="polite">
+        {t("menu.loading")}
+      </p>
     );
   }
 
@@ -62,27 +61,28 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
 
   if (hint.status !== "ok" && !warning) return <div className="-my-1">{link}</div>;
 
+  // 11/17 상권 "정보가 너무 많이 적혀있어": 메뉴 한 줄 + 바로 아래 출처 한 줄 (설명 문장 대신 'AI 정리'만)
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-[#F4F3EF] px-3 py-2.5" aria-live="polite">
+    <div className="flex flex-col gap-0.5" aria-live="polite">
       {warning && <p className="text-sm font-semibold text-[#9A4A00]">{warning}</p>}
       {hint.status === "ok" && (
-        <>
-          <p className="text-[12px] text-[#5F5E58]">{t("menu.title")}</p>
-          <p className="text-[15px] font-semibold leading-snug text-[#1F1F1C]">{hint.menus.join(" · ")}</p>
-        </>
+        <p className="text-[15px] leading-snug text-[#1F1F1C]">
+          <span className="text-[#5F5E58]">{t("menu.title")}: </span>
+          <span className="font-semibold">{hint.menus.join(" · ")}</span>
+        </p>
       )}
       {/* 출처: 내용 바로 아래 (표시 규칙) */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <div className="flex flex-wrap items-center gap-x-2 text-[12px]">
         {hint.sources.map((s) => (
-          <a key={s.uri} href={s.uri} target="_blank" rel="noreferrer" className="text-[12px] text-[#1A3F91] underline">
+          <a key={s.uri} href={s.uri} target="_blank" rel="noreferrer" className="max-w-full truncate text-[#1A3F91] underline">
             {s.title}
           </a>
         ))}
         <span translate="no" className="notranslate" style={ATTRIBUTION_STYLE}>
           Google Maps
         </span>
+        <span className="text-[#5F5E58]">· {t("menu.aiShort")}</span>
       </div>
-      <p className="text-[12px] text-[#5F5E58]">{t("menu.aiNote")}</p>
       {hint.status !== "ok" && link}
     </div>
   );

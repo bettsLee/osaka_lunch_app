@@ -267,6 +267,25 @@ export function lunchTimeText(shop: LunchShop, day: Day, minutes: number, t: T):
   };
 }
 
+// 결과 카드용 짧은 점심 시간 (11/17 상권: "정보가 너무 많이 적혀있어"). 주문 마감이 영업 끝과 같으면 한 번만
+// 예) 점심 15:00까지 (1시간 남음) / 점심 14:30까지 · 주문 14:00까지 (40분 남음)
+export function lunchTimeShort(shop: LunchShop, day: Day, minutes: number, t: T): { text: string; soon: boolean } {
+  const w = windowOn(shop, day);
+  const start = w ? toMinutes(w.start) : null;
+  const cutoff = orderCutoff(shop, day);
+  if (!w || start === null || cutoff === null) return { text: t("lunch.unknown"), soon: false };
+  if (minutes < start) return { text: t("lunchShort.before", { start: w.start, end: w.end }), soon: false };
+  if (minutes >= cutoff) return { text: t("lunchShort.over"), soon: false };
+  const left = cutoff - minutes;
+  const order = w.last_order && w.last_order !== w.end;
+  return {
+    text: order
+      ? t("lunchShort.untilOrder", { end: w.end, lastOrder: w.last_order as string, left: formatDuration(left, t) })
+      : t("lunchShort.until", { end: w.end, left: formatDuration(left, t) }),
+    soon: left <= CLOSING_SOON_MIN,
+  };
+}
+
 // 결과 카드의 점심 가격: 적힌 범위 그대로, 없으면 대표 메뉴 가격
 export function priceRange(shop: LunchShop, t: T): string {
   const { priceMin: lo, priceMax: hi, typicalPrice: typical } = shop;
