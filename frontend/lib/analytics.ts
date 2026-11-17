@@ -10,7 +10,8 @@ export type EventName =
   | "result_view"
   | "go_here_click"
   | "directions_click"
-  | "menu_link_click"
+  | "menu_link_click" // 메뉴 보기 링크 (to: 없음 · 핫페퍼, google_maps: 대표 메뉴를 못 받았을 때 구글맵)
+  | "menu_hint" // 결과 카드 대표 메뉴 (11/17, 구글 지도 그라운딩): status ok · unknown · unavailable, place, 기다린 ms, 룰렛 중 미리 물어봤는지
   | "list_open"
   | "feedback_submit"
   | "price_limit_change"
