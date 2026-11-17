@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * - 사진 이름 · 주소는 저장하지 않음 (약관 3.2.3(b): 사진 이름은 캐시 불가). 볼 때마다 받음
  * - 사진마다 올린 사람(authorAttributions)을 함께 돌려줌 → 화면에 표시 (구글 표시 규칙)
+ * - 사진마다 구글 지도에서 그 사진을 여는 링크(googleMapsUri)도 돌려줌 (11/17 상권: 사진만으로는 메뉴 이름을 모름 → 올린 사람의 리뷰에서 확인)
  * - 키(GOOGLE_PLACES_API_KEY)가 없으면 빈 목록 → 화면은 사진 줄을 숨김
  */
 @Component
@@ -33,7 +34,7 @@ public class PlacePhotosClient {
     static final String MEDIA = "https://places.googleapis.com/v1/%s/media?maxWidthPx=%d&skipHttpRedirect=true";
     static final int MAX_WIDTH = 480; // 카드 썸네일(약 120px) · 화면 배율 3까지 선명하게
 
-    public record Photo(String url, String author, String authorUri) {
+    public record Photo(String url, String author, String authorUri, String mapsUri) {
     }
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -86,7 +87,8 @@ public class PlacePhotosClient {
                     try {
                         String url = json.readTree(res.body()).path("photoUri").asText("");
                         if (!url.startsWith("https://")) return null;
-                        return new Photo(url, author.path("displayName").asText(""), safeUri(author.path("uri").asText("")));
+                        return new Photo(url, author.path("displayName").asText(""), safeUri(author.path("uri").asText("")),
+                                safeUri(photo.path("googleMapsUri").asText("")));
                     } catch (IOException e) {
                         return null;
                     }

@@ -181,7 +181,8 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
     </a>
   );
 
-  // 손님 사진: 받는 중이면 회색 칸, 0장이면 숨김. 누르면 구글 지도의 그 가게 (사진 더 보기)
+  // 손님 사진: 받는 중이면 회색 칸, 0장이면 숨김. 메뉴 아래에 '손님이 올린 사진'으로 (메뉴 순서와 상관없다는 게 보이게)
+  // 누르면 구글 지도에서 그 사진 (올린 사람의 리뷰에서 무슨 메뉴인지 확인). 사진 링크가 없으면 가게 페이지 (11/17 상권 "가) … 이걸로 해 줘")
   const photoRow =
     photos === null ? (
       <div className="flex gap-2" aria-hidden="true">
@@ -190,12 +191,15 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
         ))}
       </div>
     ) : photos.length > 0 ? (
-      <div className="flex flex-col gap-1">
+      <div className="mt-1 flex flex-col gap-1">
+        <p className="text-[13px] font-semibold text-[#5F5E58]">
+          {t("menu.photosTitle")} <span className="font-normal">· {t("menu.photosHint")}</span>
+        </p>
         <div className="flex gap-2 overflow-x-auto">
           {photos.map((p, i) => (
             <a
               key={p.url}
-              href={placeLink}
+              href={p.mapsUri || placeLink}
               target="_blank"
               rel="noreferrer"
               onClick={() => track("menu_link_click", { to: "google_maps_photo" })}
@@ -240,7 +244,6 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
 
   return frame(
     <div className="flex flex-col gap-1.5" aria-live="polite">
-      {photoRow}
       {warning && <p className="text-sm font-semibold text-[#9A4A00]">{warning}</p>}
       {hint.status === "ok" && (
         <div className="flex flex-col gap-1.5">
@@ -267,6 +270,7 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
           <Dishes menus={hint.menus} guess />
         </div>
       )}
+      {photoRow}
       {hint.status !== "ok" && link}
     </div>,
   );

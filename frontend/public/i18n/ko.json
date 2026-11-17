@@ -329,6 +329,8 @@
   "result.catchShow": "가게 소개 (핫페퍼 원문)",
   "result.menuLinkShort": "핫페퍼에서 메뉴 보기",
   "menu.lunchTitle": "점심 메뉴",
+  "menu.photosTitle": "손님이 올린 사진",
+  "menu.photosHint": "누르면 구글 지도에서 리뷰와 함께 봐요",
   "menu.photosBy": "사진:",
   "menu.photoAlt": "손님이 올린 사진 {n}"
 }
