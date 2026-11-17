@@ -309,5 +309,11 @@
   "day.sat": "Saturday",
   "day.sun": "Sunday",
   "zukan.emptyHow": "Places show up here with ✓ when you arrive or answer 'Did you go?', and with ♥ when you'd go again.",
-  "zukan.goLunch": "Find lunch"
+  "zukan.goLunch": "Find lunch",
+  "menu.title": "Popular dishes",
+  "menu.loading": "Finding popular dishes…",
+  "menu.aiNote": "Summarized by AI from Google Maps · may not be lunch items",
+  "menu.mapsLink": "See photos and reviews on Google Maps",
+  "menu.closed": "Google Maps says this place has permanently closed",
+  "menu.noLunch": "Google Maps says this place isn't open for weekday lunch"
 }

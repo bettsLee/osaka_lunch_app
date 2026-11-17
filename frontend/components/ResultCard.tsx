@@ -1,6 +1,6 @@
 "use client";
 
-// S3 결과 카드: 사진 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 가격 + 배지 · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
+// S3 결과 카드: 사진 · 장르 · 가격 + 배지 · 이름 · 걸어서 n분 · 오늘 점심 시간 · 대표 메뉴(11/17) · 여기 갈래요 / 랜덤으로 가게 고르기(10/22: 핀 · 목록에서 와도 맞는 이름) · 주문 문장 · 원문
 // 길찾기는 여기 갈래요 뒤 화면 · 홈의 가는 중에서 (10/22 도그푸딩: 여기 갈래요와 겹침)
 import { useEffect, useRef, useState } from "react";
 import { directionsUrl, genreLabel, lunchTimeText, priceBadge, priceRange, type Day, type NearbyShop } from "@/lib/lunch";
@@ -9,6 +9,7 @@ import { clockTime } from "@/lib/visits";
 import { cardTouchAction } from "@/lib/swipe";
 import { useT } from "./I18n";
 import { svg } from "./icons";
+import MenuHintBlock from "./MenuHintBlock";
 import OrderSheet from "./OrderSheet";
 import type { useSheetSwipe } from "./useSheetSwipe";
 
@@ -95,30 +96,12 @@ export default function ResultCard(props: Props) {
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
-        <h1 ref={title} tabIndex={-1} className="text-[22px] font-semibold leading-snug outline-none">
-          {shop.name}
-        </h1>
-        <p className="text-sm text-[#5F5E58]">
-          {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
-          <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
-        </p>
-        {shop.catchText && (
-          <div className="flex flex-col gap-0.5">
-            {/* 가게 소개는 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22 결정) */}
-            <p className="text-[11px] text-[#5F5E58]">{t("result.catchLabel")}</p>
-            {/* 원문 그대로 (10/24 리크루트 답: 핫페퍼 정보의 번안 · 가공 금지 → AI 번역을 끔) */}
-            <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>
-          </div>
-        )}
-        <p className={`text-sm ${time.soon ? "font-semibold text-[#9A4A00]" : "text-[#5F5E58]"}`}>
-          {time.soon ? `${t("result.closingSoon")} · ` : ""}
-          {time.text}
-        </p>
-      </div>
-
+      {/* 11/17 결정 (OL-65): 카드를 열자마자 '무엇 · 얼마'가 보이게 장르 · 가격을 맨 위로 */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[22px] font-semibold">{range}</span>
+        <span className="text-[22px] font-semibold">
+          {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
+          {range}
+        </span>
         {confirmed ? (
           <span className="flex items-center gap-1 rounded-xl bg-[#E3F1E6] px-2.5 py-0.5 text-[13px] font-semibold text-[#1E6B35]">
             <svg {...svg} width={14} height={14} strokeWidth={2.5}>
@@ -130,6 +113,23 @@ export default function ResultCard(props: Props) {
           <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">{t("result.aiJudged")}</span>
         )}
       </div>
+      <div className="-mt-1 flex flex-col gap-1">
+        <h1 ref={title} tabIndex={-1} className="text-[19px] font-semibold leading-snug outline-none">
+          {shop.name}
+        </h1>
+        <p className="text-sm text-[#5F5E58]">
+          <span className="font-semibold text-[#1A3F91]">{t("common.walk", { n: shop.walk })}</span>
+          {" · "}
+          <span className={time.soon ? "font-semibold text-[#9A4A00]" : undefined}>
+            {time.soon ? `${t("result.closingSoon")} · ` : ""}
+            {time.text}
+          </span>
+        </p>
+      </div>
+
+      {/* 대표 메뉴 (구글 지도 그라운딩). 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없음 (10/21 확인: 7/250) */}
+      <MenuHintBlock shopId={shop.id} shopName={shop.name} />
+
       {!confirmed && (
         <p className="-mt-1 text-[13px] text-[#5F5E58]">
           {typical && range !== typical ? t("result.aiNoteTypical", { typical, limit: limitYen }) : t("result.aiNote", { limit: limitYen })}
@@ -137,8 +137,16 @@ export default function ResultCard(props: Props) {
       )}
       {/* 점심 시간 · 가격은 AI가 만든 값이라 핫페퍼 정보로 착각하지 않게 (10/24 리크루트 답) */}
       <p className="-mt-1 text-[12px] text-[#5F5E58]">{t("result.aiSource")}</p>
+      {shop.catchText && (
+        <div className="flex flex-col gap-0.5">
+          {/* 가게 소개는 저녁 · 연회 얘기일 때도 있어서 점심 정보가 아니라는 걸 붙여 둠 (10/22 결정). 11/17: 대표 메뉴 아래로 내림 */}
+          <p className="text-[11px] text-[#5F5E58]">{t("result.catchLabel")}</p>
+          {/* 원문 그대로 (10/24 리크루트 답: 핫페퍼 정보의 번안 · 가공 금지 → AI 번역을 끔) */}
+          <p className="text-[13px] leading-snug text-[#5F5E58]">「{shop.catchText}」</p>
+        </div>
+      )}
 
-      {/* 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없어서(10/21 확인: 가격 근거에 메뉴가 있는 곳 7/250) 메뉴는 핫페퍼 페이지로 보냄 */}
+      {/* 핫페퍼 API 글에는 점심 메뉴 이름이 거의 없어서(10/21 확인: 가격 근거에 메뉴가 있는 곳 7/250) 메뉴 · 사진은 핫페퍼 페이지로도 보냄 */}
       {shop.hotpepperUrl && (
         <a
           href={shop.hotpepperUrl}

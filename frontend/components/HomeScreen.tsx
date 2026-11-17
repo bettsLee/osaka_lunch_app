@@ -9,7 +9,8 @@ import {
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops } from "@/lib/shops";
-import { arriveVisit, cancelVisit, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, linkAnalyticsUser, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { arriveVisit, cancelVisit, fetchMenuHint, fetchPendingVisit, fetchSharedShops, flushVisits, isStandalone, linkAnalyticsUser, saveVisit, syncPush, wakeServer } from "@/lib/api";
+import { prefetchMenuHint } from "@/lib/menuHint";
 import { startAnalytics, track, trackError, watchErrors } from "@/lib/analytics";
 import { pickLang } from "@/lib/i18n";
 import { isIOS } from "@/lib/push";
@@ -48,7 +49,7 @@ const yen = (n: number) => n.toLocaleString("ja-JP");
 const SPIN_END_PAUSE_MS = 500; // 핀이 멈춘 뒤 결과 카드를 띄우기까지
 
 export default function HomeScreen() {
-  const { t, machine } = useT();
+  const { t, machine, lang } = useT();
   const [firstRun, setFirstRun] = useState<boolean | null>(null); // S0을 보여줄지 (null: 확인 중)
   const [loc, setLoc] = useState<Loc>({ status: "asking" });
   const [data, setData] = useState<Data>({ status: "loading" });
@@ -268,6 +269,7 @@ export default function HomeScreen() {
   const spin = () => {
     const winner = pickShop(pool, picked?.id ?? null);
     if (!winner) return;
+    prefetchMenuHint(winner.id, lang, fetchMenuHint); // 도는 동안(약 3초) 대표 메뉴를 미리 물어봄 (11/17, 한 번에 평균 3.6초)
     track("roulette_spin", {
       respin: mode === "result", // 다시 돌리기 횟수 지표
       pool_size: pool.length,
