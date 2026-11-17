@@ -1,0 +1,31 @@
+name: Menu Source Diagnosis
+
+# 실험 (11/17, OL-68 2차): 대표 메뉴 '출처 없는 답'이 왜 생기는지 진단 + 다시 물으면 살아나는지
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만. 공개 기록이라 숫자 · 필드 이름만 출력
+on:
+  push:
+    branches: [feature/OL-68-menu-hit-test]
+    paths:
+      - batch/experiments/menu_source_diag.py
+      - .github/workflows/menu-source-diag.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 30곳 진단
+        run: python batch/experiments/menu_source_diag.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
