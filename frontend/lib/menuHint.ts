@@ -5,9 +5,33 @@
 export type MenuHintStatus = "ok" | "unknown" | "unavailable"; // unavailable: 하루 한도 · 서버 오류 · 시간 초과
 export type MenuHintPlace = "open" | "no_lunch" | "closed" | "unknown"; // 구글 지도 기준 평일 점심 영업
 export type MenuHintSource = { title: string; uri: string };
-export type MenuHint = { status: MenuHintStatus; place: MenuHintPlace; menus: string[]; sources: MenuHintSource[] };
+// kind: lunch = 평일 점심 메뉴로 알려진 것, signature = 가게 대표 메뉴(저녁일 수도) (11/17 상권: "대표메뉴가 점심메뉴가 맞아?")
+// placeId: 구글 가게 ID (손님 사진을 받을 때 씀)
+export type MenuHint = {
+  status: MenuHintStatus;
+  place: MenuHintPlace;
+  menus: string[];
+  kind: "lunch" | "signature";
+  sources: MenuHintSource[];
+  placeId: string | null;
+};
 
-export const UNAVAILABLE_HINT: MenuHint = { status: "unavailable", place: "unknown", menus: [], sources: [] };
+export const UNAVAILABLE_HINT: MenuHint = { status: "unavailable", place: "unknown", menus: [], kind: "signature", sources: [], placeId: null };
+
+// 결과 카드의 손님 사진 (11/17 상권: "메뉴사진도 같이 넣을 수 없어?"). 구글 장소 API, 저장하지 않음, 올린 사람 표시
+export type PlacePhoto = { url: string; author: string; authorUri: string };
+
+export function readPlacePhotos(body: unknown): PlacePhoto[] {
+  const list = (body as { photos?: unknown } | null)?.photos;
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((p): p is PlacePhoto => {
+      const o = p as Record<string, unknown> | null;
+      return !!o && typeof o.url === "string" && o.url.startsWith("https://") && typeof o.author === "string" && typeof o.authorUri === "string";
+    })
+    .map((p) => ({ url: p.url, author: p.author.slice(0, 40), authorUri: p.authorUri.startsWith("https://") ? p.authorUri : "" }))
+    .slice(0, 3);
+}
 
 const STATUSES: readonly string[] = ["ok", "unknown", "unavailable"];
 const PLACES: readonly string[] = ["open", "no_lunch", "closed", "unknown"];
@@ -29,9 +53,11 @@ export function readMenuHint(body: unknown): MenuHint {
         })
         .slice(0, 3)
     : [];
+  const kind = b.kind === "lunch" ? "lunch" : "signature";
+  const placeId = typeof b.placeId === "string" && /^[A-Za-z0-9_-]{10,300}$/.test(b.placeId) && sources.length > 0 ? b.placeId : null;
   // 메뉴가 있어도 구글 지도 출처가 없으면 보여 주지 않음 (표시 규칙: 내용 바로 아래 출처)
-  if (status === "ok" && (menus.length === 0 || sources.length === 0)) return { status: "unknown", place, menus: [], sources };
-  return { status, place, menus: status === "ok" ? menus : [], sources };
+  if (status === "ok" && (menus.length === 0 || sources.length === 0)) return { status: "unknown", place, menus: [], kind, sources, placeId };
+  return { status, place, menus: status === "ok" ? menus : [], kind, sources, placeId };
 }
 
 // 메뉴를 못 받았을 때: 구글맵에서 가게 이름으로 찾기 (호출 없음 · 제한 없음). 출처가 있으면 그 장소로 바로

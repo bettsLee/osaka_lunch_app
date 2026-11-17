@@ -42,9 +42,10 @@ public class MenuHintClient {
             Name: %s
             Location: near latitude %s, longitude %s (Osaka, Japan)
 
-            Answer in exactly these 4 lines and nothing else. Write the MENU, PRICE and BASIS values in %s.
+            Answer in exactly these 5 lines and nothing else. Write the MENU, PRICE and BASIS values in %s.
             STATUS: is it open for lunch on weekdays? Exactly one of these English words: OPEN, NO_LUNCH, CLOSED (permanently closed), UNKNOWN
-            MENU: 2-3 signature dishes of this restaurant, each followed by its Japanese name in parentheses, separated by " · ". They do not have to be lunch-only. UNKNOWN if there is no basis
+            KIND: LUNCH if the dishes in MENU are known to be served at weekday lunch (lunch sets, lunch menu), otherwise ALL
+            MENU: 2-3 dishes, each followed by its Japanese name in parentheses, separated by " · ". Prefer dishes served at weekday lunch; if unknown, the restaurant's signature dishes. UNKNOWN if there is no basis
             PRICE: lunch price range in yen. If there is no basis for lunch, the overall price range of the place. UNKNOWN if neither
             BASIS: what you looked at (reviews, menu info, place info)
             Do not make anything up.
@@ -81,7 +82,8 @@ public class MenuHintClient {
             for (JsonNode part : cand.path("content").path("parts")) {
                 if (!part.path("thought").asBoolean(false)) text.append(part.path("text").asText(""));
             }
-            MenuHint hint = parse(text.toString(), sources(cand.path("groundingMetadata")));
+            JsonNode meta = cand.path("groundingMetadata");
+            MenuHint hint = parse(text.toString(), sources(meta), placeId(meta));
             log.info("대표 메뉴 {} {} {}ms", shop.getId(), hint.status(), (System.nanoTime() - started) / 1_000_000);
             return hint;
         } catch (HttpTimeoutException e) {
@@ -141,19 +143,31 @@ public class MenuHintClient {
         return List.copyOf(out.values());
     }
 
-    /** 'STATUS: …' · 'MENU: …' 줄을 읽음. 출처가 없으면 구글 지도에서 찾은 답이 아니라서 메뉴를 쓰지 않음 */
-    static MenuHint parse(String text, List<MenuHint.Source> sources) {
+    /** 첫 번째 구글 지도 장소의 가게 ID ('places/ChIJ…' 이면 앞부분을 뗌). 사진을 받을 때 씀 */
+    static String placeId(JsonNode metadata) {
+        for (JsonNode chunk : metadata.path("groundingChunks")) {
+            String id = chunk.path("maps").path("placeId").asText("").replaceFirst("^places/", "");
+            if (id.matches("[A-Za-z0-9_-]{10,300}")) return id;
+        }
+        return null;
+    }
+
+    /** 'STATUS: …' · 'KIND: …' · 'MENU: …' 줄을 읽음. 출처가 없으면 구글 지도에서 찾은 답이 아니라서 메뉴를 쓰지 않음 */
+    static MenuHint parse(String text, List<MenuHint.Source> sources, String placeId) {
         String status = "";
+        String kind = "";
         String menu = "";
         for (String raw : text.split("\\R")) {
             String line = raw.strip().replaceFirst("^[*\\-•\\s]+", "").replace("**", "");
             String head = line.toUpperCase(Locale.ROOT);
             if (head.startsWith("STATUS")) status = value(line);
+            else if (head.startsWith("KIND")) kind = value(line);
             else if (head.startsWith("MENU")) menu = value(line);
         }
         String place = place(status);
         List<String> menus = sources.isEmpty() ? List.of() : menus(menu);
-        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place, menus, sources);
+        String menuKind = kind.toUpperCase(Locale.ROOT).startsWith("LUNCH") ? "lunch" : "signature"; // 모르면 '가게 대표 메뉴'로
+        return new MenuHint(menus.isEmpty() ? "unknown" : "ok", place, menus, menuKind, sources, sources.isEmpty() ? null : placeId);
     }
 
     static String place(String status) {

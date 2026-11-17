@@ -3,7 +3,7 @@
 import { GoTrueClient } from "@supabase/auth-js";
 import { setAnalyticsUser } from "./analytics";
 import { isIOS, keyBytes, pushState, subscriptionBody, type PushState } from "./push";
-import { readMenuHint, UNAVAILABLE_HINT, type MenuHint } from "./menuHint";
+import { readMenuHint, readPlacePhotos, UNAVAILABLE_HINT, type MenuHint, type PlacePhoto } from "./menuHint";
 import { arriveSettled, cancelSettled, enqueue, settled, type FeedbackBody, type PendingVisit, type VisitDraft } from "./visits";
 import type { ZukanVisit } from "./zukan";
 
@@ -237,6 +237,20 @@ export async function fetchMenuHint(shopId: string, lang: string): Promise<MenuH
     return readMenuHint(await res.json());
   } catch {
     return UNAVAILABLE_HINT;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 결과 카드의 손님 사진 (11/17, OL-66): 대표 메뉴 답의 구글 가게 ID로. 못 받으면 빈 목록 (화면은 사진 줄을 숨김)
+export async function fetchPlacePhotos(placeId: string): Promise<PlacePhoto[]> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 10000);
+  try {
+    const res = await call(`/api/places/${encodeURIComponent(placeId)}/photos`, { signal: stop.signal, cache: "no-store" });
+    return res.ok ? readPlacePhotos(await res.json()) : [];
+  } catch {
+    return [];
   } finally {
     clearTimeout(timer);
   }

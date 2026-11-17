@@ -1,14 +1,18 @@
 // 결과 카드 대표 메뉴 규칙 테스트 (11/17, OL-65). 실행: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapsLink, prefetchMenuHint, readMenuHint, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
+import { mapsLink, prefetchMenuHint, readMenuHint, readPlacePhotos, takeMenuHint, UNAVAILABLE_HINT } from "./menuHint.ts";
 
 const SRC = { title: "Hokkyokusei - Google Maps", uri: "https://maps.google.com/?cid=1" };
 
 test("서버 답을 그대로 믿지 않고 모양을 확인함", () => {
-  assert.deepEqual(readMenuHint({ status: "ok", place: "open", menus: ["オムライス", 3, ""], sources: [SRC] }), {
-    status: "ok", place: "open", menus: ["オムライス"], sources: [SRC],
+  assert.deepEqual(readMenuHint({ status: "ok", place: "open", menus: ["オムライス", 3, ""], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890" }), {
+    status: "ok", place: "open", menus: ["オムライス"], kind: "lunch", sources: [SRC], placeId: "ChIJ1234567890",
   });
+  // 점심 메뉴인지 모르면 '가게 대표 메뉴', 이상한 가게 ID는 버림
+  const odd = readMenuHint({ status: "ok", menus: ["A"], kind: "dinner", sources: [SRC], placeId: "../../x" });
+  assert.equal(odd.kind, "signature");
+  assert.equal(odd.placeId, null);
   assert.deepEqual(readMenuHint(null), UNAVAILABLE_HINT);
   assert.equal(readMenuHint({ status: "hack", place: "x" }).status, "unavailable");
   // https가 아닌 링크는 버림 → 출처가 없으면 메뉴도 보여 주지 않음 (표시 규칙)
@@ -16,6 +20,15 @@ test("서버 답을 그대로 믿지 않고 모양을 확인함", () => {
   assert.equal(bad.status, "unknown");
   assert.deepEqual(bad.menus, []);
   assert.equal(readMenuHint({ status: "ok", menus: ["1", "2", "3", "4"], sources: [SRC] }).menus.length, 3);
+});
+
+test("손님 사진: https 주소만, 3장까지, 올린 사람 링크도 https만", () => {
+  const ok = { url: "https://lh3.googleusercontent.com/a", author: "Aiko", authorUri: "https://maps.google.com/contrib/1" };
+  assert.deepEqual(readPlacePhotos({ photos: [ok, { url: "http://x", author: "", authorUri: "" }, { ...ok, url: "https://b", authorUri: "javascript:x" }] }), [
+    ok, { url: "https://b", author: "Aiko", authorUri: "" },
+  ]);
+  assert.equal(readPlacePhotos({ photos: [ok, ok, ok, ok] }).length, 3);
+  assert.deepEqual(readPlacePhotos(null), []);
 });
 
 test("메뉴가 없을 때 구글맵 링크: 출처 장소가 있으면 그곳, 없으면 이름으로 검색", () => {
