@@ -20,7 +20,8 @@ export type MenuHint = {
 export const UNAVAILABLE_HINT: MenuHint = { status: "unavailable", place: "unknown", menus: [], kind: "signature", sources: [], placeId: null };
 
 // 결과 카드의 손님 사진 (11/17 상권: "메뉴사진도 같이 넣을 수 없어?"). 구글 장소 API, 저장하지 않음, 올린 사람 표시
-export type PlacePhoto = { url: string; author: string; authorUri: string };
+// mapsUri: 구글 지도에서 그 사진을 여는 링크 (올린 사람의 리뷰에서 무슨 메뉴인지 확인. 11/17 상권 "사진만 있으니까 메뉴 이름을 잘 모르겠는데")
+export type PlacePhoto = { url: string; author: string; authorUri: string; mapsUri: string };
 
 export function readPlacePhotos(body: unknown): PlacePhoto[] {
   const list = (body as { photos?: unknown } | null)?.photos;
@@ -30,7 +31,15 @@ export function readPlacePhotos(body: unknown): PlacePhoto[] {
       const o = p as Record<string, unknown> | null;
       return !!o && typeof o.url === "string" && o.url.startsWith("https://") && typeof o.author === "string" && typeof o.authorUri === "string";
     })
-    .map((p) => ({ url: p.url, author: p.author.slice(0, 40), authorUri: p.authorUri.startsWith("https://") ? p.authorUri : "" }))
+    .map((p) => {
+      const maps = (p as { mapsUri?: unknown }).mapsUri;
+      return {
+        url: p.url,
+        author: p.author.slice(0, 40),
+        authorUri: p.authorUri.startsWith("https://") ? p.authorUri : "",
+        mapsUri: typeof maps === "string" && maps.startsWith("https://") ? maps : "",
+      };
+    })
     .slice(0, 3);
 }
 
