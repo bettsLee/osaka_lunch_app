@@ -22,14 +22,14 @@ test("서버 답을 그대로 믿지 않고 모양을 확인함", () => {
   assert.equal(readMenuHint({ status: "ok", menus: ["1", "2", "3", "4"], sources: [SRC] }).menus.length, 3);
 });
 
-test("손님 사진: https 주소만, 3장까지, 올린 사람 · 사진 링크도 https만", () => {
+test("손님 사진: https 주소만, 6장까지, 올린 사람 · 사진 링크도 https만", () => {
   const ok = { url: "https://lh3.googleusercontent.com/a", author: "Aiko", authorUri: "https://maps.google.com/contrib/1", mapsUri: "https://www.google.com/maps/photo/1" };
   assert.deepEqual(readPlacePhotos({ photos: [ok, { url: "http://x", author: "", authorUri: "" }, { ...ok, url: "https://b", authorUri: "javascript:x", mapsUri: "javascript:y" }] }), [
     ok, { url: "https://b", author: "Aiko", authorUri: "", mapsUri: "" },
   ]);
   // 예전 서버(사진 링크 없음)도 읽음
   assert.equal(readPlacePhotos({ photos: [{ url: "https://c", author: "", authorUri: "" }] })[0].mapsUri, "");
-  assert.equal(readPlacePhotos({ photos: [ok, ok, ok, ok] }).length, 3);
+  assert.equal(readPlacePhotos({ photos: Array(7).fill(ok) }).length, 6); // 11/18: 3장 → 6장
   assert.deepEqual(readPlacePhotos(null), []);
 });
 

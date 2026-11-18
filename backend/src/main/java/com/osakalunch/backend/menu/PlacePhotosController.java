@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 public class PlacePhotosController {
 
-    static final int PER_CARD = 3;
+    static final int PER_CARD = 6; // 11/18 상권 "이게 좋을거 같아": 3장 → 6장, 가로로 넘겨 봄 (음식 사진이 섞일 확률을 올림)
 
     public record Photos(List<PlacePhotosClient.Photo> photos) {
     }
@@ -48,8 +48,14 @@ public class PlacePhotosController {
         if (!placeId.matches("[A-Za-z0-9_-]{10,300}")) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         int count = client.ready() ? take(PER_CARD) : 0;
         List<PlacePhotosClient.Photo> photos = count == 0 ? List.of() : client.photos(placeId, count);
+        giveBack(count - photos.size()); // 사진이 6장보다 적은 가게 · 실패는 한도에서 돌려줌 (받지 않은 사진은 요금도 없음)
         // 구글 장소 사진 주소는 저장하면 안 돼서 브라우저 · 중간 서버도 보관하지 않게
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new Photos(photos));
+    }
+
+    /** 받지 못한 장 수만큼 오늘 한도를 되돌림 */
+    synchronized void giveBack(int n) {
+        used = Math.max(0, used - Math.max(0, n));
     }
 
     /** 오늘 남은 장 수 안에서 최대 want장 (오사카 날짜 기준, 서버가 다시 시작하면 0부터) */

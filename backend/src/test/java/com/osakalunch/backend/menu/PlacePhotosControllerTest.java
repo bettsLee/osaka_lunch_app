@@ -34,9 +34,9 @@ class PlacePhotosControllerTest {
     @MockitoBean PlacePhotosClient client;
 
     @Test
-    void 로그인하면_사진_3장과_올린_사람을_주고_저장하지_않게_함() throws Exception {
+    void 로그인하면_사진_6장까지와_올린_사람을_주고_저장하지_않게_함() throws Exception {
         when(client.ready()).thenReturn(true);
-        when(client.photos(eq("ChIJ1234567890"), eq(3))).thenReturn(List.of(
+        when(client.photos(eq("ChIJ1234567890"), eq(6))).thenReturn(List.of(
                 new PlacePhotosClient.Photo("https://lh3.googleusercontent.com/a", "Aiko", "https://maps.google.com/contrib/1",
                         "https://www.google.com/maps/place//data=!3m4!1e2")));
         mvc.perform(get("/api/places/ChIJ1234567890/photos").with(jwt()))
@@ -72,5 +72,15 @@ class PlacePhotosControllerTest {
         assertThat(c.take(3)).isEqualTo(0);
         now[0] = Clock.fixed(Instant.parse("2026-11-17T15:30:00Z"), ZoneId.of("Asia/Tokyo")); // 오사카 11/18
         assertThat(c.take(3)).isEqualTo(3);
+    }
+
+    @Test
+    void 사진이_6장보다_적은_가게는_받은_만큼만_한도에서_뺌() {
+        when(client.ready()).thenReturn(true);
+        PlacePhotosClient.Photo one = new PlacePhotosClient.Photo("https://lh3.googleusercontent.com/a", "Aiko", "", "");
+        when(client.photos(anyString(), eq(6))).thenReturn(List.of(one, one));
+        PlacePhotosController c = new PlacePhotosController(client, 12, Clock.fixed(Instant.parse("2026-11-18T03:00:00Z"), ZoneId.of("Asia/Tokyo")));
+        assertThat(c.get("ChIJ1234567890").getBody().photos()).hasSize(2);
+        assertThat(c.take(12)).isEqualTo(10); // 6장을 잡았다가 못 받은 4장은 돌려받음
     }
 }
