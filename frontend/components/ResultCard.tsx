@@ -95,10 +95,11 @@ export default function ResultCard(props: Props) {
       )}
 
       {/* 11/17 결정 (OL-65): 카드를 열자마자 '무엇 · 얼마'가 보이게 장르 · 가격을 맨 위로 */}
+      {/* 11/18 상권 "가격이 이렇게 표기되는 게 맞아?": 아래 대표 메뉴(저녁일 수도)와 헷갈리지 않게 '점심 900엔' + 가게 글 원문 한 줄 */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[22px] font-semibold">
           {shop.genre ? `${genreLabel(shop.genre, t)} · ` : ""}
-          {range}
+          {badge === "unknown" ? range : t("result.lunchPrice", { range })}
         </span>
         {badge === "confirmed" ? (
           <span className="flex items-center gap-1 rounded-xl bg-[#E3F1E6] px-2.5 py-0.5 text-[13px] font-semibold text-[#1E6B35]">
@@ -113,6 +114,12 @@ export default function ResultCard(props: Props) {
           <span className="rounded-xl bg-[#FFF1DC] px-2.5 py-0.5 text-[13px] font-semibold text-[#8A4B00]">{t("result.aiJudged")}</span>
         )}
       </div>
+      {/* 가격을 읽은 핫페퍼 가게 글 원문 그대로 (번안 · 가공 금지, 10/24 리크루트 답). 예전 '가격 원문 보기'를 펼치지 않아도 보이게 */}
+      {shop.priceEvidence && (
+        <p className="-mt-1 line-clamp-2 text-[13px] leading-snug text-[#5F5E58]">
+          {t("result.priceSourceInline")}: 「{shop.priceEvidence}」
+        </p>
+      )}
       <div className="-mt-1 flex flex-col gap-1">
         <h1 ref={title} tabIndex={-1} className="text-[19px] font-semibold leading-snug outline-none">
           {shop.name}
@@ -238,12 +245,6 @@ export default function ResultCard(props: Props) {
               {t("result.catchLabel")}
               <br />「{shop.catchText}」
             </p>
-          </details>
-        )}
-        {shop.priceEvidence && (
-          <details>
-            <summary className="min-h-8 cursor-pointer py-1">{t("result.priceSource")}</summary>
-            <p className="rounded-lg bg-[#F4F3EF] p-2 leading-relaxed">「{shop.priceEvidence}」</p>
           </details>
         )}
         <p>
