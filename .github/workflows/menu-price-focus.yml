@@ -1,0 +1,31 @@
+name: Menu Price Focus Test
+
+# 실험 (11/18, OL-77): 지금 질문 vs '가격 아는 메뉴 먼저' 질문 30곳 비교 + 가게 글 원문이 숨겨지는 가게 수
+# 실험 브랜치에 push할 때만 돌고 main에는 머지하지 않음. DB는 읽기만. 공개 기록이라 숫자만 출력
+on:
+  push:
+    branches: [feature/OL-77-menu-price-test]
+    paths:
+      - batch/experiments/menu_price_focus.py
+      - .github/workflows/menu-price-focus.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 메뉴 가격 · 원문 숨김
+        run: python batch/experiments/menu_price_focus.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
