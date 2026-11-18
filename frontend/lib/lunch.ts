@@ -23,7 +23,7 @@ export type LunchShop = {
   priceMin: number | null;
   priceMax: number | null;
   typicalPrice: number | null;
-  priceEvidence: string | null; // AI가 가격을 판단한 원문 (결과 카드 '가격 원문 보기')
+  priceEvidence: string | null; // AI가 가격을 판단한 원문 (결과 카드 가격 아래 한 줄, 11/18)
   catchText: string | null; // 가게 소개 한 줄 (핫페퍼 원문 그대로. 가게 설명은 번역하지 않음)
 };
 
