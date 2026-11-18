@@ -188,11 +188,13 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
 
   // 손님 사진: 받는 중이면 회색 칸, 0장이면 숨김. 메뉴 아래에 '손님이 올린 사진'으로 (메뉴 순서와 상관없다는 게 보이게)
   // 누르면 구글 지도에서 그 사진 (올린 사람의 리뷰에서 무슨 메뉴인지 확인). 사진 링크가 없으면 가게 페이지 (11/17 상권 "가) … 이걸로 해 줘")
+  // 6장까지 가로로 넘겨 봄 (11/18 상권 "이게 좋을거 같아"). 칸 너비를 줄 너비의 28%로 해서 어느 휴대폰에서든 4번째 사진이 조금 보이게
+  // 누를 때 몇 번째 사진인지 남김 (4~6번째도 누르는지 봄)
   const photoRow =
     photos === null ? (
-      <div className="flex gap-2" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-[104px] w-[104px] flex-none animate-pulse rounded-xl bg-[#ECEAE3]" />
+      <div className="flex gap-2 overflow-hidden" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="aspect-square w-[28%] flex-none animate-pulse rounded-xl bg-[#ECEAE3]" />
         ))}
       </div>
     ) : photos.length > 0 ? (
@@ -200,15 +202,15 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
         <p className="text-[13px] font-semibold text-[#5F5E58]">
           {t("menu.photosTitle")} <span className="font-normal">· {t("menu.photosHint")}</span>
         </p>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="flex snap-x gap-2 overflow-x-auto">
           {photos.map((p, i) => (
             <a
               key={p.url}
               href={p.mapsUri || placeLink}
               target="_blank"
               rel="noreferrer"
-              onClick={() => track("menu_link_click", { to: "google_maps_photo" })}
-              className="h-[104px] w-[104px] flex-none overflow-hidden rounded-xl bg-[#ECEAE3]"
+              onClick={() => track("menu_link_click", { to: "google_maps_photo", photo: i + 1 })}
+              className="aspect-square w-[28%] flex-none snap-start overflow-hidden rounded-xl bg-[#ECEAE3]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- 구글 사진 주소를 그대로 씀 (저장 · 가공 안 함) */}
               <img src={p.url} alt={t("menu.photoAlt", { n: i + 1 })} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />

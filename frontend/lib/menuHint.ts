@@ -68,7 +68,7 @@ export function readPlacePhotos(body: unknown): PlacePhoto[] {
         mapsUri: typeof maps === "string" && maps.startsWith("https://") ? maps : "",
       };
     })
-    .slice(0, 3);
+    .slice(0, 6); // 11/18: 6장까지 (가로로 넘겨 봄)
 }
 
 const STATUSES: readonly string[] = ["ok", "guess", "unknown", "unavailable"];
