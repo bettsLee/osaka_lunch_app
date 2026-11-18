@@ -255,7 +255,11 @@ export default function MenuHintBlock({ shopId, shopName }: { shopId: string; sh
       {(hint.status === "ok" || price) && (
         <div className="flex flex-col gap-1.5">
           {hint.status === "ok" && (
-            <p className="text-[13px] font-semibold text-[#5F5E58]">{t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}</p>
+            <p className="text-[13px] font-semibold text-[#5F5E58]">
+              {t(hint.kind === "lunch" ? "menu.lunchTitle" : "menu.title")}
+              {/* 11/18: 점심 메뉴로 못 찾은 대표 메뉴는 위 점심 가격과 상관없을 수 있어서 */}
+              {hint.kind !== "lunch" && <span className="font-normal"> · {t("menu.signatureNote")}</span>}
+            </p>
           )}
           {/* 11/17 30곳 테스트: 점심 가격대는 27곳 중 3곳만, 대부분 가게 전체 가격대(저녁 포함) → 점심만 크게, 전체는 작게 */}
           {price && (
