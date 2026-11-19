@@ -18,11 +18,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Gemini로 앱 문구를 한 언어로 번역. 키 · {자리}가 원문과 다르면 쓰지 않음 (한 번 더 시도)
+ * 11/19: 문구가 342개로 늘어 한 번에 보내면 시간 초과 · 한 줄만 틀려도 전체가 버려져 화면이 영어로 남음 (대만 휴대폰)
+ *   → 60개씩 나눠 3개씩 동시에 묻고, 틀린 줄만 다시 물음. 90% 넘게 번역되면 씀 (빠진 줄은 화면이 영어로 채움)
  * 요청 형식은 수집 배치(batch/ai_structure.py)와 같음: 지금 방식이 거절되면 이전 방식으로
  */
 @Component
@@ -71,7 +77,13 @@ public class Translator {
             %s
             """;
 
+    static final int CHUNK = 60;          // 한 번에 묻는 문구 수
+    static final int PARALLEL = 3;        // 동시에 묻는 묶음 수
+    static final double MIN_DONE = 0.9;   // 이보다 적게 번역되면 실패 (저장하지 않음)
+    static final Duration CALL_TIMEOUT = Duration.ofSeconds(60);
+
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private volatile boolean thinkingOption = true; // 모델이 생각 줄이기 설정을 거절하면 빼고 보냄 (MenuHintClient와 같음)
     private final ObjectMapper json;
     private final String apiKey;
     private final String model;
@@ -91,13 +103,58 @@ public class Translator {
         return model;
     }
 
+    /** 문구를 CHUNK개씩 나눠 번역해 원문 순서대로 돌려줌. 끝내 틀린 줄은 빠짐 (MIN_DONE 미만이면 실패) */
     public Map<String, String> translate(Map<String, String> source, String lang) throws IOException, InterruptedException {
-        String prompt = PROMPT.formatted(languageName(lang), json.writeValueAsString(source));
-        for (int attempt = 0; attempt < 2; attempt++) {
-            Map<String, String> out = parse(json, call(prompt));
-            if (out != null && sameShape(source, out)) return out;
+        List<Map<String, String>> chunks = new ArrayList<>();
+        for (var e : source.entrySet()) {
+            if (chunks.isEmpty() || chunks.get(chunks.size() - 1).size() >= CHUNK) chunks.add(new LinkedHashMap<>());
+            chunks.get(chunks.size() - 1).put(e.getKey(), e.getValue());
         }
-        throw new TranslationFailed("번역 결과가 원문과 맞지 않아요 (" + lang + ")");
+        Map<String, String> done = new LinkedHashMap<>();
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, Math.min(PARALLEL, chunks.size())));
+        try {
+            List<Future<Map<String, String>>> pending = new ArrayList<>();
+            for (Map<String, String> chunk : chunks) pending.add(pool.submit(() -> translateChunk(chunk, lang)));
+            for (Future<Map<String, String>> f : pending) done.putAll(f.get());
+        } catch (ExecutionException e) {
+            throw new IOException("번역 중 오류 (" + lang + ")", e.getCause());
+        } finally {
+            pool.shutdownNow();
+        }
+        if (done.size() < source.size() * MIN_DONE) {
+            throw new TranslationFailed("번역된 문구가 너무 적어요 (" + lang + " " + done.size() + "/" + source.size() + ")");
+        }
+        Map<String, String> ordered = new LinkedHashMap<>();
+        for (String key : source.keySet()) if (done.containsKey(key)) ordered.put(key, done.get(key));
+        return ordered;
+    }
+
+    /** 한 묶음: 두 번까지 묻고, 두 번째는 첫 번째에 틀린 줄만. Gemini 오류 · 시간 초과면 그 묶음은 받은 만큼만 */
+    Map<String, String> translateChunk(Map<String, String> chunk, String lang) throws InterruptedException {
+        Map<String, String> good = new LinkedHashMap<>();
+        for (int attempt = 0; attempt < 2 && good.size() < chunk.size(); attempt++) {
+            Map<String, String> todo = new LinkedHashMap<>(chunk);
+            todo.keySet().removeAll(good.keySet());
+            try {
+                Map<String, String> out = parse(json, call(PROMPT.formatted(languageName(lang), json.writeValueAsString(todo))));
+                if (out != null) good.putAll(valid(todo, out));
+            } catch (IOException e) {
+                // 다음 시도에서 다시 (끝내 안 되면 이 묶음은 빠지고, 전체가 MIN_DONE 미만이면 실패)
+            }
+        }
+        return good;
+    }
+
+    /** 원문에 있는 키 중 비어 있지 않고, 터무니없이 길지 않고, {자리}가 같은 문구만 */
+    static Map<String, String> valid(Map<String, String> source, Map<String, String> out) {
+        Map<String, String> ok = new LinkedHashMap<>();
+        for (var e : source.entrySet()) {
+            String v = out.get(e.getKey());
+            if (v == null || v.isBlank() || v.length() > Math.max(200, e.getValue().length() * 4)) continue;
+            if (!Objects.equals(placeholders(v), placeholders(e.getValue()))) continue;
+            ok.put(e.getKey(), v);
+        }
+        return ok;
     }
 
     /** 가게 소개 한 줄을 번역. 비었거나 터무니없이 길면 한 번 더 시도 */
@@ -116,18 +173,25 @@ public class Translator {
         return Locale.forLanguageTag(lang).getDisplayName(Locale.ENGLISH) + " (" + lang + ")";
     }
 
-    private String call(String prompt) throws IOException, InterruptedException {
+    /** 테스트에서 가짜 Gemini로 바꿀 수 있게 package-private */
+    String call(String prompt) throws IOException, InterruptedException {
         for (int attempt = 0; attempt < 3; attempt++) {
+            Map<String, Object> generation = new LinkedHashMap<>(FORMATS.get(format));
+            if (thinkingOption) generation.put("thinkingConfig", Map.of("thinkingLevel", "low")); // 번역은 오래 생각할 필요 없음
             Map<String, Object> body = Map.of(
                     "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                    "generationConfig", FORMATS.get(format));
+                    "generationConfig", generation);
             HttpRequest req = HttpRequest.newBuilder(URI.create(ENDPOINT.formatted(model)))
-                    .timeout(Duration.ofSeconds(90))
+                    .timeout(CALL_TIMEOUT)
                     .header("x-goog-api-key", apiKey)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(json.writeValueAsBytes(body)))
                     .build();
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
+            if (res.statusCode() == 400 && thinkingOption && res.body().contains("thinking")) {
+                thinkingOption = false;
+                continue;
+            }
             if (res.statusCode() == 400 && res.body().contains("response_format") && format + 1 < FORMATS.size()) {
                 format++;
                 continue;
@@ -157,17 +221,6 @@ public class Translator {
         } catch (IOException e) {
             return null;
         }
-    }
-
-    /** 키가 모두 같고, 문구마다 {자리}가 같고, 비어 있거나 터무니없이 길지 않음 */
-    static boolean sameShape(Map<String, String> source, Map<String, String> out) {
-        if (!out.keySet().equals(source.keySet())) return false;
-        for (var e : source.entrySet()) {
-            String v = out.get(e.getKey());
-            if (v == null || v.isBlank() || v.length() > Math.max(200, e.getValue().length() * 4)) return false;
-            if (!Objects.equals(placeholders(v), placeholders(e.getValue()))) return false;
-        }
-        return true;
     }
 
     static List<String> placeholders(String s) {
