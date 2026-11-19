@@ -20,7 +20,7 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45   # 서버 확인 최대 15분 + 번역 미리 만들기 (원문이 바뀐 날은 10분 기다림)
     steps:
       # 서버 커밋과 이 커밋 사이에 backend 변경이 있는지 보려면 전체 기록이 필요함 (11/14)
       - uses: actions/checkout@v4
@@ -82,3 +82,26 @@ jobs:
           done
           echo "::error title=서버 배포::15분이 지나도 서버가 ${SHA:0:7} 가 아니에요 (지금 ${commit:-응답 없음}). Render 대시보드 Events를 확인해 주세요"
           exit 1
+
+      # 11/19: 화면 문구(ko.json)가 바뀌면 서버가 언어마다 처음 한 번 Gemini로 번역함 → 그동안 그 언어 사용자는 영어를 봄 (대만 휴대폰)
+      # 베타 · 출시 대상 언어는 배포 직후 미리 만들어 둠. 실패해도 배포 실패로 보지 않고 경고만 (번역이 깨졌는지 여기서 알 수 있음)
+      - name: 자주 쓰는 언어 번역 미리 만들기
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # 원문이 바뀐 배포면, 서버가 받아 둔 원문(10분 보관)이 새것이 될 때까지 기다림 (예전 원문으로 번역하지 않게)
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
+             && ! git diff --quiet "$BEFORE" "$SHA" -- frontend/public/i18n/ko.json; then
+            echo "원문이 바뀌어서 10분 기다려요"
+            sleep 600
+          fi
+          for lang in ja zh-Hant zh-Hans vi; do
+            start=$(date +%s)
+            code=$(curl -sS -m 180 -o tr.json -w "%{http_code}" "$API_URL/api/i18n/$lang" || true)
+            n=$(jq -r '.messages | length' tr.json 2>/dev/null || echo 0)
+            if [ "$code" = "200" ]; then
+              echo "::notice title=번역 $lang::${n}줄 ($(( $(date +%s) - start ))초)"
+            else
+              echo "::warning title=번역 $lang::실패 (HTTP ${code:-응답 없음}). 이 언어 휴대폰은 영어로 보여요"
+            fi
+          done
