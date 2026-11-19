@@ -58,7 +58,7 @@ public class TranslationService {
             recent.addLast(now);
             Map<String, String> messages = translator.translate(src.messages(), lang);
             translations.save(new Translation(lang, version, json.writeValueAsString(messages), translator.model(), now));
-            log.info("새 번역 저장: {} ({})", lang, version);
+            log.info("새 번역 저장: {} ({}) {}/{}줄", lang, version, messages.size(), src.messages().size()); // 빠진 줄은 화면이 영어로 채움
             return new Result(lang, version, messages);
         }
     }
