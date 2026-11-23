@@ -6,6 +6,7 @@ import {
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, priceUnknown, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
+  inOsaka,
   nextLunch,
 } from "./lunch.ts";
 import ko from "../public/i18n/ko.json" with { type: "json" };
@@ -197,4 +198,11 @@ test("점심이 끝난 뒤 다음 점심: 내일 가장 이른 시작, 주말에
   assert.deepEqual(nextLunch(shops, "thu"), { days: 1, day: "fri", start: "11:15" });
   assert.deepEqual(nextLunch(shops, "fri"), { days: 3, day: "mon", start: "11:00" });
   assert.equal(nextLunch([], "mon"), null);
+});
+
+test("오사카 범위: 시내 가게는 안, 좌표가 도쿄로 들어간 가게는 밖 (11/23 출시 전 점검 ⑥)", () => {
+  assert.equal(inOsaka({ lat: 34.6937, lng: 135.5023 }), true); // 우메다 근처
+  assert.equal(inOsaka({ lat: 34.6851, lng: 135.5063 }), true); // 혼마치 근처
+  assert.equal(inOsaka({ lat: 35.6896358166, lng: 139.6920866271 }), false); // 실제로 있던 데이터 오류 (주소는 혼마치)
+  assert.equal(inOsaka({ lat: 0, lng: 0 }), false);
 });

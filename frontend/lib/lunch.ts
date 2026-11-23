@@ -83,6 +83,12 @@ export function genreLabel(genre: string, t: T): string {
   return GENRE_KEYS[genre] ? t(`genre.${GENRE_KEYS[genre]}`) : genre;
 }
 
+// 오사카 범위 (11/23 출시 전 점검 ⑥): 핫페퍼 데이터에 주소는 오사카인데 좌표가 도쿄로 들어간 가게가 있었음.
+// 근처 목록에는 안 나오지만 '동네 골라서 보기'의 동네 가운데(좌표 평균)를 크게 밀어서, 이 범위 밖 가게는 화면에 싣지 않음 (데이터는 고치지 않음)
+export function inOsaka(p: Point): boolean {
+  return p.lat >= 34.4 && p.lat <= 34.9 && p.lng >= 135.2 && p.lng <= 135.7;
+}
+
 export function distanceKm(a: Point, b: Point): number {
   const r = (d: number) => (d * Math.PI) / 180;
   const h =
