@@ -567,10 +567,15 @@ export default function HomeScreen() {
     <main className={mainClass} style={mainFont}>
       {(mode === "home" || mode === "spin") && (
         <header className="flex flex-col gap-3 px-5 pb-3 pt-5">
-          <h1 className="flex items-center gap-1.5 text-[17px] font-semibold">
-            <PinIcon />
-            {area ? t("home.near", { area }) : t("home.nearHere")}
-          </h1>
+          {/* 11/23: 제목 줄 오른쪽에서 식권이가 손 흔듦 (상권 '지금 위치 근처 저기에 자연스럽게') */}
+          <div className="-mb-2 -mt-2.5 flex items-center justify-between gap-2">
+            <h1 className="flex min-w-0 items-center gap-1.5 text-[17px] font-semibold">
+              <PinIcon />
+              {area ? t("home.near", { area }) : t("home.nearHere")}
+            </h1>
+            {/* 룰렛 동안에는 아래 칸에서 식권이가 달리니 여기는 숨김 (자리는 그대로 둬서 지도가 안 움직이게) */}
+            <Shokken size={56} className={`-mr-1 flex-none ${mode === "spin" ? "invisible" : ""}`} />
+          </div>
           {/* 작은 화면 · 큰 글자에서 칩 글자가 두 줄로 깨지지 않게 한 줄 + 가로 스크롤 (10/22 기기 점검) */}
           {mode === "home" && (
             <div className="-mx-5 flex gap-2 overflow-x-auto px-5">
@@ -828,18 +833,14 @@ export default function HomeScreen() {
               />
             )}
             {!goingNow && !sheetHidden && (
-              // 11/23: 정해 주는 건 식권이. 버튼 옆에 크게 서 있다가(고를 가게가 없으면 배고파) 누르면 룰렛 동안 달림
-              <div className="flex items-end gap-1.5">
-                <Shokken mood={pool.length === 0 ? "hungry" : "base"} size={92} className="-mb-1 -ml-3 flex-none" />
-                <button
-                  type="button"
-                  disabled={pool.length === 0}
-                  onClick={spin}
-                  className="h-14 min-w-0 flex-1 rounded-[14px] bg-[#2457C5] px-3 text-lg font-semibold leading-tight text-white disabled:opacity-50"
-                >
-                  {t("home.spin")}
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={pool.length === 0}
+                onClick={spin}
+                className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
+              >
+                {t("home.spin")}
+              </button>
             )}
             </div>
             {!goingNow && !sheetHidden && rows.length > 0 && (
