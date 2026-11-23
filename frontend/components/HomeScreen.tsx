@@ -663,11 +663,8 @@ export default function HomeScreen() {
         <section className="relative z-[600] -mt-4 flex flex-col items-center gap-2.5 rounded-t-[20px] border-t border-[#E2E0D8] bg-white px-5 pb-7 pt-4">
           <div className="h-1 w-10 rounded-full bg-[#CFCCC2]" aria-hidden="true" />
           <p className="text-xl font-semibold" aria-live="polite">{t("home.spinning")}</p>
-          <div className="flex gap-2" aria-hidden="true">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#2457C5]" />
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#9DB3E3] [animation-delay:150ms]" />
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#D6D4CC] [animation-delay:300ms]" />
-          </div>
+          {/* 11/23: 점 세 개 대신 가게를 찾아 달리는 식권이 */}
+          <Shokken mood="run" size={64} />
           <button type="button" onClick={skip} className="min-h-11 px-3 text-sm text-[#2457C5]">
             {t("home.skip")}
           </button>
@@ -835,8 +832,10 @@ export default function HomeScreen() {
                 type="button"
                 disabled={pool.length === 0}
                 onClick={spin}
-                className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
+                className="flex h-14 items-center justify-center gap-2 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
               >
+                {/* 11/23: 정해 주는 건 식권이 (누르면 룰렛 동안 달림) */}
+                <Shokken size={38} className="-my-1 -ml-2 flex-none" />
                 {t("home.spin")}
               </button>
             )}

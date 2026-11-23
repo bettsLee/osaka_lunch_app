@@ -15,6 +15,7 @@ import { LOADING_STEPS, loadingStep, mapsLink, priceRange, splitDish, takeMenuHi
 import { orderTip, type OrderPhrase } from "@/lib/order";
 import { useT } from "./I18n";
 import { svg } from "./icons";
+import Shokken from "./Shokken";
 
 const ATTRIBUTION_STYLE = { fontFamily: "Roboto, Arial, Helvetica, sans-serif", fontWeight: 400, color: "#5E5E5E", fontSize: 12 } as const;
 
@@ -68,12 +69,16 @@ function WaitBar() {
     const id = setTimeout(() => setGo(true), 30);
     return () => clearTimeout(id);
   }, []);
+  const move = "duration-[20000ms] ease-[cubic-bezier(0.15,0.75,0.3,1)] motion-reduce:transition-none";
+  // 11/23: 막대 끝을 식권이가 달려감 (찾으러 뛰는 중)
   return (
-    <div className="h-1 w-full overflow-hidden rounded-full bg-[#ECEAE3]" aria-hidden="true">
-      <div
-        className="h-full rounded-full bg-[#2457C5] transition-[width] duration-[20000ms] ease-[cubic-bezier(0.15,0.75,0.3,1)] motion-reduce:transition-none"
-        style={{ width: go ? "95%" : "4%" }}
-      />
+    <div className="relative pt-[38px]" aria-hidden="true">
+      <div className={`absolute bottom-0.5 transition-[left] ${move}`} style={{ left: `calc(${go ? 95 : 4}% - 22px)` }}>
+        <Shokken mood="run" size={36} />
+      </div>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-[#ECEAE3]">
+        <div className={`h-full rounded-full bg-[#2457C5] transition-[width] ${move}`} style={{ width: go ? "95%" : "4%" }} />
+      </div>
     </div>
   );
 }
