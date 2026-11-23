@@ -1,6 +1,6 @@
 // Supabase에서 가장 높은 가격 단계(1,190엔) 이하 가게를 읽어 옴 (화면에서 바로 조회. 서버는 잠들 수 있어서 거치지 않음)
 // 단계별로 거르는 건 화면에서 (lunch.ts underLimit과 같은 규칙)
-import { PRICE_TIERS, type LunchShop } from "./lunch";
+import { PRICE_TIERS, type LunchShop, inOsaka } from "./lunch";
 
 const MAX_LIMIT = Math.max(...PRICE_TIERS);
 const UNDER_MAX = `or=(typical_lunch_price.lte.${MAX_LIMIT},and(typical_lunch_price.is.null,lunch_price_max.lte.${MAX_LIMIT}))`;
@@ -68,6 +68,7 @@ async function fetchShops(filter: string): Promise<LunchShop[]> {
   return rows.flatMap((r) => {
     const s = r.shops;
     if (!s || s.lat === null || s.lng === null || !r.lunch_days) return [];
+    if (!inOsaka({ lat: s.lat, lng: s.lng })) return []; // 좌표가 오사카 밖이면 데이터 오류로 보고 뺌 (11/23)
     return [
       {
         id: r.shop_id,
