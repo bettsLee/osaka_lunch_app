@@ -3,6 +3,7 @@
 # - 가게는 앱 기본 화면과 같게: 990엔 이하 · 화요일 점심 영업 · 좌표가 오사카 안
 # - 공개 저장소라 기록에는 숫자만 (가게 ID · 이름 · 메뉴 글은 남기지 않음. 구글 지도 답은 저장 금지)
 # - 익명 로그인 한 번 (앱과 같은 방식). 만든 익명 사용자에는 purpose=menu-hit-test 표시
+# - 11/23 다시 돌림 (출시 전 점검 ④): 자동 재시도 · AI 추측(11/17 OL-69) 배포 뒤 같은 30곳. 11/17 첫 테스트는 16/30
 import json
 import os
 import random
@@ -105,6 +106,7 @@ def main():
     ok_ms = sorted(r["ms"] for r in shown)
     print("\n===== 요약 =====")
     print(f"메뉴가 뜬 곳: {len(shown)}/{N}")
+    print(f"메뉴가 뜬 곳 (구글 지도 + AI 추측): {sum(r['status'] in ('ok', 'guess') for r in results)}/{N}")
     print(f"status: {count('status')}")
     print(f"place (구글 지도 기준 점심 영업): {count('place')}")
     print(f"kind (뜬 곳 중): { {k: v for k, v in count('kind').items()} }")
