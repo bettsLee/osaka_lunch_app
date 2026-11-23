@@ -107,3 +107,44 @@ body {
   opacity: 0.7;
   box-shadow: none;
 }
+
+/* S0 식권 발매기 (11/23): 처음 열 때 한 번만 고른 버튼에 불이 들어오고(깜빡 → 켜짐) 식권이 나옴 */
+.first-lit {
+  background: #ffd84a;
+  box-shadow: 0 3px 0 #d9a900, 0 0 0 4px rgba(255, 216, 74, 0.35), 0 0 22px rgba(255, 216, 74, 0.55);
+  animation: first-lamp 0.9s ease-out both;
+}
+@keyframes first-lamp {
+  0%,
+  40%,
+  60% {
+    background: #f3f5fa;
+    box-shadow: 0 3px 0 #c6cddc;
+  }
+  50%,
+  70%,
+  100% {
+    background: #ffd84a;
+    box-shadow: 0 3px 0 #d9a900, 0 0 0 4px rgba(255, 216, 74, 0.35), 0 0 22px rgba(255, 216, 74, 0.55);
+  }
+}
+/* 식권 아래 끝은 뜯은 자국 (작은 반원 구멍) */
+.first-ticket {
+  -webkit-mask: radial-gradient(circle 3px at 50% 100%, transparent 98%, #000) 0 0 / 9px 100% repeat-x;
+  mask: radial-gradient(circle 3px at 50% 100%, transparent 98%, #000) 0 0 / 9px 100% repeat-x;
+  animation: first-ticket 0.5s 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes first-ticket {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-lit,
+  .first-ticket {
+    animation: none;
+  }
+}
