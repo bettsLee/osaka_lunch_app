@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { arriveVisit } from "@/lib/api";
 import { useT } from "./I18n";
+import Shokken from "./Shokken";
 
 type Props = {
   visitId: string;
@@ -43,6 +44,7 @@ export default function ArriveSheet({ visitId, shopName, limit, by, onClose, onO
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
+            <Shokken mood="found" size={64} className="-ml-1.5 mb-1" />
             {by === "auto" && <p className="text-[13px] text-[#5F5E58]">{t("arrive.auto")}</p>}
             <h1 ref={title} id="arrive-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
               {t("arrive.title")}

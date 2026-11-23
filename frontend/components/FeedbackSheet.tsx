@@ -7,6 +7,7 @@ import { track, trackError } from "@/lib/analytics";
 import { sendFeedback } from "@/lib/api";
 import { addsToZukan, canSubmit, chosenLabel, EMPTY_ANSWERS, feedbackBody, type Answers, type PendingVisit } from "@/lib/visits";
 import { useT } from "./I18n";
+import Shokken from "./Shokken";
 
 type Props = { visit: PendingVisit; onClose: () => void; onOpenZukan: () => void };
 
@@ -60,6 +61,7 @@ export default function FeedbackSheet({ visit, onClose, onOpenZukan }: Props) {
 
         {state === "done" ? (
           <>
+            <Shokken mood="found" size={72} className="-ml-1.5" />
             <h1 ref={title} id="feedback-title" tabIndex={-1} className="text-2xl font-semibold outline-none">
               {t("feedback.thanks")}
             </h1>

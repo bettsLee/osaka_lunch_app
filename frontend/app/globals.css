@@ -128,11 +128,13 @@ body {
     box-shadow: 0 3px 0 #d9a900, 0 0 0 4px rgba(255, 216, 74, 0.35), 0 0 22px rgba(255, 216, 74, 0.55);
   }
 }
-/* 식권 아래 끝은 뜯은 자국 (작은 반원 구멍) */
+/* 식권 아래 끝은 뜯은 자국 (작은 반원 구멍). 손은 종이 밖이라 움직임과 모양을 나눔 */
 .first-ticket {
+  animation: first-ticket 0.5s 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.first-ticket-paper {
   -webkit-mask: radial-gradient(circle 3px at 50% 100%, transparent 98%, #000) 0 0 / 9px 100% repeat-x;
   mask: radial-gradient(circle 3px at 50% 100%, transparent 98%, #000) 0 0 / 9px 100% repeat-x;
-  animation: first-ticket 0.5s 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes first-ticket {
   from {
@@ -145,6 +147,24 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .first-lit,
   .first-ticket {
+    animation: none;
+  }
+}
+
+/* 식권이 (11/23 마스코트): 기다리는 동안 제자리에서 통통 */
+.shokken-bob {
+  animation: shokken-bob 0.8s ease-in-out infinite alternate;
+}
+@keyframes shokken-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shokken-bob {
     animation: none;
   }
 }
