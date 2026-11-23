@@ -12,7 +12,8 @@ export const viewport: Viewport = {
 const PREVIEW_TITLE = "Osaka ¥990 Lunch | 大阪990円ランチ";
 const PREVIEW_TEXT =
   "Today's lunch near you for ¥990 or less, picked in one tap. 今日ランチ営業中の990円以下のお店をルーレットで1軒選びます。";
-const PREVIEW_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: "Osaka ¥990 Lunch" };
+// 11/23: 식권이 그림으로 바꾼 뒤 카톡에 예전 그림이 계속 나와서 주소 뒤에 버전을 붙임 (카카오는 그림 주소 기준으로 따로 저장함). 그림을 또 바꾸면 v를 올림
+const PREVIEW_IMAGE = { url: "/og.png?v=2", width: 1200, height: 630, alt: "Osaka ¥990 Lunch" };
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://osaka-lunch-app.vercel.app"), // 미리보기 그림 주소를 운영 주소로
