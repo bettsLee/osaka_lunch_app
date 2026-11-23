@@ -168,3 +168,66 @@ body {
     animation: none;
   }
 }
+
+/* 식권이 달리기 (11/23): 다리 · 팔은 엉덩이 · 어깨를 축으로 번갈아, 몸은 발 디딜 때마다 통통 */
+.shokken-run g {
+  transform-box: view-box;
+}
+.shokken-leg-a,
+.shokken-leg-b {
+  animation: shokken-leg 0.32s ease-in-out infinite alternate;
+}
+.shokken-leg-a {
+  transform-origin: 82px 176px;
+}
+.shokken-leg-b {
+  transform-origin: 118px 176px;
+  animation-delay: -0.32s;
+}
+.shokken-arm-a,
+.shokken-arm-b {
+  animation: shokken-arm 0.32s ease-in-out infinite alternate;
+}
+.shokken-arm-a {
+  transform-origin: 54px 112px;
+  animation-delay: -0.32s;
+}
+.shokken-arm-b {
+  transform-origin: 146px 112px;
+}
+.shokken-run .shokken-hop {
+  animation: shokken-hop 0.16s ease-in-out infinite alternate;
+}
+@keyframes shokken-leg {
+  from {
+    transform: rotate(-30deg);
+  }
+  to {
+    transform: rotate(30deg);
+  }
+}
+@keyframes shokken-arm {
+  from {
+    transform: rotate(-35deg);
+  }
+  to {
+    transform: rotate(35deg);
+  }
+}
+@keyframes shokken-hop {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shokken-leg-a,
+  .shokken-leg-b,
+  .shokken-arm-a,
+  .shokken-arm-b,
+  .shokken-run .shokken-hop {
+    animation: none;
+  }
+}
