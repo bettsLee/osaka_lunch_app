@@ -567,15 +567,10 @@ export default function HomeScreen() {
     <main className={mainClass} style={mainFont}>
       {(mode === "home" || mode === "spin") && (
         <header className="flex flex-col gap-3 px-5 pb-3 pt-5">
-          {/* 11/23: 제목 줄 오른쪽에서 식권이가 손 흔듦 (상권 '지금 위치 근처 저기에 자연스럽게') */}
-          <div className="-mb-2 -mt-2.5 flex items-center justify-between gap-2">
-            <h1 className="flex min-w-0 items-center gap-1.5 text-[17px] font-semibold">
-              <PinIcon />
-              {area ? t("home.near", { area }) : t("home.nearHere")}
-            </h1>
-            {/* 룰렛 동안에는 아래 칸에서 식권이가 달리니 여기는 숨김 (자리는 그대로 둬서 지도가 안 움직이게) */}
-            <Shokken size={56} className={`-mr-1 flex-none ${mode === "spin" ? "invisible" : ""}`} />
-          </div>
+          <h1 className="flex items-center gap-1.5 text-[17px] font-semibold">
+            <PinIcon />
+            {area ? t("home.near", { area }) : t("home.nearHere")}
+          </h1>
           {/* 작은 화면 · 큰 글자에서 칩 글자가 두 줄로 깨지지 않게 한 줄 + 가로 스크롤 (10/22 기기 점검) */}
           {mode === "home" && (
             <div className="-mx-5 flex gap-2 overflow-x-auto px-5">
@@ -833,14 +828,21 @@ export default function HomeScreen() {
               />
             )}
             {!goingNow && !sheetHidden && (
-              <button
-                type="button"
-                disabled={pool.length === 0}
-                onClick={spin}
-                className="h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
-              >
-                {t("home.spin")}
-              </button>
+              // 11/23: 식권이가 버튼 뒤에서 빼꼼 (한 손은 흔들고 한 손은 버튼 위 끝을 잡음). 고를 가게가 없으면 배고파
+              <div className="relative mt-12 flex flex-col">
+                <Shokken mood={pool.length === 0 ? "hungry" : "base"} size={84} className="absolute -top-[60px] right-5" />
+                <button
+                  type="button"
+                  disabled={pool.length === 0}
+                  onClick={spin}
+                  className="relative h-14 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
+                >
+                  {t("home.spin")}
+                </button>
+                <svg viewBox="0 0 16 16" className="absolute -top-[7px] right-[26px] h-3.5 w-3.5" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" fill="#fff" stroke="#1F1F1C" strokeWidth={2.2} />
+                </svg>
+              </div>
             )}
             </div>
             {!goingNow && !sheetHidden && rows.length > 0 && (
