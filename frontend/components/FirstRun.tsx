@@ -52,10 +52,11 @@ function Led({ value }: { value: number }) {
 export default function FirstRun({ onStart }: Props) {
   const { t, machine } = useT();
   const limit = DEFAULT_LIMIT.toLocaleString("ja-JP");
-  // 세로가 짧은 폰(760px 이하, 아이폰 SE 등)은 간격을 줄이고 식권을 빼서 시작 버튼이 첫 화면에 보이게
+  // 세로가 짧은 화면(760px 이하: 아이폰 SE, 노트북 브라우저 등)은 간격 · 글자 · 식권을 줄여서 시작 버튼이 첫 화면에 보이게
+  // (11/23 처음엔 식권을 뺐는데, 노트북 브라우저에서 식권이가 안 보여서 작게 남기는 쪽으로 바꿈)
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto px-6 pb-7 pt-10 [@media(max-height:760px)]:gap-4 [@media(max-height:760px)]:pt-6">
-      <div className="relative flex-none rounded-[22px] bg-[#2457C5] px-3.5 pt-3.5 shadow-[inset_0_-6px_0_#1A3F91] [@media(max-height:760px)]:pb-5" aria-hidden="true">
+    <div className="flex h-full flex-col gap-6 overflow-y-auto px-6 pb-7 pt-10 [@media(max-height:760px)]:gap-4 [@media(max-height:760px)]:pb-5 [@media(max-height:760px)]:pt-6">
+      <div className="relative flex-none rounded-[22px] bg-[#2457C5] px-3.5 pt-3.5 shadow-[inset_0_-6px_0_#1A3F91]" aria-hidden="true">
         <div className="flex items-center gap-2.5">
           <div className="flex h-[50px] flex-1 items-center justify-end gap-1.5 rounded-[10px] bg-[#1B2233] px-3.5 shadow-[inset_0_2px_0_rgba(0,0,0,0.35)]">
             <span className="-skew-x-6 text-xl font-extrabold text-[#FF6A3D]">¥</span>
@@ -70,7 +71,7 @@ export default function FirstRun({ onStart }: Props) {
           {BUTTONS.map((b) => (
             <div
               key={b.genre}
-              className={`flex min-h-[60px] flex-col [@media(max-height:760px)]:min-h-[54px] justify-between gap-1 rounded-[9px] px-[9px] pb-1.5 pt-[7px] ${b.lit ? "first-lit" : "bg-[#F3F5FA] shadow-[0_3px_0_#C6CDDC]"}`}
+              className={`flex min-h-[60px] flex-col [@media(max-height:760px)]:min-h-[50px] justify-between gap-1 rounded-[9px] px-[9px] pb-1.5 pt-[7px] ${b.lit ? "first-lit" : "bg-[#F3F5FA] shadow-[0_3px_0_#C6CDDC]"}`}
             >
               <span className={`text-xs font-semibold leading-tight ${b.lit ? "text-[#4A3A00]" : "text-[#3A3F4B]"}`}>{t(`genre.${b.genre}`)}</span>
               <span className="text-right text-[15px] font-extrabold">{b.price}</span>
@@ -78,10 +79,10 @@ export default function FirstRun({ onStart }: Props) {
           ))}
         </div>
 
-        <div className="relative -mx-3.5 mt-3.5 h-[66px] overflow-hidden [@media(max-height:760px)]:hidden">
+        <div className="relative -mx-3.5 mt-3.5 h-[66px] overflow-hidden [@media(max-height:760px)]:mt-2.5 [@media(max-height:760px)]:h-[52px]">
           <span className="absolute inset-x-[22%] top-0 z-10 h-2.5 rounded-full bg-[#0F2560]" />
           {/* 나오는 식권 = 마스코트 식권이 (11/23): 얼굴 · 고른 가게 가격, 양손을 들고 나옴 */}
-          <div className="first-ticket absolute inset-x-[26%] top-1 h-[58px]">
+          <div className="first-ticket absolute inset-x-[26%] top-1 h-[58px] [@media(max-height:760px)]:h-[46px]">
             <svg viewBox="0 0 24 26" className="absolute -left-[19px] top-3 h-[26px] w-6 overflow-visible">
               <path d="M24 18 q-12 -2 -15 -12" fill="none" stroke="#1F1F1C" strokeWidth={2.6} strokeLinecap="round" />
               <circle cx="8.5" cy="5" r="3.6" fill="#fff" stroke="#1F1F1C" strokeWidth={2} />
@@ -101,11 +102,11 @@ export default function FirstRun({ onStart }: Props) {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <h1 className="whitespace-pre-line text-[27px] font-extrabold leading-[1.32] tracking-[-0.02em]">{t("first.title", { limit })}</h1>
+        <h1 className="whitespace-pre-line text-[27px] font-extrabold leading-[1.32] tracking-[-0.02em] [@media(max-height:760px)]:text-[24px]">{t("first.title", { limit })}</h1>
         <p className="text-[15px] leading-relaxed text-[#5F5E58]">{t("first.body", { limit })}</p>
       </div>
 
-      <ul className="flex flex-col gap-3 text-[15px]">
+      <ul className="flex flex-col gap-3 text-[15px] [@media(max-height:760px)]:gap-2">
         {(["first.point1", "first.point2", "first.point3"] as const).map((key) => (
           <li key={key} className="flex items-center gap-2.5">
             <svg {...svg} width={20} height={20} strokeWidth={2.4} className="flex-none text-[#2457C5]">
