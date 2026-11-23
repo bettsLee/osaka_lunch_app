@@ -828,16 +828,18 @@ export default function HomeScreen() {
               />
             )}
             {!goingNow && !sheetHidden && (
-              <button
-                type="button"
-                disabled={pool.length === 0}
-                onClick={spin}
-                className="flex h-14 items-center justify-center gap-2 rounded-[14px] bg-[#2457C5] text-lg font-semibold text-white disabled:opacity-50"
-              >
-                {/* 11/23: 정해 주는 건 식권이 (누르면 룰렛 동안 달림) */}
-                <Shokken size={38} className="-my-1 -ml-2 flex-none" />
-                {t("home.spin")}
-              </button>
+              // 11/23: 정해 주는 건 식권이. 버튼 옆에 크게 서 있다가(고를 가게가 없으면 배고파) 누르면 룰렛 동안 달림
+              <div className="flex items-end gap-1.5">
+                <Shokken mood={pool.length === 0 ? "hungry" : "base"} size={92} className="-mb-1 -ml-3 flex-none" />
+                <button
+                  type="button"
+                  disabled={pool.length === 0}
+                  onClick={spin}
+                  className="h-14 min-w-0 flex-1 rounded-[14px] bg-[#2457C5] px-3 text-lg font-semibold leading-tight text-white disabled:opacity-50"
+                >
+                  {t("home.spin")}
+                </button>
+              </div>
             )}
             </div>
             {!goingNow && !sheetHidden && rows.length > 0 && (
