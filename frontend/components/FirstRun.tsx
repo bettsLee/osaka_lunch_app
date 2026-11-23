@@ -6,6 +6,7 @@
 import { DEFAULT_LIMIT } from "@/lib/lunch";
 import { useT } from "./I18n";
 import { svg } from "./icons";
+import { Face } from "./Shokken";
 
 type Props = { onStart: () => void };
 
@@ -79,9 +80,22 @@ export default function FirstRun({ onStart }: Props) {
 
         <div className="relative -mx-3.5 mt-3.5 h-[66px] overflow-hidden [@media(max-height:760px)]:hidden">
           <span className="absolute inset-x-[22%] top-0 z-10 h-2.5 rounded-full bg-[#0F2560]" />
-          <div className="first-ticket absolute inset-x-[26%] top-1 flex h-[58px] items-center justify-between gap-2 rounded-b bg-white px-3 pb-1.5 pt-2">
-            <span className="min-w-0 truncate text-[11px] font-semibold text-[#5F5E58]">{t(`genre.${PICKED.genre}`)}</span>
-            <span className="text-xl font-black tracking-tight">{PICKED.price}</span>
+          {/* 나오는 식권 = 마스코트 식권이 (11/23): 얼굴 · 고른 가게 가격, 양손을 들고 나옴 */}
+          <div className="first-ticket absolute inset-x-[26%] top-1 h-[58px]">
+            <svg viewBox="0 0 24 26" className="absolute -left-[19px] top-3 h-[26px] w-6 overflow-visible">
+              <path d="M24 18 q-12 -2 -15 -12" fill="none" stroke="#1F1F1C" strokeWidth={2.6} strokeLinecap="round" />
+              <circle cx="8.5" cy="5" r="3.6" fill="#fff" stroke="#1F1F1C" strokeWidth={2} />
+            </svg>
+            <svg viewBox="0 0 24 26" className="absolute -right-[19px] top-3 h-[26px] w-6 -scale-x-100 overflow-visible">
+              <path d="M24 18 q-12 -2 -15 -12" fill="none" stroke="#1F1F1C" strokeWidth={2.6} strokeLinecap="round" />
+              <circle cx="8.5" cy="5" r="3.6" fill="#fff" stroke="#1F1F1C" strokeWidth={2} />
+            </svg>
+            <div className="first-ticket-paper flex h-full items-center justify-between gap-2 rounded-b bg-white px-3 pb-1.5 pt-2">
+              <svg viewBox="66 88 68 40" className="h-[28px] w-auto flex-none">
+                <Face mood="found" />
+              </svg>
+              <span className="text-xl font-black tracking-tight">{PICKED.price}</span>
+            </div>
           </div>
         </div>
       </div>
