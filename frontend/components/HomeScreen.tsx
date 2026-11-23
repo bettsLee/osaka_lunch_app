@@ -19,6 +19,7 @@ import { arrivedNear, stillGoing, type Going, type PendingVisit } from "@/lib/vi
 import ArriveSheet from "./ArriveSheet";
 import FeedbackSheet from "./FeedbackSheet";
 import FirstRun from "./FirstRun";
+import Shokken from "./Shokken";
 import { GoingBar, GoingPanel } from "./GoingCard";
 import InstallHint from "./InstallHint";
 import GoScreen from "./GoScreen";
@@ -792,7 +793,10 @@ export default function HomeScreen() {
                 {near.widened && near.shops.length > 0 && <p>{t("home.widened", { radius: near.radiusKm })}</p>}
                 {near.shops.length === 0 && (
                   <>
-                    <p>{t("home.none", { limit: yen(limit) })}</p>
+                    <p className="flex items-center gap-3">
+                      <Shokken mood="hungry" size={52} className="flex-none" />
+                      {t("home.none", { limit: yen(limit) })}
+                    </p>
                     {data.status === "ok" && <AreaPicker shops={data.shops} onPick={(code) => chooseArea(code, "none")} className="pt-1" />}
                   </>
                 )}

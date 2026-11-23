@@ -10,6 +10,7 @@ import { isIOS, type PushState } from "@/lib/push";
 import { ALLERGENS, hasDiet, loadDiet, saveDiet, STYLES, type Allergen, type Diet } from "@/lib/diet";
 import { useT } from "./I18n";
 import { svg } from "./icons";
+import Shokken from "./Shokken";
 
 type View = "main" | "privacy" | "terms" | "opinion" | "diet";
 
@@ -245,6 +246,7 @@ function OpinionForm({ onBack }: { onBack: () => void }) {
       <section className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 pb-6 pt-4">
         {state === "sent" ? (
           <>
+            <Shokken mood="found" size={72} className="-ml-1.5" />
             <p className="text-xl font-semibold" aria-live="polite">{t("opinion.sent")}</p>
             <p className="text-[15px] leading-relaxed text-[#5F5E58]">{t("opinion.sentBody")}</p>
             <button type="button" onClick={() => setState("write")} className="h-12 rounded-[14px] border border-[#CFCCC2] text-base">

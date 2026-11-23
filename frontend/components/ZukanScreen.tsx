@@ -16,6 +16,7 @@ import {
 import { useT } from "./I18n";
 import { Heart } from "./FeedbackSheet";
 import Waiting from "./Waiting";
+import Shokken from "./Shokken";
 
 
 const LunchMap = dynamic(() => import("./LunchMap"), { ssr: false });
@@ -185,7 +186,8 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
       <section className="flex flex-1 flex-col overflow-y-auto px-5 pb-4 pt-2">
         {state.status === "loading" && <Waiting text={t("zukan.loading")} />}
         {state.status === "error" && (
-          <div className="flex flex-col items-center gap-3 py-8 text-sm text-[#5F5E58]">
+          <div className="flex flex-col items-center gap-3 py-8 text-center text-sm text-[#5F5E58]">
+            <Shokken mood="hungry" size={84} />
             <p>{t("zukan.error")}</p>
             <button type="button" onClick={load} className="h-11 rounded-xl border border-[#CFCCC2] bg-white px-4 text-[#1F1F1C]">
               {t("home.retry")}
@@ -195,6 +197,7 @@ export default function ZukanScreen({ shops, here, nearby, onGoLunch }: Props) {
         {state.status === "ok" && items.length === 0 && (
           // 10/22 화면 점검 10: 빈 도감에 다음 행동
           <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <Shokken size={96} />
             <p className="text-base font-semibold">{t("zukan.empty")}</p>
             <p className="max-w-[300px] text-sm leading-relaxed text-[#5F5E58]">{t("zukan.emptyHow")}</p>
             <button type="button" onClick={onGoLunch} className="mt-1 h-12 rounded-[14px] bg-[#2457C5] px-6 text-base font-semibold text-white">
