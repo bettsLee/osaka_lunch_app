@@ -51,6 +51,13 @@ jobs:
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
           SUPABASE_URL: https://test-project.supabase.co  # 테스트용 가짜 주소 (토큰은 테스트가 직접 만듦)
 
+      # 11/23: 서버(Render)가 쓰는 이미지를 그대로 빌드해서, Dockerfile이 깨지지 않았는지와 실제 자바 버전을 PR 화면에 남김
+      - name: 서버 이미지 빌드 · 자바 버전
+        run: |
+          docker build -t osaka-api .
+          v=$(docker run --rm --entrypoint java osaka-api -version 2>&1 | head -2 | tail -1)
+          echo "::notice title=서버 자바 버전::$v"
+
       # 실패하면 원인 몇 줄을 PR 화면의 알림으로 남김 (로그를 열지 않아도 보이게)
       - name: 실패 원인 요약
         if: failure()
