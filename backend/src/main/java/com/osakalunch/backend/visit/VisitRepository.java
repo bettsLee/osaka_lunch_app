@@ -1,7 +1,6 @@
 package com.osakalunch.backend.visit;
 
 import jakarta.persistence.LockModeType;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,10 +15,6 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
 
     /** 내가 가장 최근에 고른 기록 (from 뒤에 고른 것 중, 취소 · 답 여부와 상관없이) */
     Optional<Visit> findFirstByUserIdAndChosenAtAfterOrderByChosenAtDesc(UUID userId, Instant from);
-
-    /** 도감: 도착했거나 '네, 다녀왔어요'라고 답한 기록, 최근 것부터. 가게가 닫혀 있던 곳은 먹지 않았으니 뺌 (10/23 결정) */
-    @Query("select v from Visit v where v.userId = :userId and v.visited = true and (v.openOk is null or v.openOk = true) order by v.chosenAt desc")
-    List<Visit> findZukan(@Param("userId") UUID userId, Pageable page);
 
     /** 또 갈래요를 켜고 끌 때: 그 가게에 다녀온 기록 모두 */
     List<Visit> findByUserIdAndShopIdAndVisitedTrue(UUID userId, String shopId);
