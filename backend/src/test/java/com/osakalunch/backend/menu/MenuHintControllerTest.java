@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,10 +35,13 @@ class MenuHintControllerTest {
     @Autowired ShopRepository shops;
     @MockitoBean MenuHintClient client;
     @MockitoBean PlacePhotosClient photos;
+    @Autowired DailyQuota quota;
+    @Autowired JdbcTemplate db;
 
     @BeforeEach
     void setUp() {
         shops.deleteAll();
+        db.update("delete from daily_usage");
         shops.save(new Shop("J1", "北極星", 34.65, 135.43));
         shops.save(new Shop("J2", "좌표 없음", null, null));
         when(client.ready()).thenReturn(true);
@@ -90,7 +94,7 @@ class MenuHintControllerTest {
     @Test
     void 하루_한도를_넘으면_묻지_않고_다음_날_다시() {
         Clock[] now = {Clock.fixed(Instant.parse("2026-11-17T03:00:00Z"), ZoneId.of("Asia/Tokyo"))};
-        MenuHintController c = new MenuHintController(shops, client, photos, 2, new Clock() {
+        MenuHintController c = new MenuHintController(shops, client, photos, quota, 2, new Clock() {
             @Override public ZoneId getZone() { return now[0].getZone(); }
             @Override public Clock withZone(ZoneId zone) { return this; }
             @Override public Instant instant() { return now[0].instant(); }
@@ -100,5 +104,14 @@ class MenuHintControllerTest {
         assertThat(c.take()).isFalse();
         now[0] = Clock.fixed(Instant.parse("2026-11-17T15:30:00Z"), ZoneId.of("Asia/Tokyo")); // 오사카 11/18 0:30
         assertThat(c.take()).isTrue();
+    }
+
+    @Test
+    void 서버가_다시_켜져도_그날_물은_횟수를_이어서_셈() {
+        Clock today = Clock.fixed(Instant.parse("2026-11-24T03:00:00Z"), ZoneId.of("Asia/Tokyo"));
+        MenuHintController before = new MenuHintController(shops, client, photos, quota, 2, today);
+        assertThat(before.take()).isTrue();
+        assertThat(before.take()).isTrue();
+        assertThat(new MenuHintController(shops, client, photos, quota, 2, today).take()).isFalse(); // 새로 켜진 서버도 막힘
     }
 }
