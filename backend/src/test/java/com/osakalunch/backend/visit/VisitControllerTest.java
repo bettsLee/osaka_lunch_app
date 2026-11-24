@@ -177,32 +177,6 @@ class VisitControllerTest {
     }
 
     @Test
-    void 도감은_다녀왔다고_답한_내_기록만_최근_것부터_닫혀_있던_곳은_뺌() throws Exception {
-        Visit older = saved(ALICE, Duration.ofDays(2));
-        older.answer(true, true, true, Instant.now());
-        visits.save(older);
-        Visit newer = saved(ALICE, Duration.ofHours(3));
-        newer.answer(true, true, false, Instant.now()); // 가격은 틀렸어도 먹은 곳
-        visits.save(newer);
-        Visit closed = saved(ALICE, Duration.ofHours(1));
-        closed.answer(true, false, null, Instant.now()); // 갔는데 닫혀 있었음 (10/23 결정: 도감에서 뺌)
-        visits.save(closed);
-        Visit notGone = saved(ALICE, Duration.ofHours(4));
-        notGone.answer(false, null, null, Instant.now());
-        visits.save(notGone);
-        saved(ALICE, Duration.ofHours(2)); // 아직 답 안 함
-        Visit bobs = saved(BOB, Duration.ofHours(3));
-        bobs.answer(true, true, true, Instant.now());
-        visits.save(bobs);
-
-        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].id").value(newer.getId().toString()))
-                .andExpect(jsonPath("$[1].id").value(older.getId().toString()));
-        mvc.perform(get("/api/visits/zukan")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
     void 도착하면_도감에_바로_들어가고_질문_카드는_가격만() throws Exception {
         Visit v = saved(ALICE, Duration.ofMinutes(70));
         String url = "/api/visits/" + v.getId() + "/arrive";
@@ -210,7 +184,6 @@ class VisitControllerTest {
         mvc.perform(as(ALICE, put(url)).content("{\"by\":\"gps\"}")).andExpect(status().isBadRequest());
         mvc.perform(as(ALICE, put(url)).content("{\"by\":\"auto\"}")).andExpect(status().isNoContent());
 
-        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(jsonPath("$.length()").value(1));
         mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent()); // 도착 직후엔 묻지 않음 (도착 45분 뒤부터)
 
         // 그 자리에서 영업 여부를 답함: 처음 도착 방법은 그대로
@@ -243,7 +216,6 @@ class VisitControllerTest {
         assertThat(answered.getPriceOk()).isNull();
         assertThat(answered.getAnsweredAt()).isNotNull();
         mvc.perform(as(ALICE, get("/api/visits/pending"))).andExpect(status().isNoContent());
-        mvc.perform(as(ALICE, get("/api/visits/zukan"))).andExpect(jsonPath("$.length()").value(0)); // 닫혀 있던 곳은 도감에 없음
         mvc.perform(as(ALICE, put("/api/visits/" + closed.getId() + "/arrive")).content("{\"by\":\"auto\"}"))
                 .andExpect(status().isConflict()); // 이미 답함
 
@@ -264,9 +236,8 @@ class VisitControllerTest {
         mvc.perform(as(ALICE, put("/api/visits/" + second.getId() + "/feedback"))
                         .content("{\"visited\":true,\"openOk\":true,\"priceOk\":false,\"again\":true}"))
                 .andExpect(status().isNoContent());
-        mvc.perform(as(ALICE, get("/api/visits/zukan")))
-                .andExpect(jsonPath("$[0].again").value(true))
-                .andExpect(jsonPath("$[1].again").isEmpty());
+        assertThat(visits.findById(second.getId()).orElseThrow().getAgain()).isTrue();
+        assertThat(visits.findById(first.getId()).orElseThrow().getAgain()).isNull();
 
         // 도감에서 끔: 그 가게에 다녀온 기록 모두
         mvc.perform(as(ALICE, put("/api/visits/again")).content("{\"shopId\":\"J000000001\",\"again\":false}"))
