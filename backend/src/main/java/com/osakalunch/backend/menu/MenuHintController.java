@@ -27,21 +27,21 @@ public class MenuHintController {
     private final ShopRepository shops;
     private final MenuHintClient client;
     private final PlacePhotosClient photos;
+    private final DailyQuota quota;
     private final int dailyLimit;
     private final Clock clock;
-    private LocalDate day;
-    private int used;
 
     @Autowired
-    public MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos,
+    public MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos, DailyQuota quota,
                               @Value("${menu-hint.daily-limit:150}") int dailyLimit) {
-        this(shops, client, photos, dailyLimit, Clock.system(OSAKA));
+        this(shops, client, photos, quota, dailyLimit, Clock.system(OSAKA));
     }
 
-    MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos, int dailyLimit, Clock clock) {
+    MenuHintController(ShopRepository shops, MenuHintClient client, PlacePhotosClient photos, DailyQuota quota, int dailyLimit, Clock clock) {
         this.shops = shops;
         this.client = client;
         this.photos = photos;
+        this.quota = quota;
         this.dailyLimit = dailyLimit;
         this.clock = clock;
     }
@@ -62,15 +62,8 @@ public class MenuHintController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(hint);
     }
 
-    /** 오사카 날짜 기준 하루 한도 (서버가 다시 시작하면 0부터. 무료 서버 한 대라 이 정도로 충분) */
-    synchronized boolean take() {
-        LocalDate today = LocalDate.now(clock);
-        if (!today.equals(day)) {
-            day = today;
-            used = 0;
-        }
-        if (used >= dailyLimit) return false;
-        used++;
-        return true;
+    /** 오사카 날짜 기준 하루 한도. 쓴 수는 DB에 세서 서버가 다시 켜져도 이어짐 (11/24, OL-93) */
+    boolean take() {
+        return quota.take(LocalDate.now(clock), "menu_hint", 1, dailyLimit) == 1;
     }
 }
