@@ -276,7 +276,7 @@ export async function sendOpinion(message: string, lang: string): Promise<"sent"
 }
 
 // 도감(S6): Supabase에서 내 기록을 바로 읽음 (10/26 결정: Render 무료 서버가 잠들어 있으면 도감이 최대 1분 늦게 떠서).
-// 규칙은 서버(GET /api/visits/zukan)와 같음: 다녀온 기록(도착 또는 '네, 다녀왔어요') 중 닫혀 있던 곳은 빼고, 최근 것부터 200개.
+// 규칙: 다녀온 기록(도착 또는 '네, 다녀왔어요') 중 닫혀 있던 곳은 빼고, 최근 것부터 200개 (예전 서버 GET /api/visits/zukan과 같은 규칙, 서버 쪽은 11/24에 지움).
 // 내 기록만 읽을 수 있음 (013 SQL의 RLS 정책). 보관해 둔 '여기 갈래요' · 도착은 기다리지 않음
 const ZUKAN_QUERY = "select=shop_id,chosen_at,again&visited=is.true&or=(open_ok.is.null,open_ok.is.true)&order=chosen_at.desc&limit=200";
 export async function fetchZukan(): Promise<ZukanVisit[]> {
