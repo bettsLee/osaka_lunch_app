@@ -27,18 +27,18 @@ public class PlacePhotosController {
     }
 
     private final PlacePhotosClient client;
+    private final DailyQuota quota;
     private final int dailyLimit;
     private final Clock clock;
-    private LocalDate day;
-    private int used;
 
     @Autowired
-    public PlacePhotosController(PlacePhotosClient client, @Value("${google.places.photos-daily-limit:33}") int dailyLimit) {
-        this(client, dailyLimit, Clock.system(MenuHintController.OSAKA));
+    public PlacePhotosController(PlacePhotosClient client, DailyQuota quota, @Value("${google.places.photos-daily-limit:33}") int dailyLimit) {
+        this(client, quota, dailyLimit, Clock.system(MenuHintController.OSAKA));
     }
 
-    PlacePhotosController(PlacePhotosClient client, int dailyLimit, Clock clock) {
+    PlacePhotosController(PlacePhotosClient client, DailyQuota quota, int dailyLimit, Clock clock) {
         this.client = client;
+        this.quota = quota;
         this.dailyLimit = dailyLimit;
         this.clock = clock;
     }
@@ -54,19 +54,12 @@ public class PlacePhotosController {
     }
 
     /** 받지 못한 장 수만큼 오늘 한도를 되돌림 */
-    synchronized void giveBack(int n) {
-        used = Math.max(0, used - Math.max(0, n));
+    void giveBack(int n) {
+        quota.giveBack(LocalDate.now(clock), "place_photos", n);
     }
 
-    /** 오늘 남은 장 수 안에서 최대 want장 (오사카 날짜 기준, 서버가 다시 시작하면 0부터) */
-    synchronized int take(int want) {
-        LocalDate today = LocalDate.now(clock);
-        if (!today.equals(day)) {
-            day = today;
-            used = 0;
-        }
-        int n = Math.max(0, Math.min(want, dailyLimit - used));
-        used += n;
-        return n;
+    /** 오늘 남은 장 수 안에서 최대 want장 (오사카 날짜 기준. 쓴 수는 DB에 세서 서버가 다시 켜져도 이어짐, 11/24 OL-93) */
+    int take(int want) {
+        return quota.take(LocalDate.now(clock), "place_photos", want, dailyLimit);
     }
 }

@@ -1,9 +1,11 @@
 package com.osakalunch.backend.menu;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,6 +34,13 @@ class PlacePhotosControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean PlacePhotosClient client;
+    @Autowired DailyQuota quota;
+    @Autowired JdbcTemplate db;
+
+    @BeforeEach
+    void setUp() {
+        db.update("delete from daily_usage");
+    }
 
     @Test
     void 로그인하면_사진_6장까지와_올린_사람을_주고_저장하지_않게_함() throws Exception {
@@ -61,7 +70,7 @@ class PlacePhotosControllerTest {
     @Test
     void 하루_장_수_한도_안에서만_받고_다음_날_다시() {
         Clock[] now = {Clock.fixed(Instant.parse("2026-11-17T03:00:00Z"), ZoneId.of("Asia/Tokyo"))};
-        PlacePhotosController c = new PlacePhotosController(client, 7, new Clock() {
+        PlacePhotosController c = new PlacePhotosController(client, quota, 7, new Clock() {
             @Override public ZoneId getZone() { return now[0].getZone(); }
             @Override public Clock withZone(ZoneId zone) { return this; }
             @Override public Instant instant() { return now[0].instant(); }
@@ -79,8 +88,15 @@ class PlacePhotosControllerTest {
         when(client.ready()).thenReturn(true);
         PlacePhotosClient.Photo one = new PlacePhotosClient.Photo("https://lh3.googleusercontent.com/a", "Aiko", "", "");
         when(client.photos(anyString(), eq(6))).thenReturn(List.of(one, one));
-        PlacePhotosController c = new PlacePhotosController(client, 12, Clock.fixed(Instant.parse("2026-11-18T03:00:00Z"), ZoneId.of("Asia/Tokyo")));
+        PlacePhotosController c = new PlacePhotosController(client, quota, 12, Clock.fixed(Instant.parse("2026-11-18T03:00:00Z"), ZoneId.of("Asia/Tokyo")));
         assertThat(c.get("ChIJ1234567890").getBody().photos()).hasSize(2);
         assertThat(c.take(12)).isEqualTo(10); // 6장을 잡았다가 못 받은 4장은 돌려받음
+    }
+
+    @Test
+    void 서버가_다시_켜져도_그날_쓴_장_수를_이어서_셈() {
+        Clock today = Clock.fixed(Instant.parse("2026-11-24T03:00:00Z"), ZoneId.of("Asia/Tokyo"));
+        assertThat(new PlacePhotosController(client, quota, 7, today).take(6)).isEqualTo(6);
+        assertThat(new PlacePhotosController(client, quota, 7, today).take(6)).isEqualTo(1); // 새로 켜진 서버도 남은 1장만
     }
 }
