@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   areaCenters, DEFAULT_LIMIT, displayPrice, distanceKm, genreLabel, genresNearby, openNow, osakaNow, nextLunch, pickNearby, pickShop, priceBadge, priceLabel,
-  priceUnknown, rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
+  PICK_RADII_KM, priceUnknown, RADII_KM, rouletteCandidates, spinSteps, tierInfo, underLimit, walkMinutes,
   type LunchShop, type NearbyShop, type Point,
 } from "@/lib/lunch";
 import { fetchLunchShops, fetchUnknownPriceShops } from "@/lib/shops";
@@ -29,6 +29,7 @@ import Waiting from "./Waiting";
 import { svg } from "./icons";
 import GenreSheet from "./GenreSheet";
 import PriceSheet from "./PriceSheet";
+import RadiusSheet from "./RadiusSheet";
 import ResultCard from "./ResultCard";
 import SettingsScreen from "./SettingsScreen";
 import SharedScreen from "./SharedScreen";
@@ -46,6 +47,7 @@ const LIMIT_KEY = "osaka-lunch-price-limit"; // 고른 가격 상한은 이 휴�
 const STARTED_KEY = "osaka-lunch-started"; // S0 첫 실행에서 '내 위치로 시작하기'를 누른 적 있음
 const INSTALL_HINT_KEY = "osaka-lunch-install-hint-closed"; // 홈 화면 추가 안내를 닫음
 const GOING_KEY = "osaka-lunch-going"; // 여기 갈래요로 정한 가게 (지도의 파란 핀 · 결과 카드의 길찾기 · 취소)
+const RADIUS_KEY = "osaka-lunch-radius"; // 직접 고른 거리 km (11/28, 이 휴대폰에만 기억. 없으면 자동)
 const UNKNOWN_KEY = "osaka-lunch-unknown-price"; // '가격 모르는 곳도' 켬 (11/17, 이 휴대폰에만 기억)
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
@@ -73,6 +75,8 @@ export default function HomeScreen() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [genres, setGenres] = useState<string[]>([]); // 가게 종류 (11/28 베타 설문). 비어 있으면 전체. 오늘 고르는 것이라 기억하지 않음
   const [genreOpen, setGenreOpen] = useState(false);
+  const [radius, setRadius] = useState<number | null>(null); // 직접 고른 거리 (11/28 베타 설문). null이면 자동 (적으면 2km까지 넓힘)
+  const [radiusOpen, setRadiusOpen] = useState(false);
   const [installHint, setInstallHint] = useState(false); // 아이폰을 브라우저로 열었고 안내를 닫은 적 없음
   const [sheetHidden, setSheetHidden] = useState(false); // 손잡이를 눌러 아래 시트를 접고 지도를 크게 (10/22 도그푸딩)
   const [cardHidden, setCardHidden] = useState(false); // 결과 카드도 손잡이로 접고 지도를 크게 (새 결과가 나오면 다시 펼침)
@@ -187,6 +191,8 @@ export default function HomeScreen() {
     try {
       const saved = Number(localStorage.getItem(LIMIT_KEY));
       if (saved) setChosenLimit(saved);
+      const savedRadius = Number(localStorage.getItem(RADIUS_KEY));
+      if ((PICK_RADII_KM as readonly number[]).includes(savedRadius)) setRadius(savedRadius);
       if (localStorage.getItem(UNKNOWN_KEY) === "1") setWithUnknown(true);
     } catch {
       // 저장소를 못 쓰면 기본 990엔
@@ -255,24 +261,25 @@ export default function HomeScreen() {
 
   const { day, minutes } = osakaNow(now);
   // 가격 단계: 단계마다 근처 가게 수 · 잠금. 고른 단계가 여기서 잠기면 기본 990엔으로
+  const radii = useMemo(() => (radius ? [radius] : RADII_KM), [radius]);
   const tiers = useMemo(
-    () => (loc.status === "ok" && data.status === "ok" ? tierInfo(data.shops, loc.point, day) : null),
-    [loc, data, day],
+    () => (loc.status === "ok" && data.status === "ok" ? tierInfo(data.shops, loc.point, day, radii) : null),
+    [loc, data, day, radii],
   );
   const limit = tiers?.find((t) => t.limit === chosenLimit && !t.locked) ? chosenLimit : DEFAULT_LIMIT;
   const nearAll = useMemo(
     () =>
       loc.status === "ok" && data.status === "ok"
-        ? pickNearby(data.shops.filter((s) => underLimit(s, limit)), loc.point, day, withUnknown ? (unknownShops ?? []) : [])
+        ? pickNearby(data.shops.filter((s) => underLimit(s, limit)), loc.point, day, withUnknown ? (unknownShops ?? []) : [], radii)
         : null,
-    [loc, data, unknownShops, day, limit, withUnknown],
+    [loc, data, unknownShops, day, limit, withUnknown, radii],
   );
   // 종류를 고르면 그 종류만 다시 골라서, 가까이에 적으면 2km까지 넓힘 (가격 상한과 같은 방식)
   const near = useMemo(() => {
     if (!genres.length || loc.status !== "ok" || data.status !== "ok") return nearAll;
     const inGenre = (s: LunchShop) => genres.includes(s.genre);
-    return pickNearby(data.shops.filter((s) => underLimit(s, limit) && inGenre(s)), loc.point, day, withUnknown ? (unknownShops ?? []).filter(inGenre) : []);
-  }, [nearAll, genres, loc, data, unknownShops, day, limit, withUnknown]);
+    return pickNearby(data.shops.filter((s) => underLimit(s, limit) && inGenre(s)), loc.point, day, withUnknown ? (unknownShops ?? []).filter(inGenre) : [], radii);
+  }, [nearAll, genres, loc, data, unknownShops, day, limit, withUnknown, radii]);
   const genreOptions = useMemo(() => genresNearby(nearAll?.shops ?? []), [nearAll]);
   const nowKey = nowOnly ? minutes : -1; // '지금 영업 중'일 때만 1분마다 다시 거름 (아니면 핀이 매분 다시 그려짐)
   const visible = useMemo(() => {
@@ -389,6 +396,17 @@ export default function HomeScreen() {
       // 기억 못 해도 이번에는 적용
     }
     setPriceOpen(false);
+  };
+  const applyRadius = (next: number | null) => {
+    if (next !== radius) track("radius_change", { from: radius ?? "auto", to: next ?? "auto" });
+    setRadius(next);
+    try {
+      if (next) localStorage.setItem(RADIUS_KEY, String(next));
+      else localStorage.removeItem(RADIUS_KEY);
+    } catch {
+      // 기억 못 해도 이번에는 적용
+    }
+    setRadiusOpen(false);
   };
   const applyGenres = (next: string[]) => {
     track("genre_filter", { genres: next.join(","), count: next.length });
@@ -620,6 +638,19 @@ export default function HomeScreen() {
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => setRadiusOpen(true)}
+                aria-haspopup="dialog"
+                className={`flex h-9 flex-none items-center gap-1 whitespace-nowrap rounded-full border px-3.5 text-sm ${
+                  radius ? "border-[#2457C5] bg-[#E8EEFA] font-semibold text-[#1A3F91]" : "border-[#CFCCC2] bg-white"
+                }`}
+              >
+                {radius ? t("home.radiusChipOn", { radius }) : t("home.radiusChip")}
+                <svg {...svg} width={14} height={14} strokeWidth={2.5}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
               <Chip on={nowOnly} onClick={() => setNowOnly((v) => !v)}>{t("home.openNow")}</Chip>
               <Chip on={withUnknown} onClick={toggleUnknown}>{t("home.unknownPrice")}</Chip>
               <Chip on={byDistance} onClick={() => setByDistance((v) => !v)}>{t("home.byDistance")}</Chip>
@@ -731,6 +762,8 @@ export default function HomeScreen() {
         <PriceSheet tiers={tiers} current={limit} onApply={applyLimit} onClose={() => setPriceOpen(false)} />
       )}
 
+      {mode === "home" && radiusOpen && <RadiusSheet current={radius} onApply={applyRadius} onClose={() => setRadiusOpen(false)} />}
+
       {mode === "home" && genreOpen && (
         <GenreSheet genres={genreOptions} current={genres} onApply={applyGenres} onClose={() => setGenreOpen(false)} />
       )}
@@ -753,7 +786,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {mode === "home" && ask && !priceOpen && !genreOpen && !arrival && (
+      {mode === "home" && ask && !priceOpen && !genreOpen && !radiusOpen && !arrival && (
         <FeedbackSheet
           visit={{ ...ask, shopName: (data.status === "ok" ? known.find((s) => s.id === ask.shopId)?.name : undefined) ?? ask.shopName }}
           onClose={() => {
@@ -830,7 +863,9 @@ export default function HomeScreen() {
                   <>
                     <p className="flex items-center gap-3">
                       <Shokken mood="hungry" size={52} className="flex-none" />
-                      {t("home.none", { limit: yen(limit) })}
+                      {radius && radius < RADII_KM[RADII_KM.length - 1]
+                        ? t("home.noneRadius", { limit: yen(limit), radius })
+                        : t("home.none", { limit: yen(limit) })}
                     </p>
                     {genres.length > 0 && <p>{t("home.noneGenre")}</p>}
                     {data.status === "ok" && <AreaPicker shops={data.shops} onPick={(code) => chooseArea(code, "none")} className="pt-1" />}

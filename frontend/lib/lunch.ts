@@ -32,6 +32,8 @@ export type Point = { lat: number; lng: number };
 // 반경은 1km에서 시작해 가게가 이보다 적으면 넓힘 (10/21 결정: 20곳 유지)
 export const RADII_KM = [1, 1.5, 2];
 export const MIN_SHOPS = 20;
+// 거리 직접 고르기 (11/28 베타 설문 "검색 범위 지정"): 고르면 그 거리만 보고 넓히지 않음
+export const PICK_RADII_KM = [0.5, 1, 2] as const;
 
 // 가격 단계 (PRD: 790 / 990 / 1,190엔, 기본 990엔). 2km 안에 5곳이 안 되는 단계는 잠김
 export const PRICE_TIERS = [790, 990, 1190] as const;
@@ -149,11 +151,13 @@ export type NearbyShop = LunchShop & { km: number; walk: number };
 // 오늘 점심 영업하는 가게를 가까운 반경부터 보고, 20곳이 되는 첫 반경을 고름. 2km에서도 모자라면 2km 안 전부
 // extra(가격 모르는 가게, 11/17)는 같은 반경 안이면 함께 보여 주되 반경을 정하는 20곳에는 세지 않음
 // → 스위치를 켜도 가격이 확인된 가게가 반경이 좁아져 빠지는 일이 없음
+// radii: 거리를 직접 고르면 [그 거리] 하나만 (11/28)
 export function pickNearby(
   shops: LunchShop[],
   here: Point,
   day: Day,
   extra: LunchShop[] = [],
+  radii: readonly number[] = RADII_KM,
 ): { radiusKm: number; widened: boolean; shops: NearbyShop[] } {
   const near = (list: LunchShop[]) =>
     list
@@ -164,23 +168,23 @@ export function pickNearby(
       });
   const today = near(shops);
   const others = near(extra);
-  for (const radiusKm of RADII_KM) {
+  for (const radiusKm of radii) {
     const inside = today.filter((s) => s.km <= radiusKm);
-    const last = radiusKm === RADII_KM[RADII_KM.length - 1];
+    const last = radiusKm === radii[radii.length - 1];
     if (inside.length >= MIN_SHOPS || last) {
-      return { radiusKm, widened: radiusKm !== RADII_KM[0], shops: [...inside, ...others.filter((s) => s.km <= radiusKm)] };
+      return { radiusKm, widened: radiusKm !== radii[0], shops: [...inside, ...others.filter((s) => s.km <= radiusKm)] };
     }
   }
-  return { radiusKm: RADII_KM[0], widened: false, shops: [] }; // 도달하지 않음 (타입용)
+  return { radiusKm: radii[0], widened: false, shops: [] }; // 도달하지 않음 (타입용)
 }
 
 // 가격 단계 시트: 단계마다 오늘 보여줄 가게 수 · 반경, 2km 안 5곳 미만이면 잠김
 export type TierInfo = { limit: number; count: number; radiusKm: number; locked: boolean };
-export function tierInfo(shops: LunchShop[], here: Point, day: Day): TierInfo[] {
+export function tierInfo(shops: LunchShop[], here: Point, day: Day, radii: readonly number[] = RADII_KM): TierInfo[] {
   return PRICE_TIERS.map((limit) => {
-    const near = pickNearby(shops.filter((s) => underLimit(s, limit)), here, day);
-    // 2km 전에 멈췄으면 20곳 이상이라 충분. 2km까지 넓혔는데 5곳이 안 되면 잠금
-    const locked = near.radiusKm === RADII_KM[RADII_KM.length - 1] && near.shops.length < MIN_TIER_SHOPS;
+    const near = pickNearby(shops.filter((s) => underLimit(s, limit)), here, day, [], radii);
+    // 2km 전에 멈췄으면 20곳 이상이라 충분. 2km까지 넓혔는데 5곳이 안 되면 잠금 (거리를 고르면 그 거리 안에서)
+    const locked = near.radiusKm === radii[radii.length - 1] && near.shops.length < MIN_TIER_SHOPS;
     return { limit, count: near.shops.length, radiusKm: near.radiusKm, locked };
   });
 }

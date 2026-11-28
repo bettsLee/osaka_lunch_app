@@ -17,6 +17,7 @@ export type EventName =
   | "feedback_submit"
   | "price_limit_change"
   | "genre_filter" // 가게 종류로 고르기 (11/28 베타 설문)
+  | "radius_change" // 거리 직접 고르기 (11/28 베타 설문): from · to (km 또는 auto)
   | "unknown_price_toggle" // 가격 모르는 가게도 보기 (11/17, on: 켬 · 끔)
   | "push_permission" // '알림 받기'를 누른 결과 (허용률 확인용)
   | "order_open" // 결과 카드에서 '주문 도우미' (실험 1: 주문 문장 A/B)
