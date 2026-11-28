@@ -38,7 +38,10 @@ public class MenuHintClient {
     static final int MAX_SOURCES = 3;
     static final Duration MIN_RETRY = Duration.ofSeconds(4); // 다시 물을 시간이 이보다 적게 남으면 그만 (11/17 진단: 다시 묻기 3~4초)
 
-    /** 줄 이름은 영어로 고정해 읽기 쉽게, 값은 사용자 언어로. 가격 · 근거 줄은 화면에 안 쓰지만 이 형식이라야 메뉴를 더 꼼꼼히 찾음 (11/17 실험) */
+    /**
+     * 줄 이름은 영어로 고정해 읽기 쉽게, 값은 사용자 언어로. 가격 · 근거 줄은 화면에 안 쓰지만 이 형식이라야 메뉴를 더 꼼꼼히 찾음 (11/17 실험)
+     * MENU는 한 사람 점심 한 끼가 되는 주메뉴만 (11/28 베타 설문 "사이드 메뉴가 싼 가격인 경우가 많았음" → 반찬 · 토핑 · 음료 · 디저트 · 단품은 빼게 함)
+     */
     static final String PROMPT = """
             Find this restaurant on Google Maps.
             Name: %s
@@ -47,7 +50,7 @@ public class MenuHintClient {
             Answer in exactly these 5 lines and nothing else. Write the MENU, PRICE and BASIS values in %s.
             STATUS: Exactly one of these English words. OPEN: serves lunch on weekdays. NO_LUNCH: in business but not for weekday lunch. PERMANENTLY_CLOSED: only if Google Maps marks the place as permanently closed. UNKNOWN. Ignore whether it is open right now or today.
             KIND: LUNCH if the dishes in MENU are known to be served at weekday lunch (lunch sets, lunch menu), otherwise ALL
-            MENU: 2-3 dishes separated by " · ". Each dish: its name, its Japanese name in parentheses, then its price in yen as digits only if known (for example: 라멘 (ラーメン) 900). Prefer dishes served at weekday lunch; if unknown, the restaurant's signature dishes. UNKNOWN if there is no basis
+            MENU: 2-3 dishes separated by " · ". Each dish: its name, its Japanese name in parentheses, then its price in yen as digits only if known (for example: 라멘 (ラーメン) 900). Prefer dishes served at weekday lunch; if unknown, the restaurant's signature dishes. Only main dishes that make a full lunch for one person (a set meal, a rice bowl, noodles, curry and the like); never side dishes, toppings, add-ons, rice or soup on their own, single skewers or pieces, drinks or desserts. UNKNOWN if there is no basis
             PRICE: LUNCH followed by the weekday lunch price range in yen as digits (for example: LUNCH 800-1200). If there is no basis for lunch, ALL followed by the overall price range (for example: ALL 1000-3000). UNKNOWN if neither
             BASIS: what you looked at (reviews, menu info, place info)
             Do not make anything up.
