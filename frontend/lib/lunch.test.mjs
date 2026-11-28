@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, lunchTimeShort, lunchTimeText, openNow, osakaNow,
+  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, genresNearby, lunchTimeShort, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, priceUnknown, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
@@ -205,4 +205,10 @@ test("오사카 범위: 시내 가게는 안, 좌표가 도쿄로 들어간 가�
   assert.equal(inOsaka({ lat: 34.6851, lng: 135.5063 }), true); // 혼마치 근처
   assert.equal(inOsaka({ lat: 35.6896358166, lng: 139.6920866271 }), false); // 실제로 있던 데이터 오류 (주소는 혼마치)
   assert.equal(inOsaka({ lat: 0, lng: 0 }), false);
+});
+
+test("가게 종류: 근처에 있는 종류만, 많은 종류부터, 빈 종류는 뺌", () => {
+  const g = (genre) => ({ genre });
+  assert.deepEqual(genresNearby([g("和食"), g("ラーメン"), g("ラーメン"), g(""), g("中華"), g("ラーメン"), g("和食")]), ["ラーメン", "和食", "中華"]);
+  assert.deepEqual(genresNearby([]), []);
 });

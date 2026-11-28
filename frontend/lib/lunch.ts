@@ -83,6 +83,13 @@ export function genreLabel(genre: string, t: T): string {
   return GENRE_KEYS[genre] ? t(`genre.${GENRE_KEYS[genre]}`) : genre;
 }
 
+// 가게 종류로 고르기 (11/28 베타 설문): 근처 가게에 있는 종류만, 가게가 많은 종류부터. 종류가 비어 있는 가게는 뺌
+export function genresNearby(shops: { genre: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const s of shops) if (s.genre) counts.set(s.genre, (counts.get(s.genre) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([genre]) => genre);
+}
+
 // 오사카 범위 (11/23 출시 전 점검 ⑥): 핫페퍼 데이터에 주소는 오사카인데 좌표가 도쿄로 들어간 가게가 있었음.
 // 근처 목록에는 안 나오지만 '동네 골라서 보기'의 동네 가운데(좌표 평균)를 크게 밀어서, 이 범위 밖 가게는 화면에 싣지 않음 (데이터는 고치지 않음)
 export function inOsaka(p: Point): boolean {
