@@ -212,3 +212,11 @@ test("가게 종류: 근처에 있는 종류만, 많은 종류부터, 빈 종류
   assert.deepEqual(genresNearby([g("和食"), g("ラーメン"), g("ラーメン"), g(""), g("中華"), g("ラーメン"), g("和食")]), ["ラーメン", "和食", "中華"]);
   assert.deepEqual(genresNearby([]), []);
 });
+
+test("거리를 직접 고르면 그 거리만 보고 넓히지 않음", () => {
+  const r = pickNearby([...many(3, 0.4), ...many(30, 0.8)], HERE, "wed", [], [0.5]);
+  assert.equal(r.radiusKm, 0.5);
+  assert.equal(r.widened, false);
+  assert.equal(r.shops.length, 3);
+  assert.equal(pickNearby(many(3, 0.8), HERE, "wed", [], [0.5]).shops.length, 0);
+});
