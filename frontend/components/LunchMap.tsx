@@ -7,7 +7,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { maplibreGL } from "@maplibre/maplibre-gl-leaflet";
-import { priceLabel, priceUnknown, type NearbyShop, type Point } from "@/lib/lunch";
+import { genreIcon, priceLabel, priceUnknown, type NearbyShop, type Point } from "@/lib/lunch";
 import { useT } from "./I18n";
 
 type Props = {
@@ -135,7 +135,8 @@ export default function LunchMap({ here, radiusKm, shops, flashId = null, picked
         : priceUnknown(s)
           ? "price-pin is-unknown"
           : "price-pin";
-      pin.textContent = priceLabel(s, t);
+      const icon = genreIcon(s.genre); // 무슨 가게인지 지도에서 바로 (11/28)
+      pin.textContent = icon ? `${icon} ${priceLabel(s, t)}` : priceLabel(s, t);
       const z = (shops.length - i) * 10; // 겹치면 목록 앞쪽(싼 곳 · 가까운 곳)이 위로
       const marker = L.marker([s.lat, s.lng], {
         icon: L.divIcon({ className: "price-pin-icon", html: pin, iconSize: [0, 0] }),

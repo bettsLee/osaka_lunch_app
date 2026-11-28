@@ -85,6 +85,31 @@ export function genreLabel(genre: string, t: T): string {
   return GENRE_KEYS[genre] ? t(`genre.${GENRE_KEYS[genre]}`) : genre;
 }
 
+// 지도 핀의 종류 그림 (11/28 베타 설문 "메뉴 확인이 간단해지면": 지도에서는 무슨 가게인지 몰랐음). 그림이라 휴대폰 언어와 상관없음
+const GENRE_ICONS: Record<string, string> = {
+  izakaya: "🏮",
+  diningBar: "🍷",
+  creative: "🍽️",
+  japanese: "🍱",
+  western: "🍳",
+  italianFrench: "🍝",
+  chinese: "🥟",
+  yakiniku: "🥩",
+  korean: "🍲",
+  asianEthnic: "🍛",
+  international: "🌏",
+  karaoke: "🎤",
+  bar: "🍸",
+  ramen: "🍜",
+  okonomiyaki: "🥞",
+  cafe: "☕",
+  other: "🍽️",
+};
+
+export function genreIcon(genre: string): string {
+  return GENRE_ICONS[GENRE_KEYS[genre]] ?? "";
+}
+
 // 가게 종류로 고르기 (11/28 베타 설문): 근처 가게에 있는 종류만, 가게가 많은 종류부터. 종류가 비어 있는 가게는 뺌
 export function genresNearby(shops: { genre: string }[]): string[] {
   const counts = new Map<string, number>();
