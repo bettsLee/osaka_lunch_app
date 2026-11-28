@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  directionsUrl, displayPrice, distanceKm, formatDuration, genreLabel, genresNearby, lunchTimeShort, lunchTimeText, openNow, osakaNow,
+  directionsUrl, displayPrice, distanceKm, formatDuration, genreIcon, genreLabel, genresNearby, lunchTimeShort, lunchTimeText, openNow, osakaNow,
   pickNearby, pickShop, priceBadge, priceLabel, priceRange, priceUnknown, rouletteCandidates, SPIN_STEPS, spinSteps, tierInfo, underLimit,
   walkMinutes,
   areaCenters,
@@ -219,4 +219,11 @@ test("거리를 직접 고르면 그 거리만 보고 넓히지 않음", () => {
   assert.equal(r.widened, false);
   assert.equal(r.shops.length, 3);
   assert.equal(pickNearby(many(3, 0.8), HERE, "wed", [], [0.5]).shops.length, 0);
+});
+
+test("지도 핀 종류 그림: 핫페퍼 종류마다 하나, 모르는 종류는 빈 칸", () => {
+  assert.equal(genreIcon("ラーメン"), "🍜");
+  assert.equal(genreIcon("居酒屋"), "🏮");
+  assert.equal(genreIcon(""), "");
+  assert.equal(genreIcon("知らない"), "");
 });
